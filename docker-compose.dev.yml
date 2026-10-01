@@ -1,0 +1,50 @@
+# Development: stateful dependencies only.
+# Run API, worker, and web on the host for fast iteration.
+#
+# SailGuard dedicated host ports (loopback only — not exposed on LAN):
+#   API (host process) → 127.0.0.1:18080
+#   Web Vite (host)    → 127.0.0.1:15180
+#   Postgres           → 127.0.0.1:15433
+#   Redis              → 127.0.0.1:16380
+# Full map: docs/internal/ports.md
+#
+#   docker compose -f docker-compose.dev.yml up -d
+#   cp .env.example .env
+#   go run ./services/controlplane/cmd/api
+#   go run ./services/controlplane/cmd/worker
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sailguard-postgres
+    environment:
+      POSTGRES_USER: sailguard
+      POSTGRES_PASSWORD: sailguard
+      POSTGRES_DB: sailguard
+    ports:
+      - "127.0.0.1:15433:5432"
+    volumes:
+      - sailguard_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sailguard -d sailguard"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: sailguard-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:16380:6379"
+    volumes:
+      - sailguard_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  sailguard_pg_data:
+  sailguard_redis_data:

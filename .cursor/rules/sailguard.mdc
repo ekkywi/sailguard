@@ -1,0 +1,32 @@
+---
+description: SailGuard project conventions, ports, docs split, and guided-coding collaboration style
+alwaysApply: true
+---
+
+# SailGuard
+
+On-prem endpoint application control. Module path: `github.com/ekkywi/sailguard`.
+
+## Collaboration
+
+- User often codes manually: give small steps and explain purpose; do not dump full implementations unless asked.
+- Never silently remove planned features from checklists to “simplify” for solo pace.
+- Pace is flexible; order follows `docs/internal/roadmap.md` / checklist.
+
+## Docs
+
+- `docs/public/` — shareable product documentation (no lab passwords, no security-gap lists). **Committed.**
+- `docs/internal/` — engineering truth (checklist, merge, API matrix, handoff). **Gitignored — local only.**
+- Continuity: keep `docs/internal/handoff.md` + `CONTINUE_PROMPT.md` on each machine you use (copy privately).
+
+## Runtime (dev)
+
+- Compose: Postgres + Redis only.
+- Host: API `127.0.0.1:18080`, Web `127.0.0.1:15180`, Postgres `15433`, Redis `16380`.
+- See `docs/internal/ports.md`.
+
+## Data changes
+
+- Schema + RBAC catalog → goose migrations.
+- Lab admin users → `seeds/development/`.
+- Prefer `make migrate-up` (goose may live in `$(go env GOPATH)/bin`).

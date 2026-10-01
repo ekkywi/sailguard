@@ -1,0 +1,46 @@
+# Binaries & build output
+bin/
+dist/
+*.exe
+*.dll
+*.so
+*.dylib
+__debug_bin*
+*.test
+coverage.out
+*.prof
+*.out
+
+# Go
+vendor/
+
+# Node
+web/node_modules/
+web/dist/
+
+# Env & secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Local engineering docs (checklists, handoff, lab notes — not for remote)
+docs/internal/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# Agent local state (dev)
+.agent-data/
+
+# Logs
+*.log
+
+# Local compose overrides
+docker-compose.override.yml
