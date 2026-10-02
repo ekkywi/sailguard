@@ -43,12 +43,15 @@ make migrate-up
 go run ./services/controlplane/cmd/api
 cd web && npm run dev
 curl http://127.0.0.1:18080/v1/health
+# Auth smoke:
+# curl -s http://127.0.0.1:18080/v1/auth/login -H 'Content-Type: application/json' \
+#   -d '{"email":"admin@sailguard.local","password":"ChangeMe!SailGuard1"}'
 ```
 
 ## Milestone orientation
 
 - M0 done (scaffold).
-- M1 in progress: identity DB + admin seed + **pgx pool wired**; next **auth login/me** (JWT + bcrypt), then RBAC + ready.
+- M1 in progress: identity DB + admin seed + pgx pool + **login + /me** done; next **roles/permissions on /me**, RBAC middleware, `/ready`, Redis, web login.
 - Later: enroll, policy sync, enforce Level 1, alerts, full admin UI.
 
 ## When resuming

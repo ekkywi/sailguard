@@ -10,20 +10,28 @@ SailGuard exposes a versioned HTTP API under `/v1`. Responses use a consistent e
 { "ok": false, "error": { "code": "string", "message": "string" } }
 ```
 
-## Authentication
+## Authentication (administrators)
+
+| Step | Endpoint | Notes |
+|------|----------|--------|
+| Login | `POST /v1/auth/login` | JSON body: `email`, `password` → `access_token` (Bearer), `expires_in`, basic `user` |
+| Current user | `GET /v1/auth/me` | Header: `Authorization: Bearer <access_token>` |
+
+Tokens are signed access tokens (HMAC). Directory federation (for example LDAP/AD) may be added later without changing the Bearer pattern for API clients.
 
 | Client | Mechanism |
 |--------|-----------|
-| Administrators | Bearer access token after local login (directory federation may be added later) |
-| Agents | Bearer device credential issued at enrollment |
+| Administrators | Bearer access token after local login |
+| Agents | Bearer device credential issued at enrollment (planned) |
 
-Administrative APIs are further protected by role-based permissions. Agent credentials cannot call administrative routes.
+Administrative APIs are further protected by role-based permissions as routes come online. Agent credentials must not call administrative routes.
 
 ## Capability areas
 
 ### Identity & access
 
-Login, session/profile, password change, user administration, and role assignment.
+- **Available now:** login, current-user profile (`/auth/me`)
+- **Planned:** password change, logout/session revoke, user administration, role assignment APIs, richer `/me` (roles and permissions)
 
 ### Inventory
 
@@ -46,12 +54,13 @@ Event query, alerts, dashboard summaries, administrative audit logs, health endp
 ## Health
 
 - `GET /v1/health` — process liveness  
-- `GET /v1/ready` — dependency readiness (for orchestrators)
+- `GET /v1/ready` — dependency readiness for orchestrators (full probes rolling out)
 
 ## Notes for integrators
 
 - Prefer TLS everywhere in production deployments  
-- Treat enrollment tokens as secrets; prefer short TTL and use limits  
+- Treat enrollment tokens and JWT signing secrets as secrets; rotate when compromised  
+- Prefer short-lived access tokens; do not log raw Bearer tokens  
 - Agent event submissions should be batched and idempotent via client-generated event IDs  
 
 The exhaustive route and permission matrix used during implementation lives in internal engineering docs and is intentionally not duplicated here in full detail.

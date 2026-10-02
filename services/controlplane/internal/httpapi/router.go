@@ -5,13 +5,25 @@ import (
 	"net/http"
 
 	"github.com/ekkywi/sailguard/services/controlplane/internal/config"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func NewRouter(cfg config.Config) http.Handler {
+type API struct {
+	cfg  config.Config
+	pool *pgxpool.Pool
+}
+
+func NewRouter(cfg config.Config, pool *pgxpool.Pool) http.Handler {
+	api := &API{cfg: cfg, pool: pool}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/health", handleHealth)
 	mux.HandleFunc("GET /v1/ready", handleReady(cfg))
 	mux.HandleFunc("GET /v1/system/info", handleSystemInfo(cfg))
+
+	mux.HandleFunc("GET /v1/auth/me", api.handleMe)
+	mux.HandleFunc("POST /v1/auth/login", api.handleLogin)
+
+	_ = api
 	return mux
 }
 
@@ -37,7 +49,7 @@ func handleReady(cfg config.Config) http.HandlerFunc {
 		writeJSON(w, http.StatusOK, envelope{
 			OK: true,
 			Data: map[string]any{
-				"status":    "ok",
+				"status":     "ok",
 				"db_url_set": cfg.DBURL != "",
 				"redis_set":  cfg.RedisURL != "",
 				"note":       "connectivity probes not implemented yet",

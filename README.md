@@ -19,8 +19,8 @@ pkgs/                  shared Go (policy merge + agent contracts)
 services/controlplane/ API + worker
 agent/                 multi-OS agent
 web/                   admin UI
-docs/public/           shareable product documentation
-docs/internal/         engineering notes & checklists
+docs/public/           shareable product documentation (in git)
+docs/internal/         engineering notes (local only — gitignored)
 deploy/docker/         production images
 ```
 
@@ -28,7 +28,7 @@ deploy/docker/         production images
 
 Docker runs **only Postgres + Redis**. API, worker, and web run on the host so code changes are fast.
 
-Dev Docker / host ports (SailGuard-specific, loopback): see [docs/internal/ports.md](docs/internal/ports.md).
+Dev Docker / host ports (SailGuard-specific, loopback): see [docs/public/deployment-overview.md](docs/public/deployment-overview.md) and local `docs/internal/ports.md` if present.
 
 | Service | Address |
 |---------|---------|
@@ -46,7 +46,8 @@ make build-worker                        # separate terminal
 cd web && npm install && npm run dev
 ```
 
-Health check: `curl http://127.0.0.1:18080/v1/health`
+Health: `curl http://127.0.0.1:18080/v1/health`  
+Auth (after seed): `POST /v1/auth/login` then `GET /v1/auth/me` with Bearer token — see [docs/public/api-overview.md](docs/public/api-overview.md).
 
 More detail: [docs/internal/dev-workflow.md](docs/internal/dev-workflow.md).
 

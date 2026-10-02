@@ -15,8 +15,10 @@ SailGuard combines a privileged endpoint agent with a centralized policy control
 ### Transport and authentication
 
 - Agent and administrator traffic are expected to use **TLS** in production  
+- Administrators authenticate with **local accounts** today and receive a **Bearer access token** for API calls; directory federation may be added later  
 - Each enrolled device receives a **unique credential**; credentials are stored hashed on the server  
-- Administrative APIs require authenticated principals and **RBAC** permissions  
+- Administrative APIs require authenticated principals and **RBAC** permissions as those routes are enabled  
+- Passwords are stored only as one-way hashes; JWT signing material must come from environment or a secret store—not source control  
 
 ### Authorization and change control
 

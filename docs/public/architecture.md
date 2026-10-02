@@ -29,7 +29,7 @@ Agents evaluate policy locally so enforcement continues during brief control-pla
 | Component | Responsibility |
 |-----------|----------------|
 | **Agent** | Device enrollment, policy synchronization, process observation, enforcement, event submission |
-| **API** | Authentication, authorization, configuration APIs, agent-facing endpoints |
+| **API** | Authentication (local admin login + Bearer tokens), authorization, configuration APIs, agent-facing endpoints |
 | **Worker** | Asynchronous processing (event pipelines, notifications, retention jobs) |
 | **Web console** | Administrative UI for devices, policies, events, and users |
 | **PostgreSQL** | Durable storage for configuration, identity, and events |
