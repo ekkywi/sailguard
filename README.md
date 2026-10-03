@@ -47,6 +47,7 @@ cd web && npm install && npm run dev
 ```
 
 Health: `curl http://127.0.0.1:18080/v1/health`  
+Ready: `curl http://127.0.0.1:18080/v1/ready` (`db` probed; `redis` null until client wired)  
 Auth (after seed): `POST /v1/auth/login` then `GET /v1/auth/me` with Bearer token — see [docs/public/api-overview.md](docs/public/api-overview.md).
 
 More detail: [docs/internal/dev-workflow.md](docs/internal/dev-workflow.md).

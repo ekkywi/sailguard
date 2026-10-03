@@ -30,8 +30,8 @@ Administrative APIs are further protected by role-based permissions as routes co
 
 ### Identity & access
 
-- **Available now:** login, current-user profile (`/auth/me`)
-- **Planned:** password change, logout/session revoke, user administration, role assignment APIs, richer `/me` (roles and permissions)
+- **Available now:** login; current-user profile with roles and permission codes (`/auth/me`)
+- **Planned:** password change, logout/session revoke, user administration and role assignment APIs
 
 ### Inventory
 
@@ -54,7 +54,7 @@ Event query, alerts, dashboard summaries, administrative audit logs, health endp
 ## Health
 
 - `GET /v1/health` — process liveness  
-- `GET /v1/ready` — dependency readiness for orchestrators (full probes rolling out)
+- `GET /v1/ready` — dependency readiness (`data.db` boolean; `data.redis` appears when the Redis client is wired)
 
 ## Notes for integrators
 

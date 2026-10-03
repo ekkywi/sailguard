@@ -13,8 +13,9 @@ description: >-
 
 1. Read `docs/internal/handoff.md` if present (folder is gitignored — may be missing on fresh clones).
 2. Skim `docs/internal/checklist-mvp.md` when available — do not delete unchecked items.
-3. Respect `docs/internal/ports.md` or `docs/public/deployment-overview.md` + README ports table.
-4. If `docs/internal/` is missing, ask the user to restore it or rely on code + `docs/public/`.
+3. Read `docs/internal/academic-path.md` when discussing scope, titles, magang vs skripsi — keep technical work aligned with the internship→thesis path.
+4. Respect `docs/internal/ports.md` or `docs/public/deployment-overview.md` + README ports table.
+5. If `docs/internal/` is missing, ask the user to restore it or rely on code + `docs/public/`.
 
 ## How to work with this user
 
@@ -43,6 +44,7 @@ make migrate-up
 go run ./services/controlplane/cmd/api
 cd web && npm run dev
 curl http://127.0.0.1:18080/v1/health
+curl -s http://127.0.0.1:18080/v1/ready
 # Auth smoke:
 # curl -s http://127.0.0.1:18080/v1/auth/login -H 'Content-Type: application/json' \
 #   -d '{"email":"admin@sailguard.local","password":"ChangeMe!SailGuard1"}'
@@ -51,7 +53,7 @@ curl http://127.0.0.1:18080/v1/health
 ## Milestone orientation
 
 - M0 done (scaffold).
-- M1 in progress: identity DB + admin seed + pgx pool + **login + /me** done; next **roles/permissions on /me**, RBAC middleware, `/ready`, Redis, web login.
+- M1 in progress: identity DB + seed + login + `/me` (roles/perms) + RBAC middleware + `/ready` DB probe **done**; next **Redis client + ready redis + Streams skeleton**, then web login.
 - Later: enroll, policy sync, enforce Level 1, alerts, full admin UI.
 
 ## When resuming

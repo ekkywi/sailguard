@@ -18,6 +18,7 @@ On-prem endpoint application control. Module path: `github.com/ekkywi/sailguard`
 - `docs/public/` — shareable product documentation (no lab passwords, no security-gap lists). **Committed.**
 - `docs/internal/` — engineering truth (checklist, merge, API matrix, handoff). **Gitignored — local only.**
 - Continuity: keep `docs/internal/handoff.md` + `CONTINUE_PROMPT.md` on each machine you use (copy privately).
+- Academic path: `docs/internal/academic-path.md` (magang prototipe → skripsi pengembangan). Do not inflate internship scope into full thesis work without the user asking.
 
 ## Runtime (dev)
 

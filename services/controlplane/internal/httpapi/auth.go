@@ -26,47 +26,57 @@ func bearerToken(r *http.Request) (string, bool) {
 }
 
 func (a *API) handleMe(w http.ResponseWriter, r *http.Request) {
-	raw, ok := bearerToken(r)
-	if !ok || raw == "" {
+	userID, ok := userIDFromCtx(r.Context())
+	if !ok {
 		writeJSON(w, http.StatusUnauthorized, envelope{
-			OK:    false,
-			Error: map[string]any{"code": "unauthorized", "message": "missing bearer tokenn"},
-		})
-		return
-	}
-
-	claims, err := auth.ParseAccessToken(a.cfg.JWTSecret, raw)
-	if err != nil {
-		writeJSON(w, http.StatusUnauthorized, envelope{
-			OK:    false,
-			Error: map[string]any{"code": "unauthorized", "message": "invalid or expired token"},
+			OK: false,
+			Error: map[string]any{"code": "unauthorized", "message": "missing auth context"},
 		})
 		return
 	}
 
 	store := identity.NewStore(a.pool)
-	user, err := store.FindByEmail(r.Context(), claims.Email)
+	user, err := store.FindByID(r.Context(), userID)
 	if errors.Is(err, identity.ErrNotFound) || (user != nil && !user.IsActive) {
 		writeJSON(w, http.StatusUnauthorized, envelope{
-			OK:    false,
+			OK: false,
 			Error: map[string]any{"code": "unauthorized", "message": "user not found or inactive"},
 		})
 		return
 	}
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, envelope{
-			OK:    false,
-			Error: map[string]any{"code": "internal_server", "message": "failed to load user"},
+			OK: false,
+			Error: map[string]any{"code": "internal_error", "message": "failed to load user"},
 		})
 		return
+	}
+
+	roles, err := store.ListRoleCodes(r.Context(), user.ID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{
+			OK: false, 
+			Error: map[string]any{"code": "internal_error", "message": "failed to load roles"},
+		})
+		return
+	}
+	if roles == nil {
+		roles = []string{}
+	}
+
+	perms, ok := permissionsFromCtx(r.Context())
+	if !ok || perms == nil {
+		perms = []string{}
 	}
 
 	writeJSON(w, http.StatusOK, envelope{
 		OK: true,
 		Data: map[string]any{
-			"id":    user.ID.String(),
+			"id": user.ID.String(),
 			"email": user.Email,
-			"name":  user.Name,
+			"name": user.Name,
+			"roles": roles,
+			"permissions": perms,
 		},
 	})
 }

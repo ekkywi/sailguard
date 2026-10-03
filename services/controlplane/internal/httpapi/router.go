@@ -17,10 +17,10 @@ func NewRouter(cfg config.Config, pool *pgxpool.Pool) http.Handler {
 	api := &API{cfg: cfg, pool: pool}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/health", handleHealth)
-	mux.HandleFunc("GET /v1/ready", handleReady(cfg))
+	mux.HandleFunc("GET /v1/ready", api.handleReady)
 	mux.HandleFunc("GET /v1/system/info", handleSystemInfo(cfg))
 
-	mux.HandleFunc("GET /v1/auth/me", api.handleMe)
+	mux.HandleFunc("GET /v1/auth/me", api.requireAuth(api.handleMe))
 	mux.HandleFunc("POST /v1/auth/login", api.handleLogin)
 
 	_ = api
@@ -43,19 +43,31 @@ func handleHealth(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, envelope{OK: true, Data: map[string]any{"status": "ok"}})
 }
 
-func handleReady(cfg config.Config) http.HandlerFunc {
-	return func(w http.ResponseWriter, _ *http.Request) {
-		// Full DB/Redis probes arrive with migrations milestone.
-		writeJSON(w, http.StatusOK, envelope{
-			OK: true,
+func (a *API) handleReady(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if err := a.pool.Ping(ctx); err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "not_ready",
+				"message": "database unavailable",
+			},
 			Data: map[string]any{
-				"status":     "ok",
-				"db_url_set": cfg.DBURL != "",
-				"redis_set":  cfg.RedisURL != "",
-				"note":       "connectivity probes not implemented yet",
+				"db":    false,
+				"redis": nil,
 			},
 		})
+		return
 	}
+
+	writeJSON(w, http.StatusOK, envelope{
+		OK: true,
+		Data: map[string]any{
+			"status": "ok",
+			"db":     true,
+			"redis":  nil,
+		},
+	})
 }
 
 func handleSystemInfo(cfg config.Config) http.HandlerFunc {
