@@ -54,7 +54,7 @@ Event query, alerts, dashboard summaries, administrative audit logs, health endp
 ## Health
 
 - `GET /v1/health` — process liveness  
-- `GET /v1/ready` — dependency readiness (`data.db` boolean; `data.redis` appears when the Redis client is wired)
+- `GET /v1/ready` — dependency readiness (`data.db` and `data.redis` booleans; unavailable dependencies return HTTP 503)
 
 ## Notes for integrators
 

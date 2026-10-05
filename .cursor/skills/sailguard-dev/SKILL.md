@@ -44,7 +44,9 @@ make migrate-up
 go run ./services/controlplane/cmd/api
 cd web && npm run dev
 curl http://127.0.0.1:18080/v1/health
-curl -s http://127.0.0.1:18080/v1/ready
+curl -s http://127.0.0.1:18080/v1/ready   # db + redis true
+# go run ./services/controlplane/cmd/worker
+# redis-cli -p 16380 XADD sg:events '*' type heartbeat note hello
 # Auth smoke:
 # curl -s http://127.0.0.1:18080/v1/auth/login -H 'Content-Type: application/json' \
 #   -d '{"email":"admin@sailguard.local","password":"ChangeMe!SailGuard1"}'
@@ -53,7 +55,7 @@ curl -s http://127.0.0.1:18080/v1/ready
 ## Milestone orientation
 
 - M0 done (scaffold).
-- M1 in progress: identity DB + seed + login + `/me` (roles/perms) + RBAC middleware + `/ready` DB probe **done**; next **Redis client + ready redis + Streams skeleton**, then web login.
+- M1 in progress: identity/auth/RBAC + `/ready` (DB+Redis) + Redis Streams skeleton **done**; next **web login page**.
 - Later: enroll, policy sync, enforce Level 1, alerts, full admin UI.
 
 ## When resuming

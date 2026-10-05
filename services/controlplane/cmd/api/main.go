@@ -12,6 +12,7 @@ import (
 	"github.com/ekkywi/sailguard/services/controlplane/internal/config"
 	"github.com/ekkywi/sailguard/services/controlplane/internal/db"
 	"github.com/ekkywi/sailguard/services/controlplane/internal/httpapi"
+	"github.com/ekkywi/sailguard/services/controlplane/internal/redisx"
 )
 
 func main() {
@@ -25,9 +26,16 @@ func main() {
 	defer pool.Close()
 	log.Println("database connected")
 
+	rdb, err := redisx.Connect(ctx, cfg.RedisURL)
+	if err != nil {
+		log.Fatalf("redis: %v", err)
+	}
+	defer rdb.Close()
+	log.Println("redis connected")
+
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           httpapi.NewRouter(cfg, pool),
+		Handler:           httpapi.NewRouter(cfg, pool, rdb),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

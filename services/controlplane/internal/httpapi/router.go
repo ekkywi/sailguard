@@ -6,15 +6,17 @@ import (
 
 	"github.com/ekkywi/sailguard/services/controlplane/internal/config"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 )
 
 type API struct {
 	cfg  config.Config
 	pool *pgxpool.Pool
+	rdb  *redis.Client
 }
 
-func NewRouter(cfg config.Config, pool *pgxpool.Pool) http.Handler {
-	api := &API{cfg: cfg, pool: pool}
+func NewRouter(cfg config.Config, pool *pgxpool.Pool, rdb *redis.Client) http.Handler {
+	api := &API{cfg: cfg, pool: pool, rdb: rdb}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/health", handleHealth)
 	mux.HandleFunc("GET /v1/ready", api.handleReady)
@@ -45,29 +47,38 @@ func handleHealth(w http.ResponseWriter, _ *http.Request) {
 
 func (a *API) handleReady(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	if err := a.pool.Ping(ctx); err != nil {
+
+	dbOK := a.pool.Ping(ctx) == nil
+	redisOK := a.rdb.Ping(ctx).Err() == nil
+
+	data := map[string]any{
+		"db":    dbOK,
+		"redis": redisOK,
+	}
+
+	if !dbOK || !redisOK {
+		msg := "dependency unavailable"
+		switch {
+		case !dbOK && !redisOK:
+			msg = "database and redis unavailable"
+		case !dbOK:
+			msg = "database unavailable"
+		case !redisOK:
+			msg = "redis unavailable"
+		}
 		writeJSON(w, http.StatusServiceUnavailable, envelope{
 			OK: false,
 			Error: map[string]any{
-				"code":    "not_ready",
-				"message": "database unavailable",
+				"code": "not_ready",
+				"message": msg,
 			},
-			Data: map[string]any{
-				"db":    false,
-				"redis": nil,
-			},
+			Data: data,
 		})
 		return
 	}
 
-	writeJSON(w, http.StatusOK, envelope{
-		OK: true,
-		Data: map[string]any{
-			"status": "ok",
-			"db":     true,
-			"redis":  nil,
-		},
-	})
+	data["status"] = "ok"
+	writeJSON(w, http.StatusOK, envelope{OK: true, Data: data})
 }
 
 func handleSystemInfo(cfg config.Config) http.HandlerFunc {

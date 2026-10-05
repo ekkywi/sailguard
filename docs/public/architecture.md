@@ -30,10 +30,10 @@ Agents evaluate policy locally so enforcement continues during brief control-pla
 |-----------|----------------|
 | **Agent** | Device enrollment, policy synchronization, process observation, enforcement, event submission |
 | **API** | Authentication (local admin login + Bearer tokens), authorization, configuration APIs, agent-facing endpoints |
-| **Worker** | Asynchronous processing (event pipelines, notifications, retention jobs) |
+| **Worker** | Asynchronous processing via Redis Streams (event pipelines, notifications, retention jobs) |
 | **Web console** | Administrative UI for devices, policies, events, and users |
 | **PostgreSQL** | Durable storage for configuration, identity, and events |
-| **Redis** | Durable-enough job streams and ephemeral cache (not the system of record for business data) |
+| **Redis** | Job streams (for example event ingest) and ephemeral cache (not the system of record for business data) |
 
 ## Policy evaluation model
 
