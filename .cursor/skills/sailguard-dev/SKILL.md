@@ -50,13 +50,16 @@ curl -s http://127.0.0.1:18080/v1/ready   # db + redis true
 # Auth smoke:
 # curl -s http://127.0.0.1:18080/v1/auth/login -H 'Content-Type: application/json' \
 #   -d '{"email":"admin@sailguard.local","password":"ChangeMe!SailGuard1"}'
+# Inventory smoke (Bearer token):
+# curl -s http://127.0.0.1:18080/v1/groups -H "Authorization: Bearer $TOKEN"
+# curl -s http://127.0.0.1:18080/v1/devices -H "Authorization: Bearer $TOKEN"
 ```
 
 ## Milestone orientation
 
 - M0 done (scaffold).
-- M1 foundation **done** (auth/RBAC, `/ready` DB+Redis, Streams skeleton, web login).
-- Next: **M2 inventory & enroll** (devices/groups/tokens, agent enroll).
+- M1 foundation **done** (auth/RBAC, `/ready`, Streams skeleton, web login + theme).
+- M2 **in progress**: inventory schema `00003` + groups/devices admin APIs **done**; next **enrollment tokens + agent enroll**, then web inventory pages.
 - Later: policy sync, enforce Level 1, alerts, full admin UI.
 
 ## When resuming

@@ -35,7 +35,8 @@ Administrative APIs are further protected by role-based permissions as routes co
 
 ### Inventory
 
-Devices, groups, membership, enrollment tokens, and credential rotation.
+- **Available now:** list/create/get device groups; list/get devices (admin Bearer + `device.read` / `device.write`)
+- **Planned:** group membership, enrollment tokens, credential rotation, agent enroll channel wiring in the product surface
 
 ### Policy
 

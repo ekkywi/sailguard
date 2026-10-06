@@ -4,7 +4,7 @@ This document describes the agent ↔ control plane contract at a product level.
 
 ## Lifecycle
 
-1. **Enroll** with a one-time (or limited-use) enrollment token  
+1. **Enroll** with a one-time (or limited-use) enrollment token *(control-plane enroll endpoint planned; inventory tables for tokens/credentials exist)*  
 2. Receive a unique **device credential** and recommended sync intervals  
 3. **Poll / pull effective policy** (version + content hash)  
 4. Continuously evaluate local processes against cached policy  
