@@ -1,11 +1,16 @@
-import { FormEvent, useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
-import { getToken, setToken } from '../../lib/auth-storage';
-import { login } from './api';
+import { FormEvent, useId, useState } from 'react'
+import { Navigate, useNavigate } from 'react-router-dom'
+import { ThemeToggle } from '../../components/ThemeToggle'
+import { getToken, setToken } from '../../lib/auth-storage'
+import { login } from './api'
 
 export default function LoginPage() {
   const navigate = useNavigate()
-  const [email, setEmail] = useState('admin@sailguard.local')
+  const emailId = useId()
+  const passwordId = useId()
+  const errorId = useId()
+
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -30,42 +35,71 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="page">
-      <p className="eyebrow">SailGuard</p>
-      <h1>Sign in</h1>
-      <p className="lede">Use your control-plane admin account.</p>
+    <div className="login-screen">
+      <div className="login-theme">
+        <ThemeToggle />
+      </div>
 
-      <form
-        onSubmit={onSubmit}
-        style={{ maxWidth: 360, display: 'grid', gap: '0.75rem' }}
-      >
-        <label>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            autoComplete="username"
-            style={{ display: 'block', width: '100%', marginTop: 4 }}
-          />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            autoComplete="current-password"
-            style={{ display: 'block', width: '100%', marginTop: 4 }}
-          />
-        </label>
-        {error && <p style={{ color: '#b91c1c', margin: 0 }}>{error}</p>}
-        <button type="submit" disabled={loading}>
-          {loading ? 'Signing in…' : 'Sign in'}
-        </button>
-      </form>
-    </main>
+      <div className="login-panel">
+        <h1 className="login-brand">SailGuard</h1>
+        <p className="lede lede-tight">Sign in to the control plane</p>
+
+        <form className="form" onSubmit={onSubmit} noValidate>
+          <div className="field">
+            <label className="label" htmlFor={emailId}>
+              Email
+            </label>
+            <input
+              id={emailId}
+              className="input"
+              type="email"
+              name="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="username"
+              placeholder="admin@example.com"
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? errorId : undefined}
+            />
+          </div>
+
+          <div className="field">
+            <label className="label" htmlFor={passwordId}>
+              Password
+            </label>
+            <input
+              id={passwordId}
+              className="input"
+              type="password"
+              name="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? errorId : undefined}
+            />
+          </div>
+
+          {error ? (
+            <p id={errorId} className="error" role="alert">
+              {error}
+            </p>
+          ) : null}
+
+          <button
+            type="submit"
+            className="btn btn-primary btn-block"
+            disabled={loading}
+            aria-busy={loading}
+          >
+            {loading ? 'Signing in…' : 'Sign in'}
+          </button>
+        </form>
+      </div>
+
+      <p className="login-footer">Endpoint application control · on-premises</p>
+    </div>
   )
 }

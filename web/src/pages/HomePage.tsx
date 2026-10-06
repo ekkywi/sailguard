@@ -1,11 +1,9 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { clearToken } from '../lib/auth-storage';
-import { fetchMe } from '../features/auth/api';
-import type { Me } from '../features/auth/types';
+import { useEffect, useState } from 'react'
+import { AppShell } from '../components/AppShell'
+import { fetchMe } from '../features/auth/api'
+import type { Me } from '../features/auth/types'
 
 export default function HomePage() {
-  const navigate = useNavigate()
   const [me, setMe] = useState<Me | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -17,29 +15,64 @@ export default function HomePage() {
       )
   }, [])
 
-  function logout() {
-    clearToken()
-    navigate('/login', { replace: true })
-  }
+  const userLabel = me ? me.email : null
 
   return (
-    <main className="page">
-      <p className="eyebrow">SailGuard</p>
-      <h1>Control plane</h1>
-      {error && <p style={{ color: '#b91c1c' }}>{error}</p>}
-      {me ? (
-        <>
+    <AppShell userLabel={userLabel}>
+      <div className="stack">
+        <header>
+          <p className="section-label">Overview</p>
+          <h1 className="title">Control plane</h1>
           <p className="lede">
-            Signed in as <strong>{me.name}</strong> ({me.email})
+            Signed-in session and role summary for this admin account.
           </p>
-          <p className="muted">Roles: {me.roles.join(', ') || '—'}</p>
-          <button type="button" onClick={logout}>
-            Sign out
-          </button>
-        </>
-      ) : (
-        !error && <p className="muted">Loading profile…</p>
-      )}
-    </main>
+        </header>
+
+        {error ? (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        ) : null}
+
+        {!me && !error ? <p className="loading">Loading profile…</p> : null}
+
+        {me ? (
+          <div className="info-list" aria-label="Account details">
+            <div className="info-row">
+              <span className="info-key">Name</span>
+              <span className="info-val">{me.name}</span>
+            </div>
+            <div className="info-row">
+              <span className="info-key">Email</span>
+              <span className="info-val">{me.email}</span>
+            </div>
+            <div className="info-row">
+              <span className="info-key">Roles</span>
+              <span className="info-val">
+                {me.roles.length ? (
+                  <span className="badge-row">
+                    {me.roles.map((role) => (
+                      <span key={role} className="badge">
+                        {role}
+                      </span>
+                    ))}
+                  </span>
+                ) : (
+                  '—'
+                )}
+              </span>
+            </div>
+            <div className="info-row">
+              <span className="info-key">Permissions</span>
+              <span className="info-val muted">
+                {me.permissions.length
+                  ? `${me.permissions.length} granted`
+                  : '—'}
+              </span>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </AppShell>
   )
 }
