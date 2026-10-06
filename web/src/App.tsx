@@ -1,21 +1,7 @@
-import { Link, Route, Routes } from 'react-router-dom'
-
-function Home() {
-  return (
-    <main className="page">
-      <p className="eyebrow">SailGuard</p>
-      <h1>Control plane</h1>
-      <p className="lede">
-        Admin UI scaffold. Auth, devices, and policies arrive in later milestones.
-      </p>
-      <p>
-        <a href="/v1/health" target="_blank" rel="noreferrer">
-          Check API /v1/health
-        </a>
-      </p>
-    </main>
-  )
-}
+import { Link, Route, Routes } from 'react-router-dom';
+import { RequireAuth } from './features/auth/RequireAuth';
+import LoginPage from './features/auth/LoginPage';
+import HomePage from './pages/HomePage';
 
 export default function App() {
   return (
@@ -25,11 +11,19 @@ export default function App() {
           SailGuard
         </Link>
         <nav>
-          <span className="muted">MVP scaffold</span>
+          <span className="muted">MVP</span>
         </nav>
       </header>
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route
+          path="/"
+          element={
+            <RequireAuth>
+              <HomePage />
+            </RequireAuth>
+          }
+        />
       </Routes>
     </div>
   )

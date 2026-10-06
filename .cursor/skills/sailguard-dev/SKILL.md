@@ -55,8 +55,9 @@ curl -s http://127.0.0.1:18080/v1/ready   # db + redis true
 ## Milestone orientation
 
 - M0 done (scaffold).
-- M1 in progress: identity/auth/RBAC + `/ready` (DB+Redis) + Redis Streams skeleton **done**; next **web login page**.
-- Later: enroll, policy sync, enforce Level 1, alerts, full admin UI.
+- M1 foundation **done** (auth/RBAC, `/ready` DB+Redis, Streams skeleton, web login).
+- Next: **M2 inventory & enroll** (devices/groups/tokens, agent enroll).
+- Later: policy sync, enforce Level 1, alerts, full admin UI.
 
 ## When resuming
 

@@ -30,8 +30,8 @@ Administrative APIs are further protected by role-based permissions as routes co
 
 ### Identity & access
 
-- **Available now:** login; current-user profile with roles and permission codes (`/auth/me`)
-- **Planned:** password change, logout/session revoke, user administration and role assignment APIs
+- **Available now:** login; current-user profile with roles and permission codes (`/auth/me`); admin web console sign-in against these endpoints
+- **Planned:** password change, logout/session revoke (server-side), user administration and role assignment APIs
 
 ### Inventory
 

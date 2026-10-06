@@ -35,7 +35,7 @@ func (c *Client) Produce(ctx context.Context, stream string, values map[string]a
 func (c *Client) EnsureGroup(ctx context.Context, stream, group string) error {
 	err := c.rdb.XGroupCreateMkStream(ctx, stream, group, "0").Err()
 	if err != nil && err.Error() != "BUSYGROUP Consumer Group name already exists" {
-		return fmt.Errorf("xgroup create %s/%s: stream, group, err")
+		return fmt.Errorf("xgroup create %s / %s: stream, group, err")
 	}
 	return nil
 }

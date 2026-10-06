@@ -48,7 +48,8 @@ cd web && npm install && npm run dev
 
 Health: `curl http://127.0.0.1:18080/v1/health`  
 Ready: `curl http://127.0.0.1:18080/v1/ready` (expects `db` and `redis` true when Compose deps are up)  
-Auth (after seed): `POST /v1/auth/login` then `GET /v1/auth/me` with Bearer token — see [docs/public/api-overview.md](docs/public/api-overview.md).
+Auth (after seed): `POST /v1/auth/login` then `GET /v1/auth/me` with Bearer token — see [docs/public/api-overview.md](docs/public/api-overview.md).  
+Web console: http://127.0.0.1:15180/login (lab admin after seed).
 
 More detail: [docs/internal/dev-workflow.md](docs/internal/dev-workflow.md).
 
