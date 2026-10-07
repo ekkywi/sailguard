@@ -28,3 +28,15 @@ type Device struct {
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }
+
+type EnrollmentToken struct {
+	ID        uuid.UUID
+	Label     string
+	TokenHash string
+	MaxUses   int
+	UseCount  int
+	ExpiresAt *time.Time
+	RevokedAt *time.Time
+	CreatedBy *uuid.UUID
+	CreatedAt time.Time
+}
