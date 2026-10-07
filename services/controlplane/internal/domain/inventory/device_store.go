@@ -80,3 +80,29 @@ func (s *Store) FindDeviceByID(ctx context.Context, id uuid.UUID) (*Device, erro
 	}
 	return &d, nil
 }
+
+func (s *Store) CreateDevice(
+	ctx context.Context,
+	hostname, displayName, os, osVersion, agentVersion string,
+	machineGUID *string,
+) (*Device, error) {
+	const q = `
+		INSERT INTO devices (
+			hostname, display_name, os, os_version, agent_version,
+			machine_guid, status, enrolled_at
+		) VALUES ($1, $2, $3, $4, $5, $6, 'active', now())
+		 RETURNING id, hostname, display_name, os, os_version, agent_version,
+		 	machine_guid, status, last_seen_at, enrolled_at, created_at, updated_at
+	`
+	var d Device
+	err := s.pool.QueryRow(
+		ctx, q, hostname, displayName, os, osVersion, agentVersion, machineGUID,
+	).Scan(
+		&d.ID, &d.Hostname, &d.DisplayName, &d.OS, &d.OSVersion, &d.AgentVersion,
+		&d.MachineGUID, &d.Status, &d.LastSeenAt, &d.EnrolledAt, &d.CreatedAt, &d.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &d, nil
+}

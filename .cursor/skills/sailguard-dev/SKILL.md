@@ -53,15 +53,20 @@ curl -s http://127.0.0.1:18080/v1/ready   # db + redis true
 # Inventory smoke (Bearer token):
 # curl -s http://127.0.0.1:18080/v1/groups -H "Authorization: Bearer $TOKEN"
 # curl -s http://127.0.0.1:18080/v1/devices -H "Authorization: Bearer $TOKEN"
+# curl -s http://127.0.0.1:18080/v1/enrollment-tokens -H "Authorization: Bearer $TOKEN" \
+#   -H 'Content-Type: application/json' -d '{"label":"lab","max_uses":5}'
+# Agent enroll (after POST /v1/agent/enroll is wired):
+# curl -s http://127.0.0.1:18080/v1/agent/enroll -H 'Content-Type: application/json' \
+#   -d '{"schema_version":1,"enrollment_token":"…","hostname":"lab-pc","machine_guid":"g1","os_family":"windows","os_version":"10","agent_version":"0.0.1"}'
 ```
 
 ## Milestone orientation
 
 - M0 done (scaffold).
 - M1 foundation **done** (auth/RBAC, `/ready`, Streams skeleton, web login + theme).
-- M2 **in progress**: inventory schema `00003` + groups/devices admin APIs **done**; next **enrollment tokens + agent enroll**, then web inventory pages.
+- M2 **in progress**: schema `00003` + groups/devices + enrollment-token admin APIs + domain `EnrollDevice` **done**; next **`POST /v1/agent/enroll` HTTP (D)**, then web inventory / group members / agent client.
 - Later: policy sync, enforce Level 1, alerts, full admin UI.
 
 ## When resuming
 
-State the next concrete step from `handoff.md`. If handoff conflicts with the repo, trust the repo + checklist and update handoff guidance for the user.
+State the next concrete step from `handoff.md` (currently: wire `handleAgentEnroll`). If handoff conflicts with the repo, trust the repo + checklist and update handoff guidance for the user.

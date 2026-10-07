@@ -85,6 +85,27 @@ func (s *Store) FindEnrollmentTokenByID(ctx context.Context, id uuid.UUID) (*Enr
 	return &t, nil
 }
 
+func (s *Store) FindEnrollmentTokenByHash(ctx context.Context, tokenHash string) (*EnrollmentToken, error) {
+	const q = `
+		SELECT id, label, token_hash, max_uses, use_count,
+		       expires_at, revoked_at, created_by, created_at
+		FROM enrollment_tokens
+		WHERE token_hash = $1
+	`
+	var t EnrollmentToken
+	err := s.pool.QueryRow(ctx, q, tokenHash).Scan(
+		&t.ID, &t.Label, &t.TokenHash, &t.MaxUses, &t.UseCount,
+		&t.ExpiresAt, &t.RevokedAt, &t.CreatedBy, &t.CreatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
+
 func (s *Store) RevokeEnrollmentToken(ctx context.Context, id uuid.UUID) (*EnrollmentToken, error) {
 	const q = `
 		UPDATE enrollment_tokens
@@ -106,4 +127,26 @@ func (s *Store) RevokeEnrollmentToken(ctx context.Context, id uuid.UUID) (*Enrol
 		return nil, err
 	}
 	return &t, nil
+}
+
+func (s *Store) IncrementEnrollmentTokenUse(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
+	const q = `
+		UPDATE enrollment_tokens
+		SET use_count = use_count + 1
+		WHERE id = $1
+			AND revoked_at IS NULL
+			AND use_count < max_uses
+			AND (expires_at IS NULL OR expires_at > now())
+		RETURNING use_count
+	`
+
+	var useCount int
+	err := tx.QueryRow(ctx, q, id).Scan(&useCount)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrEnrollmentExhausted
+	}
+	if err != nil {
+		return err
+	}
+	return nil
 }
