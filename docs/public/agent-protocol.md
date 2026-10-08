@@ -4,7 +4,7 @@ This document describes the agent ↔ control plane contract at a product level.
 
 ## Lifecycle
 
-1. **Enroll** with a one-time (or limited-use) enrollment token via `POST /v1/agent/enroll` *(admin can already mint/revoke tokens; agent enroll HTTP is landing next — see API overview)*  
+1. **Enroll** with a one-time (or limited-use) enrollment token via `POST /v1/agent/enroll` *(admins mint/revoke tokens in the console or API)*  
 2. Receive a unique **device credential** and recommended sync intervals  
 3. **Poll / pull effective policy** (version + content hash)  
 4. Continuously evaluate local processes against cached policy  

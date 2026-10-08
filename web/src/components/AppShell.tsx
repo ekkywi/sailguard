@@ -152,13 +152,10 @@ export function AppShell({ children, userLabel }: AppShellProps) {
               <IconDevices />
               <span className="nav-label">Devices</span>
             </NavLink>
-            <span
-              className="nav-link nav-link-disabled"
-              title="Groups (coming soon)"
-            >
+            <NavLink to="/groups" className={navClass} title="Groups">
               <IconGroups />
               <span className="nav-label">Groups</span>
-            </span>
+            </NavLink>
             <NavLink to="/tokens" className={navClass} title="Tokens">
               <IconTokens />
               <span className="nav-label">Tokens</span>

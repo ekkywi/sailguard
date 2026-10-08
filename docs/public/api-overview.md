@@ -35,8 +35,8 @@ Administrative APIs are further protected by role-based permissions as routes co
 
 ### Inventory
 
-- **Available now:** list/create/get device groups; list/get devices; create/list/revoke enrollment tokens (admin Bearer + `device.read` / `device.write`). Create enrollment token returns the plaintext secret once.
-- **Planned:** group membership, device PATCH, credential rotation, admin UI for inventory
+- **Available now:** list/create/get device groups; list/get devices; create/list/revoke enrollment tokens (admin Bearer + `device.read` / `device.write`). Create enrollment token returns the plaintext secret once. Admin web console covers Devices, Groups, and Tokens pages.
+- **Planned:** group membership, device PATCH, credential rotation
 
 ### Policy
 
@@ -44,7 +44,7 @@ Policies, rules, assignments, categories, device overrides, and publish.
 
 ### Agent channel
 
-- **In progress:** enrollment (`POST /v1/agent/enroll`) — control-plane domain ready; HTTP agent route landing next  
+- **Available now:** enrollment (`POST /v1/agent/enroll`) — exchange enrollment token for device id + one-time device credential  
 - Effective policy download  
 - Event batch upload (heartbeat and violations)
 
