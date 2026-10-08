@@ -65,9 +65,9 @@ curl -s http://127.0.0.1:18080/v1/ready   # db + redis true
 
 - M0 done (scaffold).
 - M1 foundation **done** (auth/RBAC, `/ready`, Streams skeleton, web login + theme).
-- M2 **in progress**: schema `00003` + inventory admin APIs + `POST /v1/agent/enroll` + web Devices/Tokens/Groups **done**; next **group membership**, then agent client / heartbeat.
+- M2 **in progress**: inventory APIs + enroll + web Devices/Tokens/Groups **done**; group membership **domain + list handler**; next **add/remove handlers + router**, then members UI.
 - Later: policy sync, enforce Level 1, alerts, full admin UI.
 
 ## When resuming
 
-State the next concrete step from `handoff.md` (currently: group membership APIs + UI). If handoff conflicts with the repo, trust the repo + checklist and update handoff guidance for the user.
+State the next concrete step from `handoff.md` (currently: B2 `handleAddGroupMember`). Prefer one complete method per guidance step. If handoff conflicts with the repo, trust the repo + checklist and update handoff.
