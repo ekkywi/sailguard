@@ -43,28 +43,28 @@
 
 :root {
   --font: "Geist Sans", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
-  /* Compact scale (~10% smaller than the previous bump) */
-  --text-xs: 0.75rem;
-  --text-sm: 0.8125rem;
-  --text-base: 0.875rem;
-  --text-lg: 1.125rem;
-  --text-xl: 1.375rem;
+  /* ~5% larger than the previous compact scale */
+  --text-xs: 0.7875rem;
+  --text-sm: 0.853rem;
+  --text-base: 0.919rem;
+  --text-lg: 1.181rem;
+  --text-xl: 1.444rem;
 
   --radius: 6px;
-  --space-1: 0.25rem;
-  --space-2: 0.5rem;
-  --space-3: 0.75rem;
-  --space-4: 1rem;
-  --space-5: 1.25rem;
-  --space-6: 1.5rem;
-  --space-8: 2rem;
+  --space-1: 0.2625rem;
+  --space-2: 0.525rem;
+  --space-3: 0.7875rem;
+  --space-4: 1.05rem;
+  --space-5: 1.3125rem;
+  --space-6: 1.575rem;
+  --space-8: 2.1rem;
 
-  --control-h: 2rem;
-  --topbar-h: 48px;
-  --sidebar-w: 13.25rem;
-  --sidebar-w-collapsed: 3.75rem;
-  --form-w: 20rem;
-  --icon-size: 1rem;
+  --control-h: 2.1rem;
+  --topbar-h: 50px;
+  --sidebar-w: 13.9rem;
+  --sidebar-w-collapsed: 3.95rem;
+  --form-w: 21rem;
+  --icon-size: 1.05rem;
 
   color: var(--fg);
   background: var(--bg);
@@ -659,6 +659,20 @@ input {
   background: var(--ghost-hover);
 }
 
+.btn-danger {
+  background: var(--danger);
+  color: #fff;
+  border-color: var(--danger);
+}
+
+.btn-danger:hover:not(:disabled) {
+  filter: brightness(0.92);
+}
+
+[data-theme='dark'] .btn-danger {
+  color: #0a0a0a;
+}
+
 .btn-icon {
   width: var(--control-h);
   height: var(--control-h);
@@ -864,6 +878,176 @@ input {
   font-size: var(--text-sm);
   font-weight: 600;
   margin-bottom: var(--space-2);
+}
+
+.secret-value {
+  margin-top: var(--space-3);
+  word-break: break-all;
+}
+
+.secret-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: var(--space-4) var(--space-3);
+}
+
+.panel-title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.token-create-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 0.7fr 0.7fr auto;
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.token-create-submit {
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 1px;
+}
+
+.list-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+}
+
+.list-panel-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.list-panel-header .panel-title {
+  margin-bottom: 0;
+}
+
+.list-range {
+  font-size: var(--text-xs);
+}
+
+.table-scroll {
+  max-height: min(28rem, calc(100vh - 22rem));
+  overflow: auto;
+}
+
+.table-scroll .data-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg);
+  box-shadow: 0 1px 0 var(--border);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.pagination-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.pagination-meta {
+  font-size: var(--text-xs);
+}
+
+@media (max-width: 860px) {
+  .token-create-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .token-create-submit {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 520px) {
+  .token-create-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ——— Confirm dialog ——— */
+
+.dialog-root {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+}
+
+.dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: rgba(10, 10, 10, 0.4);
+  cursor: pointer;
+}
+
+[data-theme='dark'] .dialog-backdrop {
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.dialog-panel {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 22rem;
+  padding: var(--space-5) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+}
+
+[data-theme='dark'] .dialog-panel {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.dialog-title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0 0 var(--space-2);
+}
+
+.dialog-desc {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+  flex-wrap: wrap;
 }
 
 .crumb {
