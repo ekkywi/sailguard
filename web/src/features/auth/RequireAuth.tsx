@@ -2,7 +2,7 @@ import { Navigate } from 'react-router-dom';
 import { getToken } from '../../lib/auth-storage';
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
-    if (!getToken ()) {
+    if (!getToken()) {
         return <Navigate to="/login" replace />
     }
     return children
