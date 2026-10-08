@@ -35,7 +35,8 @@ func NewRouter(cfg config.Config, pool *pgxpool.Pool, rdb *redis.Client) http.Ha
 	mux.HandleFunc("GET /v1/enrollment-tokens", api.requirePermission("device.write", api.handleListEnrollmentTokens))
 	mux.HandleFunc("POST /v1/enrollment-tokens", api.requirePermission("device.write", api.handleCreateEnrollmentToken))
 	mux.HandleFunc("POST /v1/enrollment-tokens/{id}/revoke", api.requirePermission("device.write", api.handleRevokeEnrollmentToken))
-	
+
+	mux.HandleFunc("POST /v1/agent/enroll", api.handleAgentEnroll)
 
 	return mux
 }
@@ -80,7 +81,7 @@ func (a *API) handleReady(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, envelope{
 			OK: false,
 			Error: map[string]any{
-				"code": "not_ready",
+				"code":    "not_ready",
 				"message": msg,
 			},
 			Data: data,
