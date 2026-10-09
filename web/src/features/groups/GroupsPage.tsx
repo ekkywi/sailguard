@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { formatRelativeTime } from '../../lib/format'
 import { createGroup, listGroups } from './api'
 import type { CreateGroupInput, DeviceGroup } from './types'
@@ -6,6 +7,7 @@ import type { CreateGroupInput, DeviceGroup } from './types'
 const PAGE_SIZE = 10
 
 export default function GroupsPage() {
+  const navigate = useNavigate()
   const [groups, setGroups] = useState<DeviceGroup[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -186,7 +188,18 @@ export default function GroupsPage() {
                 </thead>
                 <tbody>
                   {pageItems.map((g) => (
-                    <tr key={g.id}>
+                    <tr
+                      key={g.id}
+                      className="table-row-link"
+                      tabIndex={0}
+                      onClick={() => navigate(`/groups/${g.id}`)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          navigate(`/groups/${g.id}`)
+                        }
+                      }}
+                    >
                       <td>
                         <div className="cell-primary">{g.name}</div>
                         <div className="muted mono">{g.id}</div>

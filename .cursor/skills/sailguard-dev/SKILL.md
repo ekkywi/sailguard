@@ -65,7 +65,7 @@ curl -s http://127.0.0.1:18080/v1/ready   # db + redis true
 
 - M0 done (scaffold).
 - M1 foundation **done** (auth/RBAC, `/ready`, Streams skeleton, web login + theme).
-- M2 **in progress**: inventory APIs + enroll + web Devices/Tokens/Groups **done**; group membership **domain + list handler**; next **add/remove handlers + router**, then members UI.
+- M2 **in progress**: inventory APIs + enroll + web Devices/Tokens/Groups + **group membership** (API + UI) **done**; next device PATCH/rotate-credential, agent enroll CLI, or heartbeat.
 - Later: policy sync, enforce Level 1, alerts, full admin UI.
 
 ## When resuming

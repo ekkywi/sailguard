@@ -5,6 +5,7 @@ import DevicesPage from './features/devices/DevicesPage'
 import DeviceDetailPage from './features/devices/DeviceDetailPage'
 import TokensPage from './features/tokens/TokensPage'
 import GroupsPage from './features/groups/GroupsPage'
+import GroupDetailPage from './features/groups/GroupDetailPage'
 import AppLayout from './layouts/AppLayout'
 import HomePage from './pages/HomePage'
 
@@ -24,6 +25,7 @@ export default function App() {
         <Route path="/devices/:id" element={<DeviceDetailPage />} />
         <Route path="/tokens" element={<TokensPage />} />
         <Route path="/groups" element={<GroupsPage />} />
+        <Route path="/groups/:id" element={<GroupDetailPage />} />
       </Route>
     </Routes>
   )

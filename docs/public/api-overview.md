@@ -35,8 +35,8 @@ Administrative APIs are further protected by role-based permissions as routes co
 
 ### Inventory
 
-- **Available now:** list/create/get device groups; list/get devices; create/list/revoke enrollment tokens (admin Bearer + `device.read` / `device.write`). Create enrollment token returns the plaintext secret once. Admin web console covers Devices, Groups, and Tokens pages.
-- **Planned:** group membership, device PATCH, credential rotation
+- **Available now:** list/create/get device groups; list/add/remove group members; list/get devices; create/list/revoke enrollment tokens (admin Bearer + `device.read` / `device.write`). Create enrollment token returns the plaintext secret once. Admin web console covers Devices, Groups (with membership), and Tokens pages.
+- **Planned:** device PATCH, credential rotation
 
 ### Policy
 
