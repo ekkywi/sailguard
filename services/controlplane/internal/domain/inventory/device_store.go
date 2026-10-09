@@ -106,3 +106,44 @@ func (s *Store) CreateDevice(
 	}
 	return &d, nil
 }
+
+func (s *Store) TouchLastSeen(ctx context.Context, id uuid.UUID) error {
+	const q = `
+		UPDATE devices
+		SET last_seen_at = now()
+		WHERE id = $1
+	`
+
+	tag, err := s.pool.Exec(ctx, q, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ApplyHeartbeat updates last_seen_at and optionally soft-refreshes identity fields.
+func (s *Store) ApplyHeartbeat(
+	ctx context.Context,
+	id uuid.UUID,
+	hostname, osVersion, agentVersion string,
+) error {
+	const q = `
+		UPDATE devices
+		SET last_seen_at = now(),
+		    hostname = CASE WHEN $2 <> '' THEN $2 ELSE hostname END,
+		    os_version = CASE WHEN $3 <> '' THEN $3 ELSE os_version END,
+		    agent_version = CASE WHEN $4 <> '' THEN $4 ELSE agent_version END
+		WHERE id = $1
+	`
+	tag, err := s.pool.Exec(ctx, q, id, hostname, osVersion, agentVersion)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}

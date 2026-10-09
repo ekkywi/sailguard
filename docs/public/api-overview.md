@@ -22,7 +22,7 @@ Tokens are signed access tokens (HMAC). Directory federation (for example LDAP/A
 | Client | Mechanism |
 |--------|-----------|
 | Administrators | Bearer access token after local login |
-| Agents | Bearer device credential issued at enrollment (planned) |
+| Agents | Bearer device credential issued at enrollment |
 
 Administrative APIs are further protected by role-based permissions as routes come online. Agent credentials must not call administrative routes.
 
@@ -44,9 +44,8 @@ Policies, rules, assignments, categories, device overrides, and publish.
 
 ### Agent channel
 
-- **Available now:** enrollment (`POST /v1/agent/enroll`) — exchange enrollment token for device id + one-time device credential  
-- Effective policy download  
-- Event batch upload (heartbeat and violations)
+- **Available now:** enrollment (`POST /v1/agent/enroll`) — exchange enrollment token for device id + one-time device credential; device-authenticated `GET /v1/agent/whoami`; event batch upload (`POST /v1/agent/events`) accepting **heartbeat** (updates `last_seen_at`; other event types rejected until M4)
+- **Planned:** effective policy download; full event persistence (violations, dedupe, streams)
 
 ### Telemetry & operations
 

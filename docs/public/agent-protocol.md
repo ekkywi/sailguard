@@ -5,11 +5,12 @@ This document describes the agent ↔ control plane contract at a product level.
 ## Lifecycle
 
 1. **Enroll** with a one-time (or limited-use) enrollment token via `POST /v1/agent/enroll` *(admins mint/revoke tokens in the console or API)*  
-2. Receive a unique **device credential** and recommended sync intervals  
-3. **Poll / pull effective policy** (version + content hash)  
-4. Continuously evaluate local processes against cached policy  
-5. **Submit event batches** (heartbeats, violations, agent errors)  
-6. Refresh policy when the server indicates a newer version  
+2. Receive a unique **device credential** and recommended sync intervals; persist locally on the agent  
+3. Authenticate subsequent calls with `Authorization: Bearer <device_token>` *(e.g. whoami / events)*  
+4. **Submit event batches** via `POST /v1/agent/events` — **heartbeat** is accepted now and refreshes `last_seen_at`; violation persistence expands later  
+5. **Poll / pull effective policy** (version + content hash) — planned  
+6. Continuously evaluate local processes against cached policy — planned  
+7. Refresh policy when the server indicates a newer version — planned  
 
 ## Transport expectations
 

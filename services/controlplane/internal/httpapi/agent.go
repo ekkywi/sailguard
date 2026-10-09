@@ -97,3 +97,134 @@ func (a *API) handleAgentEnroll(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 }
+
+func (a *API) handleAgentWhoami(w http.ResponseWriter, r *http.Request) {
+	deviceID, ok := deviceIDFromCtx(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "unauthorized",
+				"message": "missing device auth context",
+			},
+		})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{
+		OK: true,
+		Data: map[string]any{
+			"device_id": deviceID.String(),
+		},
+	})
+}
+
+func (a *API) handleAgentEvents(w http.ResponseWriter, r *http.Request) {
+	deviceID, ok := deviceIDFromCtx(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "unauthorized",
+				"message": "missing device auth context",
+			},
+		})
+		return
+	}
+
+	var req agentcontract.EventBatchRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "validation_error",
+				"message": "invalid JSON body",
+			},
+		})
+		return
+	}
+
+	if req.SchemaVersion == 0 {
+		req.SchemaVersion = 1
+	}
+	if len(req.Events) == 0 {
+		writeJSON(w, http.StatusBadRequest, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "validation_error",
+				"message": "events must not be empty",
+			},
+		})
+		return
+	}
+
+	if strings.TrimSpace(req.DeviceID) != "" && req.DeviceID != deviceID.String() {
+		writeJSON(w, http.StatusForbidden, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "forbidden",
+				"message": "device_id does not match authenticated device",
+			},
+		})
+		return
+	}
+
+	store := inventory.NewStore(a.pool)
+	accepted := 0
+	rejected := make([]map[string]any, 0)
+	sawHeartbeat := false
+	var hbHostname, hbOSVersion, hbAgentVersion string
+
+	for _, ev := range req.Events {
+		clientID := strings.TrimSpace(ev.ClientEventID)
+		if clientID == "" {
+			rejected = append(rejected, map[string]any{
+				"client_event_id": clientID,
+				"code":            "validation_error",
+				"message":         "client_event_id is required",
+			})
+			continue
+		}
+
+		switch ev.EventType {
+		case agentcontract.EventHeartbeat:
+			sawHeartbeat = true
+			if ev.Hostname != "" {
+				hbHostname = ev.Hostname
+			}
+			if ev.OSVersion != "" {
+				hbOSVersion = ev.OSVersion
+			}
+			if ev.AgentVersion != "" {
+				hbAgentVersion = ev.AgentVersion
+			}
+			accepted++
+		default:
+			rejected = append(rejected, map[string]any{
+				"client_event_id": clientID,
+				"code":            "unsupported_event",
+				"message":         "event_type not accepted yet: " + ev.EventType,
+			})
+		}
+	}
+
+	if sawHeartbeat {
+		if err := store.ApplyHeartbeat(r.Context(), deviceID, hbHostname, hbOSVersion, hbAgentVersion); err != nil {
+			writeJSON(w, http.StatusInternalServerError, envelope{
+				OK: false,
+				Error: map[string]any{
+					"code":    "internal_error",
+					"message": "failed to update last_seen",
+				},
+			})
+			return
+		}
+	}
+
+	writeJSON(w, http.StatusOK, envelope{
+		OK: true,
+		Data: map[string]any{
+			"accepted": accepted,
+			"rejected": rejected,
+		},
+	})
+}

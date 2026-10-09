@@ -3,9 +3,11 @@ package httpapi
 import (
 	"context"
 	"net/http"
+	"errors"
 
 	"github.com/ekkywi/sailguard/services/controlplane/internal/auth"
 	"github.com/ekkywi/sailguard/services/controlplane/internal/domain/identity"
+	"github.com/ekkywi/sailguard/services/controlplane/internal/domain/inventory"
 	"github.com/google/uuid"
 )
 
@@ -14,6 +16,7 @@ type ctxKey string
 const (
 	ctxUserID      ctxKey = "userID"
 	ctxPermissions ctxKey = "permissions"
+	ctxDeviceID    ctxKey = "deviceID"
 )
 
 func (a *API) requireAuth(next http.HandlerFunc) http.HandlerFunc {
@@ -67,6 +70,51 @@ func (a *API) requirePermission(code string, next http.HandlerFunc) http.Handler
 	})
 }
 
+func (a *API) requireDeviceAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		raw, ok := bearerToken(r)
+		if !ok || raw == "" {
+			writeJSON(w, http.StatusUnauthorized, envelope{
+				OK: false,
+				Error: map[string]any{
+					"code": "unauthorized",
+					"message": "missing bearer token",
+				},
+			})
+			return
+		}
+
+		store := inventory.NewStore(a.pool)
+		deviceID, err := store.FindDeviceIDByActiveTokenHash(
+			r.Context(),
+			inventory.HashToken(raw),
+		)
+		if errors.Is(err, inventory.ErrNotFound) {
+			writeJSON(w, http.StatusUnauthorized, envelope{
+				OK: false,
+				Error: map[string]any{
+					"code": "unauthorized",
+					"message": "invalid device token",
+				},
+			})
+			return
+		}
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, envelope{
+				OK: false,
+				Error: map[string]any{
+					"code": "internal_error",
+					"message": "failed to authenticate device",
+				},
+			})
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), ctxDeviceID, deviceID)
+		next(w, r.WithContext(ctx))
+	}
+}
+
 func userIDFromCtx(ctx context.Context) (uuid.UUID, bool) {
 	id, ok := ctx.Value(ctxUserID).(uuid.UUID)
 	return id, ok
@@ -75,4 +123,9 @@ func userIDFromCtx(ctx context.Context) (uuid.UUID, bool) {
 func permissionsFromCtx(ctx context.Context) ([]string, bool) {
 	perms, ok := ctx.Value(ctxPermissions).([]string)
 	return perms, ok
+}
+
+func deviceIDFromCtx(ctx context.Context) (uuid.UUID, bool) {
+	id, ok := ctx.Value(ctxDeviceID).(uuid.UUID)
+	return id, ok
 }

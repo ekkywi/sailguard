@@ -1,4 +1,6 @@
 package telemetry
 
 // Package telemetry: agent event ingest, persistence, dedupe, heartbeats.
-// Implemented starting milestone M4.
+//
+// MVP heartbeat path lives in inventory/httpapi for now
+// (POST /v1/agent/events → ApplyHeartbeat). Full event store + Streams = M4.
