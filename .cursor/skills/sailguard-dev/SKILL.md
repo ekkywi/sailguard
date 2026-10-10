@@ -70,9 +70,10 @@ curl -s http://127.0.0.1:18080/v1/ready   # db + redis true
 
 - M0 done (scaffold).
 - M1 foundation **done** (auth/RBAC, `/ready`, Streams skeleton, web login + theme).
-- M2 **in progress**: inventory + membership + agent enroll/auth + **heartbeat ingest + agent flush done**; next MachineGuid/ACL, device PATCH, or M3 policy audit.
-- Later: policy sync, enforce Level 1, alerts, full admin UI.
+- M2 inventory + agent enroll/heartbeat **done**.
+- M3 **in progress**: schema + policy/rules admin APIs **done**; next assignments + publish, then effective policy + agent sync (audit before enforce).
+- Later: enforce Level 1, alerts, full admin UI.
 
 ## When resuming
 
-State the next concrete step from `handoff.md` (currently: MachineGuid/ACL, device PATCH, or M3 policy audit). Prefer one complete method per guidance step. If handoff conflicts with the repo, trust the repo + checklist and update handoff.
+State the next concrete step from `handoff.md` (currently: M3 P3 assignments + publish). Prefer one complete method per guidance step. If handoff conflicts with the repo, trust the repo + checklist and update handoff.

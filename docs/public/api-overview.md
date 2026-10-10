@@ -40,7 +40,8 @@ Administrative APIs are further protected by role-based permissions as routes co
 
 ### Policy
 
-Policies, rules, assignments, categories, device overrides, and publish.
+- **Available now:** list/create/get policies; list/add rules on a policy (`policy.read` / `policy.write`). Schema includes categories, assignments, and overrides (APIs for those land next).
+- **Planned:** publish, assignments, category signature admin, device overrides, effective-policy preview, web policy builder
 
 ### Agent channel
 
