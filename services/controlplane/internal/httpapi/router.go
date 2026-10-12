@@ -35,6 +35,7 @@ func NewRouter(cfg config.Config, pool *pgxpool.Pool, rdb *redis.Client) http.Ha
 
 	mux.HandleFunc("GET /v1/devices", api.requirePermission("device.read", api.handleListDevices))
 	mux.HandleFunc("GET /v1/devices/{id}", api.requirePermission("device.read", api.handleGetDevice))
+	mux.HandleFunc("GET /v1/devices/{id}/policy", api.requirePermission("policy.read", api.handleGetDevicePolicy))
 
 	mux.HandleFunc("GET /v1/enrollment-tokens", api.requirePermission("device.write", api.handleListEnrollmentTokens))
 	mux.HandleFunc("POST /v1/enrollment-tokens", api.requirePermission("device.write", api.handleCreateEnrollmentToken))
@@ -45,10 +46,15 @@ func NewRouter(cfg config.Config, pool *pgxpool.Pool, rdb *redis.Client) http.Ha
 	mux.HandleFunc("GET /v1/policies/{id}", api.requirePermission("policy.read", api.handleGetPolicy))
 	mux.HandleFunc("GET /v1/policies/{id}/rules", api.requirePermission("policy.read", api.handleListPolicyRules))
 	mux.HandleFunc("POST /v1/policies/{id}/rules", api.requirePermission("policy.write", api.handleAddPolicyRule))
+	mux.HandleFunc("GET /v1/policies/{id}/assignments", api.requirePermission("policy.read", api.handleListPolicyAssignments))
+	mux.HandleFunc("POST /v1/policies/{id}/assignments", api.requirePermission("policy.write", api.handleAddPolicyAssignment))
+	mux.HandleFunc("DELETE /v1/policies/{id}/assignments/{assignmentId}", api.requirePermission("policy.write", api.handleRemovePolicyAssignment))
+	mux.HandleFunc("POST /v1/policies/{id}/publish", api.requirePermission("policy.write", api.handlePublishPolicy))
 
 	mux.HandleFunc("POST /v1/agent/enroll", api.handleAgentEnroll)
 	mux.HandleFunc("GET /v1/agent/whoami", api.requireDeviceAuth(api.handleAgentWhoami))
 	mux.HandleFunc("POST /v1/agent/events", api.requireDeviceAuth(api.handleAgentEvents))
+	mux.HandleFunc("GET /v1/agent/policy", api.requireDeviceAuth(api.handleAgentPolicy))
 
 	return mux
 }

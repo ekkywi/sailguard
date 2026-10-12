@@ -40,13 +40,13 @@ Administrative APIs are further protected by role-based permissions as routes co
 
 ### Policy
 
-- **Available now:** list/create/get policies; list/add rules on a policy (`policy.read` / `policy.write`). Schema includes categories, assignments, and overrides (APIs for those land next).
-- **Planned:** publish, assignments, category signature admin, device overrides, effective-policy preview, web policy builder
+- **Available now:** list/create/get policies; list/add rules; list/add/remove assignments; publish (bumps version); effective-policy preview `GET /v1/devices/{id}/policy`. Schema also includes categories and overrides.
+- **Planned:** category signature admin, device override APIs, web policy builder
 
 ### Agent channel
 
-- **Available now:** enrollment (`POST /v1/agent/enroll`) — exchange enrollment token for device id + one-time device credential; device-authenticated `GET /v1/agent/whoami`; event batch upload (`POST /v1/agent/events`) accepting **heartbeat** (updates `last_seen_at`; other event types rejected until M4)
-- **Planned:** effective policy download; full event persistence (violations, dedupe, streams)
+- **Available now:** enrollment (`POST /v1/agent/enroll`); device auth (`GET /v1/agent/whoami`); heartbeat events (`POST /v1/agent/events` → `last_seen_at`); effective policy download (`GET /v1/agent/policy`, optional `?hash=` for unchanged)
+- **Planned:** violation event persistence / full telemetry pipeline (M4); process audit/enforce evaluation on agent
 
 ### Telemetry & operations
 

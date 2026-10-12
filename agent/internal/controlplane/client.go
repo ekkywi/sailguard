@@ -148,3 +148,56 @@ func (c *Client) PostEvents(
 	}
 	return env.Data, nil
 }
+
+func (c *Client) GetPolicy(
+	ctx context.Context,
+	deviceToken string,
+	currentHash string,
+) (*agentcontract.PolicySyncData, error) {
+	if c.BaseURL == "" {
+		return nil, fmt.Errorf("server URL is empty")
+	}
+	if strings.TrimSpace(deviceToken) == "" {
+		return nil, fmt.Errorf("device token is empty")
+	}
+
+	url := c.BaseURL + "/v1/agent/policy"
+	if h := strings.TrimSpace(currentHash); h != "" {
+		url = url + "?hash=" + h
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build policy request: %w", err)
+	}
+	httpReq.Header.Set("Accept", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+deviceToken)
+	if c.UserAgent != "" {
+		httpReq.Header.Set("User-Agent", c.UserAgent)
+	}
+
+	res, err := c.HTTPClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("policy request failed: %w", err)
+	}
+	defer res.Body.Close()
+
+	raw, err := io.ReadAll(io.LimitReader(res.Body, 1<<20))
+	if err != nil {
+		return nil, fmt.Errorf("read policy response: %w", err)
+	}
+
+	var env agentcontract.Envelope[agentcontract.PolicySyncData]
+	if err := json.Unmarshal(raw, &env); err != nil {
+		return nil, fmt.Errorf("decode policy response (status %d): %w", res.StatusCode, err)
+	}
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 || !env.OK || env.Data == nil {
+		if env.Error != nil {
+			return nil, fmt.Errorf("policy rejected (%d): %s: %s",
+				res.StatusCode, env.Error.Code, env.Error.Message)
+		}
+		return nil, fmt.Errorf("policy rejected (%d): %s", res.StatusCode, strings.TrimSpace(string(raw)))
+	}
+	return env.Data, nil
+}

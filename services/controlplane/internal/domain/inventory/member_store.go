@@ -80,3 +80,28 @@ func (s *Store) RemoveGroupMember(ctx context.Context, groupID, deviceID uuid.UU
 	}
 	return nil
 }
+
+func (s *Store) ListGroupIDsForDevice(ctx context.Context, deviceID uuid.UUID) ([]uuid.UUID, error) {
+	const q = `
+		SELECT group_id
+		FROM device_group_members
+		WHERE device_id = $1
+		ORDER BY group_id
+	`
+
+	rows, err := s.pool.Query(ctx, q, deviceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make ([]uuid.UUID, 0)
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}

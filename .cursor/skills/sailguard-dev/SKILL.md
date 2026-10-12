@@ -58,9 +58,11 @@ curl -s http://127.0.0.1:18080/v1/ready   # db + redis true
 # Agent enroll:
 # curl -s http://127.0.0.1:18080/v1/agent/enroll -H 'Content-Type: application/json' \
 #   -d '{"schema_version":1,"enrollment_token":"…","hostname":"lab-pc","machine_guid":"g1","os_family":"windows","os_version":"10","agent_version":"0.0.1"}'
-# Agent device auth + heartbeat:
+# Agent device auth + heartbeat + policy:
+# export SG_DATA_DIR=$HOME/.sailguard-agent-lab
 # DEVICE_TOKEN=$(jq -r .device_token "$SG_DATA_DIR/device.json")
 # curl -s http://127.0.0.1:18080/v1/agent/whoami -H "Authorization: Bearer $DEVICE_TOKEN"
+# curl -s "http://127.0.0.1:18080/v1/agent/policy" -H "Authorization: Bearer $DEVICE_TOKEN"
 # curl -s -X POST http://127.0.0.1:18080/v1/agent/events -H "Authorization: Bearer $DEVICE_TOKEN" \
 #   -H 'Content-Type: application/json' -d '{"schema_version":1,"device_id":"…","sent_at":"…","events":[{"client_event_id":"hb-1","event_type":"heartbeat","occurred_at":"…"}]}'
 # Web: http://127.0.0.1:15180 — Devices, Groups, Tokens
@@ -71,9 +73,9 @@ curl -s http://127.0.0.1:18080/v1/ready   # db + redis true
 - M0 done (scaffold).
 - M1 foundation **done** (auth/RBAC, `/ready`, Streams skeleton, web login + theme).
 - M2 inventory + agent enroll/heartbeat **done**.
-- M3 **in progress**: schema + policy/rules admin APIs **done**; next assignments + publish, then effective policy + agent sync (audit before enforce).
+- M3 **core done**: schema + admin APIs + assign/publish + effective merge + **agent policy sync/cache**; next web policy UI and/or agent audit match (enforce in M4).
 - Later: enforce Level 1, alerts, full admin UI.
 
 ## When resuming
 
-State the next concrete step from `handoff.md` (currently: M3 P3 assignments + publish). Prefer one complete method per guidance step. If handoff conflicts with the repo, trust the repo + checklist and update handoff.
+State the next concrete step from `handoff.md` (currently: web policy UI or agent audit match). Prefer one complete method per guidance step. If handoff conflicts with the repo, trust the repo + checklist and update handoff.

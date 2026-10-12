@@ -12,7 +12,9 @@ import (
 	"github.com/ekkywi/sailguard/agent/internal/controlplane"
 	"github.com/ekkywi/sailguard/agent/internal/credstore"
 	"github.com/ekkywi/sailguard/agent/internal/host"
+	"github.com/ekkywi/sailguard/agent/internal/policycache"
 	"github.com/ekkywi/sailguard/pkgs/agentcontract"
+	policypkg "github.com/ekkywi/sailguard/pkgs/policy"
 )
 
 func Run(ctx context.Context, cfg config.Config, h host.Host) error {
@@ -51,6 +53,7 @@ func Run(ctx context.Context, cfg config.Config, h host.Host) error {
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
 
+		syncPolicy(ctx, client, cred, dataDir)
 		sendHeartbeat(ctx, client, cred, cfg, h, hostname, osVersion)
 
 		for {
@@ -58,6 +61,7 @@ func Run(ctx context.Context, cfg config.Config, h host.Host) error {
 			case <-ctx.Done():
 				return nil
 			case <-ticker.C:
+				syncPolicy(ctx, client, cred, dataDir)
 				sendHeartbeat(ctx, client, cred, cfg, h, hostname, osVersion)
 			}
 		}
@@ -153,4 +157,41 @@ func sendHeartbeat(
 	} else {
 		log.Printf("processes_visible=%d", len(procs))
 	}
+}
+
+func syncPolicy(
+	ctx context.Context,
+	client *controlplane.Client,
+	cred *credstore.Credential,
+	dataDir string,
+) {
+	currentHash := policycache.Hash(dataDir)
+	data, err := client.GetPolicy(ctx, cred.DeviceToken, currentHash)
+	if err != nil {
+		log.Printf("policy sync failed: device_id=%s err=%v", cred.DeviceID, err)
+		return
+	}
+
+	if data.Unchanged {
+		log.Printf("policy unchanged: device_id=%s hash=%s", cred.DeviceID, currentHash)
+		return
+	}
+
+	ep := policypkg.EffectivePolicy{
+		SchemaVersion: data.SchemaVersion,
+		Version:       data.Version,
+		ComputedAt:    data.ComputedAt,
+		Mode:          data.Mode,
+		Hash:          data.Hash,
+		Rules:         data.Rules,
+	}
+
+	if err := policycache.Save(dataDir, ep); err != nil {
+		log.Printf("policy cache save failed: %v", err)
+		return
+	}
+	log.Printf(
+		"policy updated: device_id=%s version=%d mode=%s rules=%d hash=%s path=%s",
+		cred.DeviceID, ep.Version, ep.Mode, len(ep.Rules), ep.Hash, policycache.Path(dataDir),
+	)
 }

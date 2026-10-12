@@ -10,7 +10,7 @@ type Policy struct {
 	ID          uuid.UUID
 	Name        string
 	Description string
-	Mode        string // audit | enforce
+	Mode        string
 	Priority    int
 	Version     int64
 	PublishedAt *time.Time
@@ -21,7 +21,7 @@ type Policy struct {
 type PolicyRule struct {
 	ID           uuid.UUID
 	PolicyID     uuid.UUID
-	Action       string // allow | block
+	Action       string
 	RuleType     string
 	Operator     string
 	Value        string
@@ -36,5 +36,20 @@ type AddRuleInput struct {
 	RuleType     string
 	Operator     string
 	Value        string
-	CategoryCode string // required when rule_type=category
+	CategoryCode string
+}
+
+type PolicyAssignment struct {
+	ID        uuid.UUID
+	PolicyID  uuid.UUID
+	Scope     string
+	GroupID   *uuid.UUID
+	DeviceID  *uuid.UUID
+	CreatedAt time.Time
+}
+
+type AddAssignmentInput struct {
+	Scope    string
+	GroupID  string
+	DeviceID string
 }
