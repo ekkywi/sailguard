@@ -45,8 +45,8 @@ Administrative APIs are further protected by role-based permissions as routes co
 
 ### Agent channel
 
-- **Available now:** enrollment (`POST /v1/agent/enroll`); device auth (`GET /v1/agent/whoami`); event batch (`POST /v1/agent/events`) accepts **heartbeat** (updates `last_seen_at`) and **`violation_detected`** (persisted to `device_events`, idempotent by `client_event_id`); effective policy download (`GET /v1/agent/policy`, optional `?hash=` for unchanged). Agents evaluate cached policy in **audit** mode and report matches.
-- **Planned:** enforce-mode termination (`violation_blocked`); full async telemetry pipeline (streams/worker); real process enumeration on Windows
+- **Available now:** enrollment (`POST /v1/agent/enroll`); device auth (`GET /v1/agent/whoami`); event batch (`POST /v1/agent/events`) accepts **heartbeat** (updates `last_seen_at`) and **`violation_detected`** (persisted to `device_events`, idempotent by `client_event_id`); effective policy download (`GET /v1/agent/policy`, optional `?hash=` for unchanged). Agents evaluate cached policy in **audit** mode and report matches. On **Linux**, agents enumerate live processes via `/proc` (Windows Toolhelp enumeration planned next).
+- **Planned:** Windows process enumeration; enforce-mode termination (`violation_blocked`) on Windows and Linux; full async telemetry pipeline (streams/worker)
 
 ### Telemetry & operations
 

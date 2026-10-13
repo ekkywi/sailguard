@@ -44,7 +44,7 @@ Runtime configuration is supplied through environment variables (database URL, R
 
 ## Capacity guidance (indicative)
 
-The architecture targets mid-scale estates (on the order of **hundreds to low thousands** of Windows endpoints) with batched agent telemetry and asynchronous workers. Exact sizing depends on event volume, retention policy, and hardware.
+The architecture targets mid-scale estates (on the order of **hundreds to low thousands** of Windows and Linux endpoints) with batched agent telemetry and asynchronous workers. Exact sizing depends on event volume, retention policy, and hardware.
 
 ## Development vs production runtimes
 

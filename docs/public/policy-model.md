@@ -42,7 +42,7 @@ Administrators edit policies in draft form and **publish** to produce a new effe
 
 ## Agent evaluation order
 
-For each observed process:
+For each observed process (Linux agents list live processes via `/proc` today; Windows enumeration follows the same evaluation rules once Toolhelp listing is enabled):
 
 1. If an **allow** rule matches (and is not expired), do not block  
 2. If a **block** rule matches:  

@@ -31,6 +31,7 @@ description: >-
 - Shared policy engine: `pkgs/policy` (merge allow>block at equal weight; safety rail).
 - Agent contracts: `pkgs/agentcontract`.
 - Agent OS split: `internal/host` + `windows|linux|darwin` + `platform_*` build tags.
+- Near-term OS priority: **Windows + Linux** (Darwin stub).
 - Migrations: goose under `services/controlplane/migrations/`.
 - System catalog seeds (RBAC): goose migrations.
 - Dev/demo seeds (admin user): `seeds/development/` only — never production goose.
@@ -49,22 +50,23 @@ curl -s http://127.0.0.1:18080/v1/ready   # db + redis true
 
 ## Milestone orientation
 
-- M0–M2 **done**.
-- M3 **done for magang core**: policy APIs + web policy UI + agent sync + audit match MVP.
-- M4 **partial**: persist `device_events` + `GET /v1/events` + web `/events` **done**; remaining real process enum, enforce Level 1, streams/dashboard.
+- M0–M3 magang core **done** (policy UI, audit match, Events persist/UI).
+- M4 **partial**: Linux `/proc` List **done**; remaining Windows Toolhelp, enforce Level 1 (Win+Linux), streams/dashboard.
 - Later: alerts, users admin, LDAP, etc.
 
 ## When resuming
 
-State the next concrete step from `handoff.md` (currently: real process enum or enforce Level 1). Prefer one complete method per guidance step. If handoff conflicts with the repo, trust the repo + checklist and update handoff.
+State the next concrete step from `handoff.md` (currently: Windows process enumeration). Prefer one complete method per guidance step. If handoff conflicts with the repo, trust the repo + checklist and update handoff.
 
-## Lab smoke (audit → Events)
+## Lab smoke
 
 ```bash
+# Linux real enum (no fake):
+unset SG_LAB_FAKE_PROCESS
 export SG_DATA_DIR=$HOME/.sailguard-agent-lab
-export SG_LAB_FAKE_PROCESS=notepad.exe
-# policy audit + block notepad.exe published+assigned, then:
 go run ./agent/cmd/sailguard-agent
-# expect: audit scan … violations=1 accepted=1
-# Admin: http://127.0.0.1:15180/events  or  GET /v1/events with Bearer
+# expect: audit scan: processes=<large N> …
+
+# Optional lab fake match:
+# export SG_LAB_FAKE_PROCESS=notepad.exe
 ```

@@ -1,6 +1,6 @@
 # Architecture
 
-SailGuard is an on-premises platform for monitoring and controlling disallowed applications on managed endpoints. The initial supported platform is Microsoft Windows, with a multi-platform agent architecture prepared for additional operating systems.
+SailGuard is an on-premises platform for monitoring and controlling disallowed applications on managed endpoints. Near-term agent observation targets **Windows and Linux**; a multi-platform agent layout also reserves Darwin stubs for later.
 
 ## Design goals
 
@@ -28,7 +28,7 @@ Agents evaluate policy locally so enforcement continues during brief control-pla
 
 | Component | Responsibility |
 |-----------|----------------|
-| **Agent** | Device enrollment, policy synchronization, process observation (audit match + report today; enforcement Level 1 later), event submission |
+| **Agent** | Device enrollment, policy synchronization, process observation (Linux `/proc` list + audit match/report today; Windows enumeration and Level 1 enforce next), event submission |
 | **API** | Authentication (local admin login + Bearer tokens), authorization, configuration APIs, agent-facing endpoints |
 | **Worker** | Asynchronous processing via Redis Streams (event pipelines, notifications, retention jobs) |
 | **Web console** | Administrative UI (local sign-in; overview; Devices, Groups with membership, Tokens; Policies list/create, rules, assign, publish; Events list of policy violations) |

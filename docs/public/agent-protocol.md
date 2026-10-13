@@ -9,7 +9,8 @@ This document describes the agent ↔ control plane contract at a product level.
 3. Authenticate subsequent calls with `Authorization: Bearer <device_token>` *(whoami / events / policy)*  
 4. **Submit event batches** via `POST /v1/agent/events` — **heartbeat** refreshes `last_seen_at`; **`violation_detected`** is persisted and listed for admins (`GET /v1/events` / console Events)  
 5. **Poll / pull effective policy** via `GET /v1/agent/policy` (optional `?hash=` → `unchanged`); replace local cache atomically when content changes  
-6. **Evaluate** local processes against cached policy in **audit** mode and report matches (`violation_detected`); **enforce** (terminate + `violation_blocked`) comes later  
+6. **Enumerate** local processes (Linux: `/proc` today; Windows Toolhelp next) and **evaluate** them against cached policy in **audit** mode, reporting matches (`violation_detected`); **enforce** (terminate + `violation_blocked`) comes later on Windows and Linux  
+
 7. Refresh when the server returns a newer version/hash — supported via conditional sync above
 
 ## Transport expectations
