@@ -1,6 +1,10 @@
 package host
 
-import "context"
+import (
+	"context"
+	"os"
+	"strings"
+)
 
 // Process is a running process snapshot used for policy matching.
 type Process struct {
@@ -11,6 +15,20 @@ type Process struct {
 	Publisher   string
 	ProductName string
 	UserName    string
+}
+
+// LabFakeProcesses returns a single fake process when SG_LAB_FAKE_PROCESS is set
+// (e.g. notepad.exe). Used for audit-match smoke on hosts without real enumeration.
+func LabFakeProcesses() []Process {
+	name := strings.TrimSpace(os.Getenv("SG_LAB_FAKE_PROCESS"))
+	if name == "" {
+		return nil
+	}
+	return []Process{{
+		PID:  4242,
+		Name: name,
+		Path: "/lab/" + name,
+	}}
 }
 
 type ProcessMonitor interface {

@@ -54,7 +54,8 @@ func Run(ctx context.Context, cfg config.Config, h host.Host) error {
 		defer ticker.Stop()
 
 		syncPolicy(ctx, client, cred, dataDir)
-		sendHeartbeat(ctx, client, cred, cfg, h, hostname, osVersion)
+		scanAndReport(ctx, client, cred, h, dataDir)
+		sendHeartbeat(ctx, client, cred, cfg, hostname, osVersion)
 
 		for {
 			select {
@@ -62,7 +63,8 @@ func Run(ctx context.Context, cfg config.Config, h host.Host) error {
 				return nil
 			case <-ticker.C:
 				syncPolicy(ctx, client, cred, dataDir)
-				sendHeartbeat(ctx, client, cred, cfg, h, hostname, osVersion)
+				scanAndReport(ctx, client, cred, h, dataDir)
+				sendHeartbeat(ctx, client, cred, cfg, hostname, osVersion)
 			}
 		}
 	})
@@ -122,7 +124,6 @@ func sendHeartbeat(
 	client *controlplane.Client,
 	cred *credstore.Credential,
 	cfg config.Config,
-	h host.Host,
 	hostname, osVersion string,
 ) {
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -151,12 +152,6 @@ func sendHeartbeat(
 		"heartbeat ok: device_id=%s accepted=%d rejected=%d",
 		cred.DeviceID, res.Accepted, len(res.Rejected),
 	)
-
-	if procs, err := h.List(ctx); err != nil {
-		log.Printf("process list: %v", err)
-	} else {
-		log.Printf("processes_visible=%d", len(procs))
-	}
 }
 
 func syncPolicy(
@@ -193,5 +188,98 @@ func syncPolicy(
 	log.Printf(
 		"policy updated: device_id=%s version=%d mode=%s rules=%d hash=%s path=%s",
 		cred.DeviceID, ep.Version, ep.Mode, len(ep.Rules), ep.Hash, policycache.Path(dataDir),
+	)
+}
+
+func scanAndReport(
+	ctx context.Context,
+	client *controlplane.Client,
+	cred *credstore.Credential,
+	h host.Host,
+	dataDir string,
+) {
+	ep, err := policycache.Load(dataDir)
+	if err != nil {
+		log.Printf("policy load failed: %v", err)
+		return
+	}
+	if ep == nil || len(ep.Rules) == 0 {
+		log.Printf("audit scan skip: no cached policy rules")
+		return
+	}
+
+	procs, err := h.List(ctx)
+	if err != nil {
+		log.Printf("process list: %v", err)
+		return
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	events := make([]agentcontract.Event, 0)
+
+	for _, p := range procs {
+		if policypkg.IsCriticalProcess(p.Name) {
+			continue
+		}
+
+		attrs := policypkg.ProcessAttrs{
+			Name:        p.Name,
+			Path:        p.Path,
+			HashSHA256:  p.HashSHA256,
+			Publisher:   p.Publisher,
+			ProductName: p.ProductName,
+		}
+
+		matched, allow := policypkg.Evaluate(*ep, attrs)
+		if matched == nil || allow {
+			continue
+		}
+
+		events = append(events, agentcontract.Event{
+			ClientEventID: fmt.Sprintf("vd-%d-%d", p.PID, time.Now().UnixNano()),
+			EventType:     agentcontract.EventViolationDetected,
+			OccurredAt:    now,
+			DedupeKey:     fmt.Sprintf("%s:%d:%s", ep.Hash, p.PID, matched.ID),
+			Process: &agentcontract.ProcessInfo{
+				PID:         p.PID,
+				Name:        p.Name,
+				Path:        p.Path,
+				HashSHA256:  p.HashSHA256,
+				Publisher:   p.Publisher,
+				ProductName: p.ProductName,
+				UserName:    p.UserName,
+			},
+			Match: &agentcontract.MatchInfo{
+				RuleID:       matched.ID,
+				Action:       string(matched.Action),
+				RuleType:     string(matched.RuleType),
+				Value:        matched.Value,
+				CategoryCode: matched.CategoryCode,
+			},
+			Policy: &agentcontract.PolicyRef{
+				Version: ep.Version,
+				Mode:    string(ep.Mode),
+			},
+		})
+	}
+
+	if len(events) == 0 {
+		log.Printf("audit scan: processes=%d violations=0", len(procs))
+		return
+	}
+
+	res, err := client.PostEvents(ctx, cred.DeviceToken, agentcontract.EventBatchRequest{
+		SchemaVersion: 1,
+		DeviceID:      cred.DeviceID,
+		SentAt:        now,
+		Events:        events,
+	})
+	if err != nil {
+		log.Printf("violation flush failed: %v", err)
+		return
+	}
+	log.Printf(
+		"audit scan: processes=%d violations=%d accepted=%d rejected=%d",
+		len(procs), len(events), res.Accepted, len(res.Rejected),
 	)
 }

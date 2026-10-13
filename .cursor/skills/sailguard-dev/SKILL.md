@@ -73,9 +73,20 @@ curl -s http://127.0.0.1:18080/v1/ready   # db + redis true
 - M0 done (scaffold).
 - M1 foundation **done** (auth/RBAC, `/ready`, Streams skeleton, web login + theme).
 - M2 inventory + agent enroll/heartbeat **done**.
-- M3 **core done**: schema + admin APIs + assign/publish + effective merge + **agent policy sync/cache**; next web policy UI and/or agent audit match (enforce in M4).
-- Later: enforce Level 1, alerts, full admin UI.
+- M3 **done for magang core**: schema + admin APIs + assign/publish + effective merge + agent policy sync/cache + web policy UI + audit match MVP (E2E smoke). Builder polish still open.
+- M4 next: persist violations + Events UI; then real process enum, enforce Level 1, streams/dashboard.
+- Later: alerts, full admin UI breadth.
 
 ## When resuming
 
-State the next concrete step from `handoff.md` (currently: web policy UI or agent audit match). Prefer one complete method per guidance step. If handoff conflicts with the repo, trust the repo + checklist and update handoff.
+State the next concrete step from `handoff.md` (currently: persist events + Events UI). Prefer one complete method per guidance step. If handoff conflicts with the repo, trust the repo + checklist and update handoff.
+
+## Lab smoke (audit)
+
+```bash
+export SG_DATA_DIR=$HOME/.sailguard-agent-lab
+export SG_LAB_FAKE_PROCESS=notepad.exe
+# policy audit + block notepad.exe published+assigned, then:
+go run ./agent/cmd/sailguard-agent
+# expect: audit scan … violations=1 accepted=1
+```

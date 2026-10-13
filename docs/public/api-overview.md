@@ -40,17 +40,18 @@ Administrative APIs are further protected by role-based permissions as routes co
 
 ### Policy
 
-- **Available now:** list/create/get policies; list/add rules; list/add/remove assignments; publish (bumps version); effective-policy preview `GET /v1/devices/{id}/policy`. Schema also includes categories and overrides.
-- **Planned:** category signature admin, device override APIs, web policy builder
+- **Available now:** list/create/get policies; list/add rules; list/add/remove assignments; publish (bumps version); effective-policy preview `GET /v1/devices/{id}/policy`. Admin web: `/policies` and `/policies/:id`. Schema also includes categories and overrides.
+- **Planned:** category signature admin, device override APIs, richer policy editor (edit/delete rules)
 
 ### Agent channel
 
-- **Available now:** enrollment (`POST /v1/agent/enroll`); device auth (`GET /v1/agent/whoami`); heartbeat events (`POST /v1/agent/events` → `last_seen_at`); effective policy download (`GET /v1/agent/policy`, optional `?hash=` for unchanged)
-- **Planned:** violation event persistence / full telemetry pipeline (M4); process audit/enforce evaluation on agent
+- **Available now:** enrollment (`POST /v1/agent/enroll`); device auth (`GET /v1/agent/whoami`); event batch (`POST /v1/agent/events`) accepts **heartbeat** (updates `last_seen_at`) and **`violation_detected`** (validated; durable store planned next); effective policy download (`GET /v1/agent/policy`, optional `?hash=` for unchanged). Agents evaluate cached policy in **audit** mode and report matches.
+- **Planned:** persist violations to the control-plane database; admin event query/UI; enforce-mode termination (`violation_blocked`); full async telemetry pipeline (streams/worker)
 
 ### Telemetry & operations
 
-Event query, alerts, dashboard summaries, administrative audit logs, health endpoints, and alert-channel configuration.
+- **Available now:** health/ready; agent can submit violation matches (accepted, not yet listed in console)
+- **Planned:** event query APIs and Events console; alerts; dashboard summaries; administrative audit logs; alert-channel configuration
 
 ## Health
 

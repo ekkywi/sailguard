@@ -85,6 +85,26 @@ function IconTokens() {
   )
 }
 
+function IconPolicies() {
+  return (
+    <svg className="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M12 3.5 5.5 6.2v5.1c0 4.1 2.7 7.8 6.5 9.2 3.8-1.4 6.5-5.1 6.5-9.2V6.2L12 3.5Z"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9.5 12.2 11.2 13.9 14.8 10"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 function IconPanelLeft() {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -159,6 +179,11 @@ export function AppShell({ children, userLabel }: AppShellProps) {
             <NavLink to="/tokens" className={navClass} title="Tokens">
               <IconTokens />
               <span className="nav-label">Tokens</span>
+            </NavLink>
+            <p className="sidebar-section">Control</p>
+            <NavLink to="/policies" className={navClass} title="Policies">
+              <IconPolicies />
+              <span className="nav-label">Policies</span>
             </NavLink>
           </nav>
         </div>

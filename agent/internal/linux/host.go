@@ -28,7 +28,10 @@ func (h *Host) OSVersion() (string, error) {
 
 func (h *Host) List(ctx context.Context) ([]host.Process, error) {
 	_ = ctx
-	return nil, fmt.Errorf("linux process monitor: stub not implemented")
+	if procs := host.LabFakeProcesses(); procs != nil {
+		return procs, nil
+	}
+	return nil, fmt.Errorf("linux process monitor: stub not implemented (set SG_LAB_FAKE_PROCESS for lab)")
 }
 
 func (h *Host) Terminate(ctx context.Context, pid uint32) error {

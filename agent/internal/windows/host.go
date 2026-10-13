@@ -33,8 +33,11 @@ func (h *Host) OSVersion() (string, error) {
 
 func (h *Host) List(ctx context.Context) ([]host.Process, error) {
 	_ = ctx
+	if procs := host.LabFakeProcesses(); procs != nil {
+		return procs, nil
+	}
 	// Real Toolhelp32 enumeration lands in M4.
-	return nil, fmt.Errorf("windows process enumeration: not implemented yet")
+	return nil, fmt.Errorf("windows process enumeration: not implemented yet (set SG_LAB_FAKE_PROCESS for lab)")
 }
 
 func (h *Host) Terminate(ctx context.Context, pid uint32) error {

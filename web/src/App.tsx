@@ -6,6 +6,8 @@ import DeviceDetailPage from './features/devices/DeviceDetailPage'
 import TokensPage from './features/tokens/TokensPage'
 import GroupsPage from './features/groups/GroupsPage'
 import GroupDetailPage from './features/groups/GroupDetailPage'
+import PoliciesPage from './features/policies/PoliciesPage'
+import PolicyDetailPage from './features/policies/PolicyDetailPage'
 import AppLayout from './layouts/AppLayout'
 import HomePage from './pages/HomePage'
 
@@ -26,6 +28,8 @@ export default function App() {
         <Route path="/tokens" element={<TokensPage />} />
         <Route path="/groups" element={<GroupsPage />} />
         <Route path="/groups/:id" element={<GroupDetailPage />} />
+        <Route path="/policies" element={<PoliciesPage />} />
+        <Route path="/policies/:id" element={<PolicyDetailPage />} />
       </Route>
     </Routes>
   )

@@ -198,6 +198,16 @@ func (a *API) handleAgentEvents(w http.ResponseWriter, r *http.Request) {
 				hbAgentVersion = ev.AgentVersion
 			}
 			accepted++
+		case agentcontract.EventViolationDetected:
+			if ev.Process == nil || strings.TrimSpace(ev.Process.Name) == "" {
+				rejected = append(rejected, map[string]any{
+					"client_event_id": clientID,
+					"code":            "validation_error",
+					"message":         "violation_detected requires process.name",
+				})
+				continue
+			}
+			accepted++
 		default:
 			rejected = append(rejected, map[string]any{
 				"client_event_id": clientID,
