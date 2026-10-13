@@ -46,7 +46,7 @@ For each observed process:
 
 1. If an **allow** rule matches (and is not expired), do not block  
 2. If a **block** rule matches:  
-   - `audit` → report a `violation_detected` event (agents do this today; durable event store and console listing expand next)  
+   - `audit` → report a `violation_detected` event (persisted and shown in the admin Events console)  
    - `enforce` → terminate the process and record a `violation_blocked` event (planned)  
 3. Critical operating-system processes are protected by a safety rail and are never terminated by policy
 

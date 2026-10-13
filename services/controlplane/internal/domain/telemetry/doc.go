@@ -1,6 +1,6 @@
 package telemetry
 
-// Package telemetry: agent event ingest, persistence, dedupe, heartbeats.
+// Package telemetry: agent event persistence and (later) query/dashboard.
 //
-// MVP heartbeat path lives in inventory/httpapi for now
-// (POST /v1/agent/events → ApplyHeartbeat). Full event store + Streams = M4.
+// Heartbeat still updates devices.last_seen_at via inventory.
+// Violations are stored in device_events (00005_events.sql).

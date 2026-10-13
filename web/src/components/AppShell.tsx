@@ -105,6 +105,20 @@ function IconPolicies() {
   )
 }
 
+function IconEvents() {
+  return (
+    <svg className="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M5 6.5h14M5 12h10M5 17.5h12"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+      <circle cx="18.5" cy="12" r="1.75" fill="currentColor" />
+    </svg>
+  )
+}
+
 function IconPanelLeft() {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -184,6 +198,11 @@ export function AppShell({ children, userLabel }: AppShellProps) {
             <NavLink to="/policies" className={navClass} title="Policies">
               <IconPolicies />
               <span className="nav-label">Policies</span>
+            </NavLink>
+            <p className="sidebar-section">Telemetry</p>
+            <NavLink to="/events" className={navClass} title="Events">
+              <IconEvents />
+              <span className="nav-label">Events</span>
             </NavLink>
           </nav>
         </div>

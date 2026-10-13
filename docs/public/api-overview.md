@@ -45,13 +45,13 @@ Administrative APIs are further protected by role-based permissions as routes co
 
 ### Agent channel
 
-- **Available now:** enrollment (`POST /v1/agent/enroll`); device auth (`GET /v1/agent/whoami`); event batch (`POST /v1/agent/events`) accepts **heartbeat** (updates `last_seen_at`) and **`violation_detected`** (validated; durable store planned next); effective policy download (`GET /v1/agent/policy`, optional `?hash=` for unchanged). Agents evaluate cached policy in **audit** mode and report matches.
-- **Planned:** persist violations to the control-plane database; admin event query/UI; enforce-mode termination (`violation_blocked`); full async telemetry pipeline (streams/worker)
+- **Available now:** enrollment (`POST /v1/agent/enroll`); device auth (`GET /v1/agent/whoami`); event batch (`POST /v1/agent/events`) accepts **heartbeat** (updates `last_seen_at`) and **`violation_detected`** (persisted to `device_events`, idempotent by `client_event_id`); effective policy download (`GET /v1/agent/policy`, optional `?hash=` for unchanged). Agents evaluate cached policy in **audit** mode and report matches.
+- **Planned:** enforce-mode termination (`violation_blocked`); full async telemetry pipeline (streams/worker); real process enumeration on Windows
 
 ### Telemetry & operations
 
-- **Available now:** health/ready; agent can submit violation matches (accepted, not yet listed in console)
-- **Planned:** event query APIs and Events console; alerts; dashboard summaries; administrative audit logs; alert-channel configuration
+- **Available now:** health/ready; agents submit `violation_detected` (persisted); admin `GET /v1/events`; web console **Events** page (`/events`)
+- **Planned:** event detail filters, alerts, dashboard summaries, administrative audit logs, alert-channel configuration, async stream pipeline
 
 ## Health
 

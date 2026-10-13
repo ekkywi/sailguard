@@ -45,43 +45,20 @@ go run ./services/controlplane/cmd/api
 cd web && npm run dev
 curl http://127.0.0.1:18080/v1/health
 curl -s http://127.0.0.1:18080/v1/ready   # db + redis true
-# go run ./services/controlplane/cmd/worker
-# redis-cli -p 16380 XADD sg:events '*' type heartbeat note hello
-# Auth smoke:
-# curl -s http://127.0.0.1:18080/v1/auth/login -H 'Content-Type: application/json' \
-#   -d '{"email":"admin@sailguard.local","password":"ChangeMe!SailGuard1"}'
-# Inventory smoke (Bearer token):
-# curl -s http://127.0.0.1:18080/v1/groups -H "Authorization: Bearer $TOKEN"
-# curl -s http://127.0.0.1:18080/v1/devices -H "Authorization: Bearer $TOKEN"
-# curl -s http://127.0.0.1:18080/v1/enrollment-tokens -H "Authorization: Bearer $TOKEN" \
-#   -H 'Content-Type: application/json' -d '{"label":"lab","max_uses":5}'
-# Agent enroll:
-# curl -s http://127.0.0.1:18080/v1/agent/enroll -H 'Content-Type: application/json' \
-#   -d '{"schema_version":1,"enrollment_token":"…","hostname":"lab-pc","machine_guid":"g1","os_family":"windows","os_version":"10","agent_version":"0.0.1"}'
-# Agent device auth + heartbeat + policy:
-# export SG_DATA_DIR=$HOME/.sailguard-agent-lab
-# DEVICE_TOKEN=$(jq -r .device_token "$SG_DATA_DIR/device.json")
-# curl -s http://127.0.0.1:18080/v1/agent/whoami -H "Authorization: Bearer $DEVICE_TOKEN"
-# curl -s "http://127.0.0.1:18080/v1/agent/policy" -H "Authorization: Bearer $DEVICE_TOKEN"
-# curl -s -X POST http://127.0.0.1:18080/v1/agent/events -H "Authorization: Bearer $DEVICE_TOKEN" \
-#   -H 'Content-Type: application/json' -d '{"schema_version":1,"device_id":"…","sent_at":"…","events":[{"client_event_id":"hb-1","event_type":"heartbeat","occurred_at":"…"}]}'
-# Web: http://127.0.0.1:15180 — Devices, Groups, Tokens
 ```
 
 ## Milestone orientation
 
-- M0 done (scaffold).
-- M1 foundation **done** (auth/RBAC, `/ready`, Streams skeleton, web login + theme).
-- M2 inventory + agent enroll/heartbeat **done**.
-- M3 **done for magang core**: schema + admin APIs + assign/publish + effective merge + agent policy sync/cache + web policy UI + audit match MVP (E2E smoke). Builder polish still open.
-- M4 next: persist violations + Events UI; then real process enum, enforce Level 1, streams/dashboard.
-- Later: alerts, full admin UI breadth.
+- M0–M2 **done**.
+- M3 **done for magang core**: policy APIs + web policy UI + agent sync + audit match MVP.
+- M4 **partial**: persist `device_events` + `GET /v1/events` + web `/events` **done**; remaining real process enum, enforce Level 1, streams/dashboard.
+- Later: alerts, users admin, LDAP, etc.
 
 ## When resuming
 
-State the next concrete step from `handoff.md` (currently: persist events + Events UI). Prefer one complete method per guidance step. If handoff conflicts with the repo, trust the repo + checklist and update handoff.
+State the next concrete step from `handoff.md` (currently: real process enum or enforce Level 1). Prefer one complete method per guidance step. If handoff conflicts with the repo, trust the repo + checklist and update handoff.
 
-## Lab smoke (audit)
+## Lab smoke (audit → Events)
 
 ```bash
 export SG_DATA_DIR=$HOME/.sailguard-agent-lab
@@ -89,4 +66,5 @@ export SG_LAB_FAKE_PROCESS=notepad.exe
 # policy audit + block notepad.exe published+assigned, then:
 go run ./agent/cmd/sailguard-agent
 # expect: audit scan … violations=1 accepted=1
+# Admin: http://127.0.0.1:15180/events  or  GET /v1/events with Bearer
 ```

@@ -5,9 +5,11 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/ekkywi/sailguard/pkgs/agentcontract"
 	"github.com/ekkywi/sailguard/services/controlplane/internal/domain/inventory"
+	"github.com/ekkywi/sailguard/services/controlplane/internal/domain/telemetry"
 )
 
 func (a *API) handleAgentEnroll(w http.ResponseWriter, r *http.Request) {
@@ -169,6 +171,7 @@ func (a *API) handleAgentEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	store := inventory.NewStore(a.pool)
+	events := telemetry.NewStore(a.pool)
 	accepted := 0
 	rejected := make([]map[string]any, 0)
 	sawHeartbeat := false
@@ -204,6 +207,48 @@ func (a *API) handleAgentEvents(w http.ResponseWriter, r *http.Request) {
 					"client_event_id": clientID,
 					"code":            "validation_error",
 					"message":         "violation_detected requires process.name",
+				})
+				continue
+			}
+
+			occurredAt := time.Now().UTC()
+			if ts := strings.TrimSpace(ev.OccurredAt); ts != "" {
+				if t, err := time.Parse(time.RFC3339, ts); err == nil {
+					occurredAt = t.UTC()
+				}
+			}
+
+			in := telemetry.InsertViolationInput{
+				DeviceID:           deviceID,
+				ClientEventID:      clientID,
+				EventType:          agentcontract.EventViolationDetected,
+				OccurredAt:         occurredAt,
+				DedupeKey:          ev.DedupeKey,
+				ProcessPID:         ev.Process.PID,
+				ProcessName:        ev.Process.Name,
+				ProcessPath:        ev.Process.Path,
+				ProcessHashSHA256:  ev.Process.HashSHA256,
+				ProcessPublisher:   ev.Process.Publisher,
+				ProcessProductName: ev.Process.ProductName,
+				ProcessUserName:    ev.Process.UserName,
+			}
+			if ev.Match != nil {
+				in.MatchRuleID = ev.Match.RuleID
+				in.MatchAction = ev.Match.Action
+				in.MatchRuleType = ev.Match.RuleType
+				in.MatchValue = ev.Match.Value
+				in.MatchCategoryCode = ev.Match.CategoryCode
+			}
+			if ev.Policy != nil {
+				in.PolicyVersion = ev.Policy.Version
+				in.PolicyMode = ev.Policy.Mode
+			}
+
+			if _, _, err := events.InsertViolation(r.Context(), in); err != nil {
+				rejected = append(rejected, map[string]any{
+					"client_event_id": clientID,
+					"code":            "persist_error",
+					"message":         "failed to store violation",
 				})
 				continue
 			}
