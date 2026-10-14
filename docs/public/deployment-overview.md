@@ -42,7 +42,7 @@ Agents are installed on endpoints and are **not** packaged inside the control-pl
 
 | Platform | Support level | Notes |
 |----------|---------------|--------|
-| **Windows 7 SP1 and later** (including 8.1, 10, 11) | Supported target | Prefer 64-bit; TLS 1.2; Toolhelp list/terminate + PID-diff watch; build Win7 with Go 1.20 |
+| **Windows 7 SP1 and later** (including 8.1, 10, 11) | Supported target | Prefer 64-bit; TLS 1.2; Toolhelp list/terminate; WMI watch (PID-diff fallback); build Win7 with Go 1.20 |
 | **Linux** | Supported target | Process enumeration via `/proc`; Level 1 terminate; poll-based observe (event watch later) |
 | **Windows XP / Vista** | **Not supported** | Out of scope for the current Go agent |
 | **macOS** | Later | Agent stubs only |

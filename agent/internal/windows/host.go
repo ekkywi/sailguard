@@ -101,6 +101,22 @@ func (h *Host) Watch(ctx context.Context, onCreate func(host.Process)) error {
 		return fmt.Errorf("windows watch: onCreate is nil")
 	}
 
+	// Prefer WMI process-creation events; fall back to Toolhelp PID-diff (Win7-safe).
+	if err := h.watchWMI(ctx, onCreate); err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		log.Printf("windows watch: WMI unavailable (%v); falling back to PID-diff", err)
+		return h.watchPIDDiff(ctx, onCreate)
+	}
+	return nil
+}
+
+func (h *Host) watchPIDDiff(ctx context.Context, onCreate func(host.Process)) error {
+	if onCreate == nil {
+		return fmt.Errorf("windows watch: onCreate is nil")
+	}
+
 	seen := make(map[uint32]struct{})
 	if procs, err := h.List(ctx); err == nil {
 		for _, p := range procs {
@@ -138,3 +154,5 @@ func (h *Host) Watch(ctx context.Context, onCreate func(host.Process)) error {
 		}
 	}
 }
+
+

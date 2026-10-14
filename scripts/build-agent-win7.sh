@@ -22,6 +22,9 @@ cleanup() {
   cp -f "$TMP/agent.go.mod" "$ROOT/agent/go.mod"
   cp -f "$TMP/agent.go.sum" "$ROOT/agent/go.sum"
   cp -f "$TMP/pkgs.go.mod" "$ROOT/pkgs/go.mod"
+  if [[ -f "$TMP/pkgs.go.sum" ]]; then
+    cp -f "$TMP/pkgs.go.sum" "$ROOT/pkgs/go.sum"
+  fi
   rm -rf "$TMP"
 }
 trap cleanup EXIT
@@ -29,30 +32,12 @@ trap cleanup EXIT
 cp "$ROOT/agent/go.mod" "$TMP/agent.go.mod"
 cp "$ROOT/agent/go.sum" "$TMP/agent.go.sum"
 cp "$ROOT/pkgs/go.mod" "$TMP/pkgs.go.mod"
+if [[ -f "$ROOT/pkgs/go.sum" ]]; then
+  cp "$ROOT/pkgs/go.sum" "$TMP/pkgs.go.sum"
+fi
 
-# Temporary module metadata compatible with Go 1.20
-cat >"$ROOT/pkgs/go.mod" <<'EOF'
-module github.com/ekkywi/sailguard/pkgs
-
-go 1.20
-EOF
-
-cat >"$ROOT/agent/go.mod" <<'EOF'
-module github.com/ekkywi/sailguard/agent
-
-go 1.20
-
-require github.com/ekkywi/sailguard/pkgs v0.0.0
-
-require golang.org/x/sys v0.15.0
-
-replace github.com/ekkywi/sailguard/pkgs => ../pkgs
-EOF
-
-cat >"$ROOT/agent/go.sum" <<'EOF'
-golang.org/x/sys v0.15.0 h1:h48lPFYpsTvQJZF4EKyI4aLHaev3CxivZmv7yZig9pc=
-golang.org/x/sys v0.15.0/go.mod h1:/VUhepiaJMQUp4+oa/7Zr1D23ma6VTLIYjOOTFZPUcA=
-EOF
+# Temporary module metadata compatible with Go 1.20 (keep requires; tidy below).
+sed -i 's/^go .*/go 1.20/' "$ROOT/pkgs/go.mod" "$ROOT/agent/go.mod"
 
 mkdir -p "$ROOT/bin"
 export GOWORK=off
@@ -60,6 +45,10 @@ export GOTOOLCHAIN=local
 
 (
   cd "$ROOT/agent"
+  "$GO120" mod tidy
+  # Pin x/sys to a release that still builds with Go 1.20 if tidy floated too high.
+  "$GO120" get golang.org/x/sys@v0.15.0
+  "$GO120" mod tidy
   GOOS=windows GOARCH=amd64 "$GO120" build -o "$OUT" ./cmd/sailguard-agent
 )
 

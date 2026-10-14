@@ -45,8 +45,8 @@ Administrative APIs are further protected by role-based permissions as routes co
 
 ### Agent channel
 
-- **Available now:** enrollment (`POST /v1/agent/enroll`); device auth (`GET /v1/agent/whoami`); event batch (`POST /v1/agent/events`) accepts **heartbeat**, **`violation_detected`**, and **`violation_blocked`** (persisted to `device_events`, idempotent by `client_event_id`); effective policy download (`GET /v1/agent/policy`, optional `?hash=` for unchanged). Agents evaluate cached policy: Linux `/proc` + Windows Toolhelp; Windows also uses a fast PID-diff watch with periodic scan fallback; enforce mode terminates matched processes (Level 1).
-- **Planned:** OS-native process-start subscriptions (e.g. WMI/ETW) as the primary Windows watch path; full async telemetry pipeline (streams/worker)
+- **Available now:** enrollment (`POST /v1/agent/enroll`); device auth (`GET /v1/agent/whoami`); event batch (`POST /v1/agent/events`) accepts **heartbeat**, **`violation_detected`**, and **`violation_blocked`** (persisted to `device_events`, idempotent by `client_event_id`); effective policy download (`GET /v1/agent/policy`, optional `?hash=` for unchanged). Agents evaluate cached policy: Linux `/proc` + Windows Toolhelp; Windows watch prefers WMI process-creation events with PID-diff + periodic scan fallbacks; enforce mode terminates matched processes (Level 1).
+- **Planned:** ETW-based watch refinements; full async telemetry pipeline (streams/worker)
 
 ### Telemetry & operations
 

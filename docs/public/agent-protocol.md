@@ -13,8 +13,8 @@ This document describes the agent ↔ control plane contract at a product level.
 5. **Poll / pull effective policy** via `GET /v1/agent/policy` (optional `?hash=` → `unchanged`); replace local cache atomically when content changes  
 6. **Observe processes** and evaluate against cached policy:  
    - **Enumerate** via Linux `/proc` or Windows Toolhelp  
-   - **Fast path (Windows):** short-interval PID-diff watch (~0.5s) detects new processes  
-   - **Fallback / reconciliation:** periodic full scan (default ~3s; `SG_SCAN_INTERVAL`)  
+   - **Fast path (Windows):** WMI `__InstanceCreationEvent` for new processes; if WMI is unavailable, fall back to Toolhelp PID-diff (~0.5s)  
+   - **Reconciliation:** periodic full scan (default ~3s; `SG_SCAN_INTERVAL`) catches anything the watch missed  
    - **audit** → report `violation_detected`; **enforce** → terminate (Level 1) and report `violation_blocked`  
 7. **Heartbeat and policy sync** run on a separate slower timer (default ~30s; `SG_HEARTBEAT_INTERVAL`) — not on the enforce path  
 8. Refresh when the server returns a newer version/hash — supported via conditional sync above

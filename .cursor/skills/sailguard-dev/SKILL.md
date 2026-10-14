@@ -51,19 +51,20 @@ curl -s http://127.0.0.1:18080/v1/ready   # db + redis true
 ## Milestone orientation
 
 - M0–M3 magang core **done** (policy UI, audit match, Events persist/UI; mode PATCH + delete rules).
-- M4 **partial**: Linux `/proc` List+Terminate **done**; Windows Toolhelp List+Terminate+PID-diff Watch+scan fallback **done**; Win7 Go 1.20 build **done**. Remaining: WMI/ETW Watch (6B), streams/dashboard, MachineGuid.
+- M4 **partial**: Linux `/proc` List+Terminate **done**; Windows Toolhelp List+Terminate+WMI Watch (PID-diff fallback)+scan **done**; Win7 Go 1.20 build **done**. Remaining: streams/dashboard, MachineGuid; optional ETW/Linux Watch.
 - Later: alerts, users admin, LDAP, etc.
 
 ## Agent timers / dual-path
 
 - `SG_SCAN_INTERVAL` default `3s` — full list reconciliation (and Linux enforce path today).
 - `SG_HEARTBEAT_INTERVAL` default `30s` — policy sync + heartbeat (not enforce).
-- Windows `Watch`: PID-diff every ~500ms; on `ErrWatchUnsupported` → poll only.
+- Windows `Watch`: WMI `__InstanceCreationEvent` first; on failure → Toolhelp PID-diff ~500ms; Linux → `ErrWatchUnsupported` (poll only).
 - Shared `recentSet` dedupe (~45s) across watch + scan to avoid double kill/report.
+- Win7 build: `./scripts/build-agent-win7.sh` (sed go 1.20 + `go mod tidy` with Go 1.20).
 
 ## When resuming
 
-State the next concrete step from `handoff.md` (currently: Windows WMI/ETW Watch 6B, or MachineGuid). Prefer one complete method per guidance step. If handoff conflicts with the repo, trust the repo + checklist and update handoff.
+State the next concrete step from `handoff.md` (currently: MachineGuid, or streams/dashboard). Prefer one complete method per guidance step. If handoff conflicts with the repo, trust the repo + checklist and update handoff.
 
 ## Lab smoke
 

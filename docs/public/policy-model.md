@@ -42,7 +42,7 @@ Administrators edit policies in draft form and **publish** to produce a new effe
 
 ## Agent evaluation order
 
-For each observed process (Linux `/proc` list; Windows Toolhelp list and fast new-PID watch; same evaluation rules):
+For each observed process (Linux `/proc` list; Windows Toolhelp list, WMI creation watch, and PID-diff/scan fallbacks; same evaluation rules):
 
 1. If an **allow** rule matches (and is not expired), do not block  
 2. If a **block** rule matches:  

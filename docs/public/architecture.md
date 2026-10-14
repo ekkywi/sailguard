@@ -28,7 +28,7 @@ Agents evaluate policy locally so enforcement continues during brief control-pla
 
 | Component | Responsibility |
 |-----------|----------------|
-| **Agent** | Device enrollment, policy sync, process observation (Linux `/proc`; Windows Toolhelp + fast PID-diff watch), audit/enforce Level 1 terminate, event submission; heartbeat timer separate from enforce path |
+| **Agent** | Device enrollment, policy sync, process observation (Linux `/proc`; Windows Toolhelp + WMI watch with PID-diff fallback), audit/enforce Level 1 terminate, event submission; heartbeat timer separate from enforce path |
 | **API** | Authentication (local admin login + Bearer tokens), authorization, configuration APIs, agent-facing endpoints |
 | **Worker** | Asynchronous processing via Redis Streams (event pipelines, notifications, retention jobs) |
 | **Web console** | Administrative UI (local sign-in; overview; Devices, Groups with membership, Tokens; Policies list/create, rules, assign, publish; Events list of policy violations) |
@@ -52,7 +52,7 @@ See [Policy model](policy-model.md) for semantics.
 
 SailGuard’s primary enforcement approach is **endpoint process control**: detect a matching process and terminate it when the device is in enforce mode.
 
-Detection uses a **dual path**: a fast new-process watch where available (Windows PID-diff today; OS event subscriptions such as WMI/ETW are a planned upgrade) plus a **periodic full scan** as reconciliation/fallback. Heartbeat and policy pull stay on a slower cadence so enforcement latency is not tied to telemetry intervals.
+Detection uses a **layered path**: Windows prefers WMI process-creation events, falls back to Toolhelp PID-diff if WMI fails, and always runs a **periodic full scan** as reconciliation. Heartbeat and policy pull stay on a slower cadence so enforcement latency is not tied to telemetry intervals. (ETW remains an optional future refinement.)
 
 Stronger OS-native application control mechanisms (for example publisher-based OS policy packs) may be evaluated as optional advanced capabilities without changing the control-plane model.
 
