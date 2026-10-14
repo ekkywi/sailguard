@@ -42,13 +42,15 @@ Administrators edit policies in draft form and **publish** to produce a new effe
 
 ## Agent evaluation order
 
-For each observed process (Linux agents list live processes via `/proc` today; Windows enumeration follows the same evaluation rules once Toolhelp listing is enabled):
+For each observed process (Linux `/proc` list; Windows Toolhelp list and fast new-PID watch; same evaluation rules):
 
 1. If an **allow** rule matches (and is not expired), do not block  
 2. If a **block** rule matches:  
    - `audit` → report a `violation_detected` event (persisted and shown in the admin Events console)  
-   - `enforce` → terminate the process and record a `violation_blocked` event (planned)  
-3. Critical operating-system processes are protected by a safety rail and are never terminated by policy
+   - `enforce` → terminate the process and record a `violation_blocked` event  
+3. Critical operating-system processes are protected by a safety rail and are never terminated by policy  
+
+Administrators can switch a policy between `audit` and `enforce` (PATCH + publish) and delete unused rules from the policy detail console.
 
 ## Privacy posture
 

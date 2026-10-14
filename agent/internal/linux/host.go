@@ -89,9 +89,25 @@ func readProcIdentity(pid string) (name, path string) {
 
 func (h *Host) Terminate(ctx context.Context, pid uint32) error {
 	_ = ctx
-	return fmt.Errorf("linux enforce: stub not implemented (pid=%d)", pid)
+	if pid == 0 || pid == 1 {
+		return fmt.Errorf("linux terminate: refusing pid %d", pid)
+	}
+	proc, err := os.FindProcess(int(pid))
+	if err != nil {
+		return err
+	}
+	if err := proc.Signal(os.Kill); err != nil { //SIGKILL
+		return fmt.Errorf("kill(%d): %w", pid, err)
+	}
+	return nil
 }
 
 func (h *Host) Run(ctx context.Context, fn func(context.Context) error) error {
 	return fn(ctx)
+}
+
+func (h *Host) Watch(ctx context.Context, onCreate func(host.Process)) error {
+	_ = ctx
+	_ = onCreate
+	return host.ErrWatchUnsupported
 }

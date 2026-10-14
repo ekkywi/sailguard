@@ -1,6 +1,6 @@
 # Architecture
 
-SailGuard is an on-premises platform for monitoring and controlling disallowed applications on managed endpoints. Near-term agent observation targets **Windows and Linux**; a multi-platform agent layout also reserves Darwin stubs for later.
+SailGuard is an on-premises platform for monitoring and controlling disallowed applications on managed endpoints. Supported agents target **Windows 7 SP1+** and **Linux**; a multi-platform agent layout reserves Darwin stubs for later. Windows XP is out of scope.
 
 ## Design goals
 
@@ -28,7 +28,7 @@ Agents evaluate policy locally so enforcement continues during brief control-pla
 
 | Component | Responsibility |
 |-----------|----------------|
-| **Agent** | Device enrollment, policy synchronization, process observation (Linux `/proc` list + audit match/report today; Windows enumeration and Level 1 enforce next), event submission |
+| **Agent** | Device enrollment, policy sync, process observation (Linux `/proc`; Windows Toolhelp + fast PID-diff watch), audit/enforce Level 1 terminate, event submission; heartbeat timer separate from enforce path |
 | **API** | Authentication (local admin login + Bearer tokens), authorization, configuration APIs, agent-facing endpoints |
 | **Worker** | Asynchronous processing via Redis Streams (event pipelines, notifications, retention jobs) |
 | **Web console** | Administrative UI (local sign-in; overview; Devices, Groups with membership, Tokens; Policies list/create, rules, assign, publish; Events list of policy violations) |
@@ -50,7 +50,11 @@ See [Policy model](policy-model.md) for semantics.
 
 ## Enforcement approach
 
-SailGuard’s primary enforcement approach is **endpoint process control**: detect a matching process and terminate it when the device is in enforce mode. Stronger OS-native application control mechanisms (for example publisher-based OS policy packs) may be evaluated as optional advanced capabilities without changing the control-plane model.
+SailGuard’s primary enforcement approach is **endpoint process control**: detect a matching process and terminate it when the device is in enforce mode.
+
+Detection uses a **dual path**: a fast new-process watch where available (Windows PID-diff today; OS event subscriptions such as WMI/ETW are a planned upgrade) plus a **periodic full scan** as reconciliation/fallback. Heartbeat and policy pull stay on a slower cadence so enforcement latency is not tied to telemetry intervals.
+
+Stronger OS-native application control mechanisms (for example publisher-based OS policy packs) may be evaluated as optional advanced capabilities without changing the control-plane model.
 
 ## Trust boundaries
 

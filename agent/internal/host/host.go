@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"strings"
+	"errors"
 )
 
 // Process is a running process snapshot used for policy matching.
@@ -35,6 +36,12 @@ type ProcessMonitor interface {
 	List(ctx context.Context) ([]Process, error)
 }
 
+type ProcessWatcher interface {
+	Watch(ctx context.Context, onCreate func(Process)) error
+}
+
+var ErrWatchUnsupported = errors.New("process watch unsupported")
+
 type Enforcer interface {
 	Terminate(ctx context.Context, pid uint32) error
 }
@@ -55,6 +62,7 @@ type Host interface {
 	OSFamily() string // windows | linux | darwin
 	IdentityProvider
 	ProcessMonitor
+	ProcessWatcher
 	Enforcer
 	ServiceManager
 }

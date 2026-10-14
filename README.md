@@ -1,12 +1,12 @@
 # SailGuard
 
-On-prem IT endpoint monitoring: detect, report, and block disallowed applications (Windows-first).
+On-prem IT endpoint monitoring: detect, report, and block disallowed applications (**Windows 7 SP1+** and Linux; macOS later).
 
 ## Stack (locked)
 
 | Layer | Choice |
 |-------|--------|
-| Agent | Go (Windows first; Linux/macOS stubs) |
+| Agent | Go (Windows 7 SP1+ and Linux; macOS stubs) |
 | Control plane | Go (`api` + `worker`) |
 | Frontend | React + TypeScript + **npm** |
 | Data | PostgreSQL + Redis (Streams from day one) |

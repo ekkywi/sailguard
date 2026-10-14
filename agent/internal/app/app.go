@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/ekkywi/sailguard/agent/internal/config"
@@ -50,20 +51,49 @@ func Run(ctx context.Context, cfg config.Config, h host.Host) error {
 	client := controlplane.NewClient(serverURL)
 
 	return h.Run(ctx, func(ctx context.Context) error {
-		ticker := time.NewTicker(30 * time.Second)
-		defer ticker.Stop()
+		scanEvery := cfg.ScanInterval
+		if scanEvery <= 0 {
+			scanEvery = 3 * time.Second
+		}
+		hbEvery := cfg.HeartbeatInterval
+		if hbEvery <= 0 {
+			hbEvery = 30 * time.Second
+		}
+
+		scanTicker := time.NewTicker(scanEvery)
+		defer scanTicker.Stop()
+		hbTicker := time.NewTicker(hbEvery)
+		defer hbTicker.Stop()
+
+		log.Printf("timers scan %s heartbeat %s", scanEvery, hbEvery)
+
+		recent := &recentSet{}
 
 		syncPolicy(ctx, client, cred, dataDir)
-		scanAndReport(ctx, client, cred, h, dataDir)
+		scanAndReport(ctx, client, cred, h, dataDir, recent)
 		sendHeartbeat(ctx, client, cred, cfg, hostname, osVersion)
+
+		go func() {
+			err := h.Watch(ctx, func(p host.Process) {
+				handleProcessEvent(ctx, client, cred, h, dataDir, p, recent, "watch")
+			})
+			if errors.Is(err, host.ErrWatchUnsupported) {
+				log.Printf("process watch: unsupported — poll fallback only")
+				return
+			}
+			if err != nil && ctx.Err() == nil {
+				log.Printf("process watch stopped: %v (poll continues)", err)
+			}
+		}()
 
 		for {
 			select {
 			case <-ctx.Done():
 				return nil
-			case <-ticker.C:
+			case <-scanTicker.C:
+				scanAndReport(ctx, client, cred, h, dataDir, recent)
+			case <-hbTicker.C:
 				syncPolicy(ctx, client, cred, dataDir)
-				scanAndReport(ctx, client, cred, h, dataDir)
 				sendHeartbeat(ctx, client, cred, cfg, hostname, osVersion)
 			}
 		}
@@ -197,6 +227,7 @@ func scanAndReport(
 	cred *credstore.Credential,
 	h host.Host,
 	dataDir string,
+	recent *recentSet,
 ) {
 	ep, err := policycache.Load(dataDir)
 	if err != nil {
@@ -218,49 +249,11 @@ func scanAndReport(
 	events := make([]agentcontract.Event, 0)
 
 	for _, p := range procs {
-		if policypkg.IsCriticalProcess(p.Name) {
+		ev, ok := evaluateAndReport(ctx, ep, p, h, now, recent)
+		if !ok {
 			continue
 		}
-
-		attrs := policypkg.ProcessAttrs{
-			Name:        p.Name,
-			Path:        p.Path,
-			HashSHA256:  p.HashSHA256,
-			Publisher:   p.Publisher,
-			ProductName: p.ProductName,
-		}
-
-		matched, allow := policypkg.Evaluate(*ep, attrs)
-		if matched == nil || allow {
-			continue
-		}
-
-		events = append(events, agentcontract.Event{
-			ClientEventID: fmt.Sprintf("vd-%d-%d", p.PID, time.Now().UnixNano()),
-			EventType:     agentcontract.EventViolationDetected,
-			OccurredAt:    now,
-			DedupeKey:     fmt.Sprintf("%s:%d:%s", ep.Hash, p.PID, matched.ID),
-			Process: &agentcontract.ProcessInfo{
-				PID:         p.PID,
-				Name:        p.Name,
-				Path:        p.Path,
-				HashSHA256:  p.HashSHA256,
-				Publisher:   p.Publisher,
-				ProductName: p.ProductName,
-				UserName:    p.UserName,
-			},
-			Match: &agentcontract.MatchInfo{
-				RuleID:       matched.ID,
-				Action:       string(matched.Action),
-				RuleType:     string(matched.RuleType),
-				Value:        matched.Value,
-				CategoryCode: matched.CategoryCode,
-			},
-			Policy: &agentcontract.PolicyRef{
-				Version: ep.Version,
-				Mode:    string(ep.Mode),
-			},
-		})
+		events = append(events, ev)
 	}
 
 	if len(events) == 0 {
@@ -282,4 +275,158 @@ func scanAndReport(
 		"audit scan: processes=%d violations=%d accepted=%d rejected=%d",
 		len(procs), len(events), res.Accepted, len(res.Rejected),
 	)
+}
+
+func evaluateAndReport(
+	ctx context.Context,
+	ep *policypkg.EffectivePolicy,
+	p host.Process,
+	h host.Host,
+	now string,
+	recent *recentSet,
+) (agentcontract.Event, bool) {
+	if policypkg.IsCriticalProcess(p.Name) {
+		return agentcontract.Event{}, false
+	}
+
+	attrs := policypkg.ProcessAttrs{
+		Name:        p.Name,
+		Path:        p.Path,
+		HashSHA256:  p.HashSHA256,
+		Publisher:   p.Publisher,
+		ProductName: p.ProductName,
+	}
+
+	matched, allow := policypkg.Evaluate(*ep, attrs)
+	if matched == nil || allow {
+		return agentcontract.Event{}, false
+	}
+
+	eventType := agentcontract.EventViolationDetected
+	clientPrefix := "vd"
+	if ep.Mode == policypkg.ModeEnforce {
+		eventType = agentcontract.EventViolationBlocked
+		clientPrefix = "vb"
+	}
+
+	dedupeKey := fmt.Sprintf("%s:%d:%s:%s", ep.Hash, p.PID, matched.ID, eventType)
+	// Shared with Watch so poll reconciliation does not double-terminate / double-report.
+	if recent != nil && recent.seenRecently(dedupeKey, 45*time.Second) {
+		return agentcontract.Event{}, false
+	}
+
+	var enf *agentcontract.Enforcement
+	if ep.Mode == policypkg.ModeEnforce {
+		errTerm := h.Terminate(ctx, p.PID)
+		enf = &agentcontract.Enforcement{
+			Result:   "terminated",
+			Attempts: 1,
+		}
+		if errTerm != nil {
+			msg := errTerm.Error()
+			enf.Result = "terminate_failed"
+			enf.Error = &msg
+			log.Printf("enforce terminate pid=%d name=%s: %v", p.PID, p.Name, errTerm)
+		}
+	}
+
+	ev := agentcontract.Event{
+		ClientEventID: fmt.Sprintf("%s-%d-%d", clientPrefix, p.PID, time.Now().UnixNano()),
+		EventType:     eventType,
+		OccurredAt:    now,
+		DedupeKey:     dedupeKey,
+		Process: &agentcontract.ProcessInfo{
+			PID:         p.PID,
+			Name:        p.Name,
+			Path:        p.Path,
+			HashSHA256:  p.HashSHA256,
+			Publisher:   p.Publisher,
+			ProductName: p.ProductName,
+			UserName:    p.UserName,
+		},
+		Match: &agentcontract.MatchInfo{
+			RuleID:       matched.ID,
+			Action:       string(matched.Action),
+			RuleType:     string(matched.RuleType),
+			Value:        matched.Value,
+			CategoryCode: matched.CategoryCode,
+		},
+		Policy: &agentcontract.PolicyRef{
+			Version: ep.Version,
+			Mode:    string(ep.Mode),
+		},
+		Enforcement: enf,
+	}
+	return ev, true
+}
+
+type recentSet struct {
+	mu sync.Mutex
+	m  map[string]time.Time
+}
+
+func (r *recentSet) seenRecently(key string, window time.Duration) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.m == nil {
+		r.m = make(map[string]time.Time)
+	}
+	now := time.Now()
+	for k, t := range r.m {
+		if now.Sub(t) > window {
+			delete(r.m, k)
+		}
+	}
+	if t, ok := r.m[key]; ok && now.Sub(t) <= window {
+		return true
+	}
+	r.m[key] = now
+	return false
+}
+
+func flushEvents(
+	ctx context.Context,
+	client *controlplane.Client,
+	cred *credstore.Credential,
+	events []agentcontract.Event,
+	label string,
+) {
+	if len(events) == 0 {
+		return
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	res, err := client.PostEvents(ctx, cred.DeviceToken, agentcontract.EventBatchRequest{
+		SchemaVersion: 1,
+		DeviceID:      cred.DeviceID,
+		SentAt:        now,
+		Events:        events,
+	})
+	if err != nil {
+		log.Printf("%s flush failed: %v", label, err)
+		return
+	}
+	log.Printf("%s: violations=%d accepted=%d rejected=%d",
+		label, len(events), res.Accepted, len(res.Rejected))
+}
+
+func handleProcessEvent(
+	ctx context.Context,
+	client *controlplane.Client,
+	cred *credstore.Credential,
+	h host.Host,
+	dataDir string,
+	p host.Process,
+	recent *recentSet,
+	label string,
+) {
+	ep, err := policycache.Load(dataDir)
+	if err != nil || ep == nil || len(ep.Rules) == 0 {
+		return
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	ev, ok := evaluateAndReport(ctx, ep, p, h, now, recent)
+	if !ok {
+		return
+	}
+	flushEvents(ctx, client, cred, []agentcontract.Event{ev}, label)
 }

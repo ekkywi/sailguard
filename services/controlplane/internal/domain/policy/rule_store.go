@@ -95,3 +95,18 @@ func (s *Store) AddRule(ctx context.Context, policyID uuid.UUID, in AddRuleInput
 	}
 	return &r, nil
 }
+
+func (s *Store) DeleteRule(ctx context.Context, policyID, ruleID uuid.UUID) error {
+	const q = `
+		DELETE FROM policy_rules
+		WHERE id = $1 AND policy_id = $2
+	`
+	tag, err := s.pool.Exec(ctx, q, ruleID, policyID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}

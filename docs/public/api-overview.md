@@ -40,17 +40,17 @@ Administrative APIs are further protected by role-based permissions as routes co
 
 ### Policy
 
-- **Available now:** list/create/get policies; list/add rules; list/add/remove assignments; publish (bumps version); effective-policy preview `GET /v1/devices/{id}/policy`. Admin web: `/policies` and `/policies/:id`. Schema also includes categories and overrides.
-- **Planned:** category signature admin, device override APIs, richer policy editor (edit/delete rules)
+- **Available now:** list/create/get policies; **PATCH** mode (`audit`/`enforce`); list/add/**delete** rules; list/add/remove assignments; publish (bumps version); effective-policy preview `GET /v1/devices/{id}/policy`. Admin web: `/policies` and `/policies/:id` (change mode, delete rules). Schema also includes categories and overrides.
+- **Planned:** category signature admin, device override APIs, richer policy editor (edit rule values in place)
 
 ### Agent channel
 
-- **Available now:** enrollment (`POST /v1/agent/enroll`); device auth (`GET /v1/agent/whoami`); event batch (`POST /v1/agent/events`) accepts **heartbeat** (updates `last_seen_at`) and **`violation_detected`** (persisted to `device_events`, idempotent by `client_event_id`); effective policy download (`GET /v1/agent/policy`, optional `?hash=` for unchanged). Agents evaluate cached policy in **audit** mode and report matches. On **Linux**, agents enumerate live processes via `/proc` (Windows Toolhelp enumeration planned next).
-- **Planned:** Windows process enumeration; enforce-mode termination (`violation_blocked`) on Windows and Linux; full async telemetry pipeline (streams/worker)
+- **Available now:** enrollment (`POST /v1/agent/enroll`); device auth (`GET /v1/agent/whoami`); event batch (`POST /v1/agent/events`) accepts **heartbeat**, **`violation_detected`**, and **`violation_blocked`** (persisted to `device_events`, idempotent by `client_event_id`); effective policy download (`GET /v1/agent/policy`, optional `?hash=` for unchanged). Agents evaluate cached policy: Linux `/proc` + Windows Toolhelp; Windows also uses a fast PID-diff watch with periodic scan fallback; enforce mode terminates matched processes (Level 1).
+- **Planned:** OS-native process-start subscriptions (e.g. WMI/ETW) as the primary Windows watch path; full async telemetry pipeline (streams/worker)
 
 ### Telemetry & operations
 
-- **Available now:** health/ready; agents submit `violation_detected` (persisted); admin `GET /v1/events`; web console **Events** page (`/events`)
+- **Available now:** health/ready; agents submit `violation_detected` / `violation_blocked` (persisted); admin `GET /v1/events`; web console **Events** page (`/events`)
 - **Planned:** event detail filters, alerts, dashboard summaries, administrative audit logs, alert-channel configuration, async stream pipeline
 
 ## Health

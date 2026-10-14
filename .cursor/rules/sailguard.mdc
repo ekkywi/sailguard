@@ -6,6 +6,7 @@ alwaysApply: true
 # SailGuard
 
 On-prem endpoint application control. Module path: `github.com/ekkywi/sailguard`.
+Agent OS floor: **Windows 7 SP1+** and **Linux** (XP unsupported; Darwin later).
 
 ## Collaboration
 

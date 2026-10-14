@@ -26,6 +26,13 @@ export function getPolicy(id: string) {
   return apiFetch<Policy>(`/v1/policies/${id}`)
 }
 
+export function patchPolicy(id: string, body: { mode: string }) {
+  return apiFetch<Policy>(`/v1/policies/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+}
+
 export function listPolicyRules(policyId: string) {
   return apiFetch<PolicyRuleListData>(`/v1/policies/${policyId}/rules`)
 }
@@ -35,6 +42,13 @@ export function addPolicyRule(policyId: string, body: AddPolicyRuleInput) {
     method: 'POST',
     body: JSON.stringify(body),
   })
+}
+
+export function deletePolicyRule(policyId: string, ruleId: string) {
+  return apiFetch<{ policy_id: string; rule_id: string }>(
+    `/v1/policies/${policyId}/rules/${ruleId}`,
+    { method: 'DELETE' },
+  )
 }
 
 export function listPolicyAssignments(policyId: string) {

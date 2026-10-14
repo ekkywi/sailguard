@@ -201,7 +201,7 @@ func (a *API) handleAgentEvents(w http.ResponseWriter, r *http.Request) {
 				hbAgentVersion = ev.AgentVersion
 			}
 			accepted++
-		case agentcontract.EventViolationDetected:
+		case agentcontract.EventViolationDetected, agentcontract.EventViolationBlocked:
 			if ev.Process == nil || strings.TrimSpace(ev.Process.Name) == "" {
 				rejected = append(rejected, map[string]any{
 					"client_event_id": clientID,
@@ -221,7 +221,7 @@ func (a *API) handleAgentEvents(w http.ResponseWriter, r *http.Request) {
 			in := telemetry.InsertViolationInput{
 				DeviceID:           deviceID,
 				ClientEventID:      clientID,
-				EventType:          agentcontract.EventViolationDetected,
+				EventType:          ev.EventType,
 				OccurredAt:         occurredAt,
 				DedupeKey:          ev.DedupeKey,
 				ProcessPID:         ev.Process.PID,

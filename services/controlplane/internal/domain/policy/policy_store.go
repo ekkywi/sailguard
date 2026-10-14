@@ -89,3 +89,33 @@ func (s *Store) FindPolicyByID(ctx context.Context, id uuid.UUID) (*Policy, erro
 	}
 	return &p, nil
 }
+
+// UpdatePolicyMode sets audit/enforce. Effective policy for agents uses live mode
+// on the next sync; publish still recommended to bump version for operators.
+func (s *Store) UpdatePolicyMode(ctx context.Context, id uuid.UUID, mode string) (*Policy, error) {
+	mode = strings.TrimSpace(strings.ToLower(mode))
+	if mode != "audit" && mode != "enforce" {
+		return nil, ErrInvalid
+	}
+
+	const q = `
+		UPDATE policies
+		SET mode = $2,
+		    updated_at = now()
+		WHERE id = $1
+		RETURNING id, name, description, mode, priority, version, published_at,
+		          created_at, updated_at
+	`
+	var p Policy
+	err := s.pool.QueryRow(ctx, q, id, mode).Scan(
+		&p.ID, &p.Name, &p.Description, &p.Mode, &p.Priority, &p.Version, &p.PublishedAt,
+		&p.CreatedAt, &p.UpdatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
+}

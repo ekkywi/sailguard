@@ -9,9 +9,11 @@ import type { DeviceGroup } from '../groups/types'
 import {
   addPolicyAssignment,
   addPolicyRule,
+  deletePolicyRule,
   getPolicy,
   listPolicyAssignments,
   listPolicyRules,
+  patchPolicy,
   publishPolicy,
   removePolicyAssignment,
 } from './api'
@@ -45,8 +47,12 @@ export default function PolicyDetailPage() {
   const [removeAssign, setRemoveAssign] = useState<PolicyAssignment | null>(
     null,
   )
+  const [removeRule, setRemoveRule] = useState<PolicyRule | null>(null)
   const [removing, setRemoving] = useState(false)
+  const [removingRule, setRemovingRule] = useState(false)
   const [publishing, setPublishing] = useState(false)
+  const [modeDraft, setModeDraft] = useState('audit')
+  const [savingMode, setSavingMode] = useState(false)
 
   const load = useCallback(() => {
     if (!id) {
@@ -67,6 +73,7 @@ export default function PolicyDetailPage() {
     ])
       .then(([p, ruleData, assignData, groupData, deviceData]) => {
         setPolicy(p)
+        setModeDraft(p.mode || 'audit')
         setRules(ruleData.items)
         setAssignments(assignData.items)
         setGroups(groupData.items)
@@ -168,6 +175,36 @@ export default function PolicyDetailPage() {
     }
   }
 
+  async function onConfirmRemoveRule() {
+    if (!id || !removeRule) return
+    setRemovingRule(true)
+    setError(null)
+    try {
+      await deletePolicyRule(id, removeRule.id)
+      setRemoveRule(null)
+      load()
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'failed to delete rule')
+    } finally {
+      setRemovingRule(false)
+    }
+  }
+
+  async function onSaveMode() {
+    if (!id) return
+    setSavingMode(true)
+    setError(null)
+    try {
+      const p = await patchPolicy(id, { mode: modeDraft })
+      setPolicy(p)
+      setModeDraft(p.mode)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'failed to update mode')
+    } finally {
+      setSavingMode(false)
+    }
+  }
+
   async function onPublish() {
     if (!id) return
     setPublishing(true)
@@ -247,24 +284,70 @@ export default function PolicyDetailPage() {
       {loading && !policy ? <p className="loading">Loading policy…</p> : null}
 
       {policy ? (
-        <div className="info-list" aria-label="Policy details">
-          <div className="info-row">
-            <span className="info-key">Mode</span>
-            <span className="info-val mono">{policy.mode}</span>
+        <>
+          <div className="info-list" aria-label="Policy details">
+            <div className="info-row">
+              <span className="info-key">Mode</span>
+              <span className="info-val mono">{policy.mode}</span>
+            </div>
+            <div className="info-row">
+              <span className="info-key">Priority</span>
+              <span className="info-val">{policy.priority}</span>
+            </div>
+            <div className="info-row">
+              <span className="info-key">Version</span>
+              <span className="info-val">{policy.version}</span>
+            </div>
+            <div className="info-row">
+              <span className="info-key">ID</span>
+              <span className="info-val mono">{policy.id}</span>
+            </div>
           </div>
-          <div className="info-row">
-            <span className="info-key">Priority</span>
-            <span className="info-val">{policy.priority}</span>
-          </div>
-          <div className="info-row">
-            <span className="info-key">Version</span>
-            <span className="info-val">{policy.version}</span>
-          </div>
-          <div className="info-row">
-            <span className="info-key">ID</span>
-            <span className="info-val mono">{policy.id}</span>
-          </div>
-        </div>
+
+          <section className="panel" aria-labelledby="mode-heading">
+            <h2 id="mode-heading" className="panel-title">
+              Change mode
+            </h2>
+            <p className="muted" style={{ marginTop: 0 }}>
+              Audit reports matches only. Enforce will terminate when agent
+              Level&nbsp;1 kill is implemented — publish after switching so
+              operators see a new version.
+            </p>
+            <form
+              className="token-create-grid"
+              onSubmit={(e) => {
+                e.preventDefault()
+                void onSaveMode()
+              }}
+            >
+              <div className="field">
+                <label className="label" htmlFor="policy-mode-edit">
+                  Mode
+                </label>
+                <select
+                  id="policy-mode-edit"
+                  className="input"
+                  value={modeDraft}
+                  onChange={(e) => setModeDraft(e.target.value)}
+                >
+                  <option value="audit">audit</option>
+                  <option value="enforce">enforce</option>
+                </select>
+              </div>
+              <div className="token-create-submit">
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={
+                    savingMode || modeDraft === policy.mode || !modeDraft
+                  }
+                >
+                  {savingMode ? 'Saving…' : 'Save mode'}
+                </button>
+              </div>
+            </form>
+          </section>
+        </>
       ) : null}
 
       {policy ? (
@@ -366,6 +449,7 @@ export default function PolicyDetailPage() {
                   <th>Type</th>
                   <th>Operator</th>
                   <th>Value</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -375,7 +459,16 @@ export default function PolicyDetailPage() {
                     <td className="mono">{r.rule_type}</td>
                     <td className="muted">{r.operator}</td>
                     <td>
-                      <div className="cell-primary mono">{r.value}</div>
+                      <div className="cell-primary mono">{r.value || '—'}</div>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => setRemoveRule(r)}
+                      >
+                        Delete
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -522,6 +615,24 @@ export default function PolicyDetailPage() {
         onConfirm={onConfirmRemoveAssign}
         onCancel={() => {
           if (!removing) setRemoveAssign(null)
+        }}
+      />
+
+      <ConfirmDialog
+        open={removeRule !== null}
+        title="Delete rule?"
+        description={
+          removeRule
+            ? `Remove ${removeRule.action} · ${removeRule.rule_type} ${removeRule.value || '(empty)'}? Agents drop it on the next policy sync; publish to bump version.`
+            : ''
+        }
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        danger
+        busy={removingRule}
+        onConfirm={onConfirmRemoveRule}
+        onCancel={() => {
+          if (!removingRule) setRemoveRule(null)
         }}
       />
     </div>

@@ -42,3 +42,9 @@ func (h *Host) Terminate(ctx context.Context, pid uint32) error {
 func (h *Host) Run(ctx context.Context, fn func(context.Context) error) error {
 	return fn(ctx)
 }
+
+func (h *Host) Watch(ctx context.Context, onCreate func(host.Process)) error {
+	_ = ctx
+	_ = onCreate
+	return host.ErrWatchUnsupported
+}

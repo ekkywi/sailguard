@@ -25,6 +25,10 @@ type addPolicyRuleRequest struct {
 	CategoryCode string `json:"category_code"`
 }
 
+type patchPolicyRequest struct {
+	Mode string `json:"mode"`
+}
+
 func policyJSON(p policy.Policy) map[string]any {
 	return map[string]any{
 		"id":           p.ID.String(),
@@ -285,5 +289,125 @@ func (a *API) handleAddPolicyRule(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, envelope{
 		OK:   true,
 		Data: policyRuleJSON(*rule),
+	})
+}
+
+func (a *API) handlePatchPolicy(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "validation_error",
+				"message": "invalid policy id",
+			},
+		})
+		return
+	}
+
+	var req patchPolicyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "validation_error",
+				"message": "invalid JSON body",
+			},
+		})
+		return
+	}
+
+	store := policy.NewStore(a.pool)
+	p, err := store.UpdatePolicyMode(r.Context(), id, req.Mode)
+	if errors.Is(err, policy.ErrNotFound) {
+		writeJSON(w, http.StatusNotFound, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "not_found",
+				"message": "policy not found",
+			},
+		})
+		return
+	}
+	if errors.Is(err, policy.ErrInvalid) {
+		writeJSON(w, http.StatusBadRequest, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "validation_error",
+				"message": "mode must be audit or enforce",
+			},
+		})
+		return
+	}
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "internal_error",
+				"message": "failed to update policy",
+			},
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, envelope{
+		OK:   true,
+		Data: policyJSON(*p),
+	})
+}
+
+func (a *API) handleDeletePolicyRule(w http.ResponseWriter, r *http.Request) {
+	policyID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "validation_error",
+				"message": "invalid policy id",
+			},
+		})
+		return
+	}
+	ruleID, err := uuid.Parse(r.PathValue("ruleId"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "validation_error",
+				"message": "invalid rule id",
+			},
+		})
+		return
+	}
+
+	store := policy.NewStore(a.pool)
+	err = store.DeleteRule(r.Context(), policyID, ruleID)
+	if errors.Is(err, policy.ErrNotFound) {
+		writeJSON(w, http.StatusNotFound, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "not_found",
+				"message": "rule not found",
+			},
+		})
+		return
+	}
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "internal_error",
+				"message": "failed to delete rule",
+			},
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, envelope{
+		OK: true,
+		Data: map[string]any{
+			"policy_id": policyID.String(),
+			"rule_id":   ruleID.String(),
+		},
 	})
 }
