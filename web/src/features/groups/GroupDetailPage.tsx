@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import {
   formatRelativeTime,
@@ -9,14 +9,17 @@ import { listDevices } from '../devices/api'
 import type { Device } from '../devices/types'
 import {
   addGroupMember,
+  deleteGroup,
   getGroup,
   listGroupMembers,
+  patchGroup,
   removeGroupMember,
 } from './api'
 import type { DeviceGroup } from './types'
 
 export default function GroupDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
 
   const [group, setGroup] = useState<DeviceGroup | null>(null)
   const [members, setMembers] = useState<Device[] | null>(null)
@@ -31,6 +34,12 @@ export default function GroupDetailPage() {
   const [removeTarget, setRemoveTarget] = useState<Device | null>(null)
   const [removing, setRemoving] = useState(false)
 
+  const [nameDraft, setNameDraft] = useState('')
+  const [descriptionDraft, setDescriptionDraft] = useState('')
+  const [savingMeta, setSavingMeta] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
   const load = useCallback(() => {
     if (!id) {
       setError('missing group id')
@@ -44,6 +53,8 @@ export default function GroupDetailPage() {
     Promise.all([getGroup(id), listGroupMembers(id), listDevices()])
       .then(([g, memberData, deviceData]) => {
         setGroup(g)
+        setNameDraft(g.name)
+        setDescriptionDraft(g.description || '')
         setMembers(memberData.items)
         setAllDevices(deviceData.items)
       })
@@ -106,6 +117,50 @@ export default function GroupDetailPage() {
     }
   }
 
+  async function onSaveMeta(e: FormEvent) {
+    e.preventDefault()
+    if (!id || !group) return
+    const name = nameDraft.trim()
+    if (!name) {
+      setError('name is required')
+      return
+    }
+    setSavingMeta(true)
+    setError(null)
+    try {
+      const updated = await patchGroup(id, {
+        name,
+        description: descriptionDraft.trim(),
+      })
+      setGroup(updated)
+      setNameDraft(updated.name)
+      setDescriptionDraft(updated.description || '')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'failed to update group')
+    } finally {
+      setSavingMeta(false)
+    }
+  }
+
+  async function onConfirmDelete() {
+    if (!id) return
+    setDeleting(true)
+    setError(null)
+    try {
+      await deleteGroup(id)
+      navigate('/groups')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'failed to delete group')
+      setDeleting(false)
+      setConfirmDelete(false)
+    }
+  }
+
+  const metaDirty =
+    !!group &&
+    (nameDraft.trim() !== group.name ||
+      descriptionDraft.trim() !== (group.description || ''))
+
   return (
     <div className="stack">
       <header className="page-header">
@@ -128,14 +183,25 @@ export default function GroupDetailPage() {
             ) : null}
           </p>
         </div>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          onClick={load}
-          disabled={loading}
-        >
-          Refresh
-        </button>
+        <div className="page-header-actions">
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={load}
+            disabled={loading}
+          >
+            Refresh
+          </button>
+          {group ? (
+            <button
+              type="button"
+              className="btn btn-danger"
+              onClick={() => setConfirmDelete(true)}
+            >
+              Delete
+            </button>
+          ) : null}
+        </div>
       </header>
 
       {error ? (
@@ -147,26 +213,61 @@ export default function GroupDetailPage() {
       {loading && !group ? <p className="loading">Loading group…</p> : null}
 
       {group ? (
-        <div className="info-list" aria-label="Group details">
-          <div className="info-row">
-            <span className="info-key">Name</span>
-            <span className="info-val">{group.name}</span>
+        <>
+          <div className="info-list" aria-label="Group details">
+            <div className="info-row">
+              <span className="info-key">Created</span>
+              <span className="info-val" title={group.created_at}>
+                {formatRelativeTime(group.created_at)}
+              </span>
+            </div>
+            <div className="info-row">
+              <span className="info-key">ID</span>
+              <span className="info-val mono">{group.id}</span>
+            </div>
           </div>
-          <div className="info-row">
-            <span className="info-key">Description</span>
-            <span className="info-val">{group.description || '—'}</span>
-          </div>
-          <div className="info-row">
-            <span className="info-key">Created</span>
-            <span className="info-val" title={group.created_at}>
-              {formatRelativeTime(group.created_at)}
-            </span>
-          </div>
-          <div className="info-row">
-            <span className="info-key">ID</span>
-            <span className="info-val mono">{group.id}</span>
-          </div>
-        </div>
+
+          <section className="panel" aria-labelledby="edit-group-heading">
+            <h2 id="edit-group-heading" className="panel-title">
+              Edit group
+            </h2>
+            <form className="token-create-grid" onSubmit={onSaveMeta}>
+              <div className="field" style={{ gridColumn: '1 / -1' }}>
+                <label className="label" htmlFor="group-name">
+                  Name
+                </label>
+                <input
+                  id="group-name"
+                  className="input"
+                  value={nameDraft}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="field" style={{ gridColumn: '1 / -1' }}>
+                <label className="label" htmlFor="group-description">
+                  Description
+                </label>
+                <input
+                  id="group-description"
+                  className="input"
+                  value={descriptionDraft}
+                  onChange={(e) => setDescriptionDraft(e.target.value)}
+                  placeholder="optional"
+                />
+              </div>
+              <div className="token-create-submit">
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={savingMeta || !metaDirty}
+                >
+                  {savingMeta ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </form>
+          </section>
+        </>
       ) : null}
 
       {group ? (
@@ -307,6 +408,19 @@ export default function GroupDetailPage() {
         onConfirm={onConfirmRemove}
         onCancel={() => {
           if (!removing) setRemoveTarget(null)
+        }}
+      />
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete group?"
+        description="Membership and policy assignments for this group will be removed. Devices stay enrolled."
+        confirmLabel="Delete group"
+        danger
+        busy={deleting}
+        onConfirm={onConfirmDelete}
+        onCancel={() => {
+          if (!deleting) setConfirmDelete(false)
         }}
       />
     </div>

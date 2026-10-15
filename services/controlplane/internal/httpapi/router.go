@@ -28,6 +28,8 @@ func NewRouter(cfg config.Config, pool *pgxpool.Pool, rdb *redis.Client) http.Ha
 	mux.HandleFunc("GET /v1/groups", api.requirePermission("device.read", api.handleListGroups))
 	mux.HandleFunc("POST /v1/groups", api.requirePermission("device.write", api.handleCreateGroup))
 	mux.HandleFunc("GET /v1/groups/{id}", api.requirePermission("device.read", api.handleGetGroup))
+	mux.HandleFunc("PATCH /v1/groups/{id}", api.requirePermission("device.write", api.handlePatchGroup))
+	mux.HandleFunc("DELETE /v1/groups/{id}", api.requirePermission("device.write", api.handleDeleteGroup))
 
 	mux.HandleFunc("GET /v1/groups/{id}/members", api.requirePermission("device.read", api.handleListGroupMembers))
 	mux.HandleFunc("POST /v1/groups/{id}/members", api.requirePermission("device.write", api.handleAddGroupMember))
@@ -35,6 +37,8 @@ func NewRouter(cfg config.Config, pool *pgxpool.Pool, rdb *redis.Client) http.Ha
 
 	mux.HandleFunc("GET /v1/devices", api.requirePermission("device.read", api.handleListDevices))
 	mux.HandleFunc("GET /v1/devices/{id}", api.requirePermission("device.read", api.handleGetDevice))
+	mux.HandleFunc("PATCH /v1/devices/{id}", api.requirePermission("device.write", api.handlePatchDevice))
+	mux.HandleFunc("DELETE /v1/devices/{id}", api.requirePermission("device.write", api.handleDeleteDevice))
 	mux.HandleFunc("GET /v1/devices/{id}/policy", api.requirePermission("policy.read", api.handleGetDevicePolicy))
 
 	mux.HandleFunc("GET /v1/enrollment-tokens", api.requirePermission("device.write", api.handleListEnrollmentTokens))

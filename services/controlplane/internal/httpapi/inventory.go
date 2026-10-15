@@ -15,6 +15,16 @@ type createGroupRequest struct {
 	Description string `json:"description"`
 }
 
+type patchGroupRequest struct {
+	Name        *string `json:"name"`
+	Description *string `json:"description"`
+}
+
+type patchDeviceRequest struct {
+	DisplayName *string `json:"display_name"`
+	Status      *string `json:"status"`
+}
+
 func groupJSON(g inventory.DeviceGroup) map[string]any {
 	return map[string]any{
 		"id":          g.ID.String(),
@@ -130,6 +140,95 @@ func (a *API) handleGetGroup(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (a *API) handlePatchGroup(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, envelope{
+			OK:    false,
+			Error: map[string]any{"code": "validation_error", "message": "invalid group id"},
+		})
+		return
+	}
+
+	var req patchGroupRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, envelope{
+			OK:    false,
+			Error: map[string]any{"code": "validation_error", "message": "invalid JSON body"},
+		})
+		return
+	}
+	if req.Name == nil && req.Description == nil {
+		writeJSON(w, http.StatusBadRequest, envelope{
+			OK:    false,
+			Error: map[string]any{"code": "validation_error", "message": "name or description is required"},
+		})
+		return
+	}
+
+	store := inventory.NewStore(a.pool)
+	group, err := store.UpdateGroup(r.Context(), id, req.Name, req.Description)
+	if errors.Is(err, inventory.ErrNotFound) {
+		writeJSON(w, http.StatusNotFound, envelope{
+			OK:    false,
+			Error: map[string]any{"code": "not_found", "message": "group not found"},
+		})
+		return
+	}
+	if errors.Is(err, inventory.ErrInvalid) {
+		writeJSON(w, http.StatusBadRequest, envelope{
+			OK:    false,
+			Error: map[string]any{"code": "validation_error", "message": "name must not be empty"},
+		})
+		return
+	}
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{
+			OK:    false,
+			Error: map[string]any{"code": "internal_error", "message": "failed to update group"},
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, envelope{
+		OK:   true,
+		Data: groupJSON(*group),
+	})
+}
+
+func (a *API) handleDeleteGroup(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, envelope{
+			OK:    false,
+			Error: map[string]any{"code": "validation_error", "message": "invalid group id"},
+		})
+		return
+	}
+
+	store := inventory.NewStore(a.pool)
+	err = store.DeleteGroup(r.Context(), id)
+	if errors.Is(err, inventory.ErrNotFound) {
+		writeJSON(w, http.StatusNotFound, envelope{
+			OK:    false,
+			Error: map[string]any{"code": "not_found", "message": "group not found"},
+		})
+		return
+	}
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{
+			OK:    false,
+			Error: map[string]any{"code": "internal_error", "message": "failed to delete group"},
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, envelope{
+		OK:   true,
+		Data: map[string]any{"deleted": true},
+	})
+}
+
 func (a *API) handleListDevices(w http.ResponseWriter, r *http.Request) {
 	store := inventory.NewStore(a.pool)
 	devices, err := store.ListDevices(r.Context())
@@ -181,5 +280,94 @@ func (a *API) handleGetDevice(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, envelope{
 		OK:   true,
 		Data: deviceJSON(*device),
+	})
+}
+
+func (a *API) handlePatchDevice(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, envelope{
+			OK:    false,
+			Error: map[string]any{"code": "validation_error", "message": "invalid device id"},
+		})
+		return
+	}
+
+	var req patchDeviceRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, envelope{
+			OK:    false,
+			Error: map[string]any{"code": "validation_error", "message": "invalid JSON body"},
+		})
+		return
+	}
+	if req.DisplayName == nil && req.Status == nil {
+		writeJSON(w, http.StatusBadRequest, envelope{
+			OK:    false,
+			Error: map[string]any{"code": "validation_error", "message": "display_name or status is required"},
+		})
+		return
+	}
+
+	store := inventory.NewStore(a.pool)
+	device, err := store.UpdateDevice(r.Context(), id, req.DisplayName, req.Status)
+	if errors.Is(err, inventory.ErrNotFound) {
+		writeJSON(w, http.StatusNotFound, envelope{
+			OK:    false,
+			Error: map[string]any{"code": "not_found", "message": "device not found"},
+		})
+		return
+	}
+	if errors.Is(err, inventory.ErrInvalid) {
+		writeJSON(w, http.StatusBadRequest, envelope{
+			OK:    false,
+			Error: map[string]any{"code": "validation_error", "message": "status must be active or disabled"},
+		})
+		return
+	}
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{
+			OK:    false,
+			Error: map[string]any{"code": "internal_error", "message": "failed to update device"},
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, envelope{
+		OK:   true,
+		Data: deviceJSON(*device),
+	})
+}
+
+func (a *API) handleDeleteDevice(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, envelope{
+			OK:    false,
+			Error: map[string]any{"code": "validation_error", "message": "invalid device id"},
+		})
+		return
+	}
+
+	store := inventory.NewStore(a.pool)
+	err = store.DeleteDevice(r.Context(), id)
+	if errors.Is(err, inventory.ErrNotFound) {
+		writeJSON(w, http.StatusNotFound, envelope{
+			OK:    false,
+			Error: map[string]any{"code": "not_found", "message": "device not found"},
+		})
+		return
+	}
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{
+			OK:    false,
+			Error: map[string]any{"code": "internal_error", "message": "failed to delete device"},
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, envelope{
+		OK:   true,
+		Data: map[string]any{"deleted": true},
 	})
 }

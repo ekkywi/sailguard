@@ -22,6 +22,22 @@ export function getGroup(id: string) {
   return apiFetch<DeviceGroup>(`/v1/groups/${id}`)
 }
 
+export function patchGroup(
+  id: string,
+  body: { name?: string; description?: string },
+) {
+  return apiFetch<DeviceGroup>(`/v1/groups/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+}
+
+export function deleteGroup(id: string) {
+  return apiFetch<{ deleted: boolean }>(`/v1/groups/${id}`, {
+    method: 'DELETE',
+  })
+}
+
 export function listGroupMembers(groupId: string) {
   return apiFetch<GroupMemberListData>(`/v1/groups/${groupId}/members`)
 }

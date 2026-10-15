@@ -28,10 +28,10 @@ Agents evaluate policy locally so enforcement continues during brief control-pla
 
 | Component | Responsibility |
 |-----------|----------------|
-| **Agent** | Device enrollment, policy sync, process observation (Linux `/proc`; Windows Toolhelp + WMI watch with PID-diff fallback), audit/enforce Level 1 terminate, event submission; heartbeat timer separate from enforce path |
-| **API** | Authentication (local admin login + Bearer tokens), authorization, configuration APIs, agent-facing endpoints |
+| **Agent** | Device enrollment (including reclaim by machine ID), policy sync, process observation (Linux `/proc`; Windows Toolhelp + WMI watch with PID-diff fallback), audit/enforce Level 1 terminate, event submission with optional process owner; heartbeat timer separate from enforce path |
+| **API** | Authentication (local admin login + Bearer tokens), authorization, configuration APIs, agent-facing endpoints, Windows agent package download |
 | **Worker** | Asynchronous processing via Redis Streams (event pipelines, notifications, retention jobs) |
-| **Web console** | Administrative UI (local sign-in; overview; Devices, Groups with membership, Tokens; Policies list/create, rules, assign, publish; Events list of policy violations) |
+| **Web console** | Administrative UI (local sign-in; overview; Devices and Groups with edit/delete; Tokens; Download agent; Policies list/create, rules, assign, publish; Events with process user) |
 | **PostgreSQL** | Durable storage for configuration, identity, and events |
 | **Redis** | Job streams (for example event ingest) and ephemeral cache (not the system of record for business data) |
 

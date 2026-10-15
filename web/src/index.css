@@ -900,6 +900,13 @@ input {
   min-width: 0;
 }
 
+.page-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
 .page-meta {
   color: var(--muted);
   font-weight: 400;

@@ -3,6 +3,7 @@ package inventory
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -107,6 +108,64 @@ func (s *Store) CreateDevice(
 	return &d, nil
 }
 
+func (s *Store) UpdateDevice(
+	ctx context.Context,
+	id uuid.UUID,
+	displayName *string,
+	status *string,
+) (*Device, error) {
+	cur, err := s.FindDeviceByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if displayName != nil {
+		cur.DisplayName = strings.TrimSpace(*displayName)
+	}
+	if status != nil {
+		st := strings.TrimSpace(strings.ToLower(*status))
+		switch st {
+		case "active", "disabled":
+			cur.Status = st
+		default:
+			return nil, ErrInvalid
+		}
+	}
+
+	const q = `
+		UPDATE devices
+		SET display_name = $2,
+		    status = $3,
+		    updated_at = now()
+		WHERE id = $1
+		RETURNING id, hostname, display_name, os, os_version, agent_version,
+		          machine_guid, status, last_seen_at, enrolled_at, created_at, updated_at
+	`
+	var d Device
+	err = s.pool.QueryRow(ctx, q, id, cur.DisplayName, cur.Status).Scan(
+		&d.ID, &d.Hostname, &d.DisplayName, &d.OS, &d.OSVersion, &d.AgentVersion,
+		&d.MachineGUID, &d.Status, &d.LastSeenAt, &d.EnrolledAt, &d.CreatedAt, &d.UpdatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
+
+func (s *Store) DeleteDevice(ctx context.Context, id uuid.UUID) error {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM devices WHERE id = $1`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (s *Store) TouchLastSeen(ctx context.Context, id uuid.UUID) error {
 	const q = `
 		UPDATE devices
@@ -150,8 +209,8 @@ func (s *Store) ApplyHeartbeat(
 
 func (s *Store) FindDeviceMachineGUID(ctx context.Context, machineGUID string) (*Device, error) {
 	const q = `
-		SELECT ID, hostname, display_name, os, os_version, agent_version,
-				machine_guid, status, last_seen_at, enrolled_at, created_at, updated_at
+		SELECT id, hostname, display_name, os, os_version, agent_version,
+		       machine_guid, status, last_seen_at, enrolled_at, created_at, updated_at
 		FROM devices
 		WHERE machine_guid = $1
 		LIMIT 1

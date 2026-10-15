@@ -35,8 +35,8 @@ Administrative APIs are further protected by role-based permissions as routes co
 
 ### Inventory
 
-- **Available now:** list/create/get device groups; list/add/remove group members; list/get devices; create/list/revoke enrollment tokens (admin Bearer + `device.read` / `device.write`). Create enrollment token returns the plaintext secret once. Admin web console covers Devices, Groups (with membership), and Tokens pages.
-- **Planned:** device PATCH, credential rotation
+- **Available now:** list/create/get/**PATCH**/**DELETE** device groups; list/add/remove group members; list/get/**PATCH**/**DELETE** devices (`display_name`, `status` active|disabled); create/list/revoke enrollment tokens (admin Bearer + `device.read` / `device.write`). Create enrollment token returns the plaintext secret once. Admin web console covers Devices and Groups detail actions, plus Tokens pages.
+- **Planned:** credential rotation; reject agent auth when device is disabled
 
 ### Policy
 
@@ -45,12 +45,12 @@ Administrative APIs are further protected by role-based permissions as routes co
 
 ### Agent channel
 
-- **Available now:** enrollment (`POST /v1/agent/enroll`); device auth (`GET /v1/agent/whoami`); event batch (`POST /v1/agent/events`) accepts **heartbeat**, **`violation_detected`**, and **`violation_blocked`** (persisted to `device_events`, idempotent by `client_event_id`); effective policy download (`GET /v1/agent/policy`, optional `?hash=` for unchanged). Agents evaluate cached policy: Linux `/proc` + Windows Toolhelp; Windows watch prefers WMI process-creation events with PID-diff + periodic scan fallbacks; enforce mode terminates matched processes (Level 1). Admin **Download agent** packages: `GET/POST /v1/agent-packages/windows` (lists channels `windows-legacy` / `windows-current` / `linux` plus setup binary metadata; ZIP download for Windows channels with `sailguard-agent-setup.exe`, channel agent exe, `config.json`, and portable start scripts; requires prebuilt binaries via `SG_AGENT_WIN7_PATH` / `SG_AGENT_WINDOWS_PATH` / `SG_AGENT_SETUP_PATH`).
-- **Planned:** ETW-based watch refinements; full async telemetry pipeline (streams/worker)
+- **Available now:** enrollment (`POST /v1/agent/enroll`) including **reclaim** when `machine_guid` already exists (valid enrollment token rotates device credential); device auth (`GET /v1/agent/whoami`); event batch (`POST /v1/agent/events`) accepts **heartbeat**, **`violation_detected`**, and **`violation_blocked`** (persisted to `device_events`, idempotent by `client_event_id`; violation payloads may include process `user_name`); effective policy download (`GET /v1/agent/policy`, optional `?hash=` for unchanged). Agents report stable machine IDs (Windows MachineGuid / Linux machine-id) and OS version strings. Agents evaluate cached policy: Linux `/proc` + Windows Toolhelp; Windows watch prefers WMI process-creation events with PID-diff + periodic scan fallbacks; enforce mode terminates matched processes (Level 1). Admin **Download agent** packages: `GET/POST /v1/agent-packages/windows` (channels `windows-legacy` / `windows-current` / `linux` placeholder; ZIP with `sailguard-agent-setup.exe`, channel agent exe, `config.json`, portable start scripts; `SG_AGENT_WIN7_PATH` / `SG_AGENT_WINDOWS_PATH` / `SG_AGENT_SETUP_PATH`).
+- **Planned:** ETW-based watch refinements; full async telemetry pipeline (streams/worker); Linux download channel
 
 ### Telemetry & operations
 
-- **Available now:** health/ready; agents submit `violation_detected` / `violation_blocked` (persisted); admin `GET /v1/events`; web console **Events** page (`/events`)
+- **Available now:** health/ready; agents submit `violation_detected` / `violation_blocked` (persisted, including optional process user); admin `GET /v1/events`; web console **Events** page (`/events`, User column)
 - **Planned:** event detail filters, alerts, dashboard summaries, administrative audit logs, alert-channel configuration, async stream pipeline
 
 ## Health
