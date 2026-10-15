@@ -2,9 +2,9 @@ package host
 
 import (
 	"context"
+	"errors"
 	"os"
 	"strings"
-	"errors"
 )
 
 // Process is a running process snapshot used for policy matching.
@@ -26,9 +26,10 @@ func LabFakeProcesses() []Process {
 		return nil
 	}
 	return []Process{{
-		PID:  4242,
-		Name: name,
-		Path: "/lab/" + name,
+		PID:      4242,
+		Name:     name,
+		Path:     "/lab/" + name,
+		UserName: "lab\\fake-user",
 	}}
 }
 

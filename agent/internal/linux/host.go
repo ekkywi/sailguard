@@ -22,11 +22,11 @@ func (h *Host) OSFamily() string { return "linux" }
 func (h *Host) Hostname() (string, error) { return os.Hostname() }
 
 func (h *Host) MachineID() (string, error) {
-	return "linux-stub", nil
+	return readMachineID()
 }
 
 func (h *Host) OSVersion() (string, error) {
-	return "Linux (stub)", nil
+	return readOSVersion(), nil
 }
 
 func (h *Host) List(ctx context.Context) ([]host.Process, error) {

@@ -23,16 +23,12 @@ func (h *Host) OSFamily() string { return "windows" }
 func (h *Host) Hostname() (string, error) { return os.Hostname() }
 
 func (h *Host) MachineID() (string, error) {
-	// MVP placeholder: real MachineGuid from registry comes in M2.
-	name, err := os.Hostname()
-	if err != nil {
-		return "", err
-	}
-	return "win-pending:" + name, nil
+	return readMachineGUID()
 }
 
 func (h *Host) OSVersion() (string, error) {
-	return "Windows (detail pending)", nil
+	maj, min, build := windows.RtlGetNtVersionNumbers()
+	return fmt.Sprintf("Windows %d.%d.%d", maj, min, build), nil
 }
 
 func (h *Host) List(ctx context.Context) ([]host.Process, error) {
@@ -62,6 +58,7 @@ func (h *Host) List(ctx context.Context) ([]host.Process, error) {
 			out = append(out, host.Process{
 				PID:  pe.ProcessID,
 				Name: name,
+				UserName: lookupProcessUser(pe.ProcessID),
 			})
 		}
 		err = windows.Process32Next(snap, &pe)

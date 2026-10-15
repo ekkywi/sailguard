@@ -113,7 +113,11 @@ func (h *Host) watchWMI(ctx context.Context, onCreate func(host.Process)) error 
 			if name == "" {
 				return
 			}
-			onCreate(host.Process{PID: pid, Name: name})
+			onCreate(host.Process{
+				PID:      pid,
+				Name:     name,
+				UserName: lookupProcessUser(pid),
+			})
 		}()
 
 		time.Sleep(10 * time.Millisecond)

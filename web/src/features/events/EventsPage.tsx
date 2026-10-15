@@ -116,6 +116,7 @@ export default function EventsPage() {
                     <th>Device</th>
                     <th>Type</th>
                     <th>Process</th>
+                    <th>User</th>
                     <th>Match</th>
                     <th>Mode</th>
                   </tr>
@@ -153,6 +154,11 @@ export default function EventsPage() {
                         {e.process_path ? (
                           <div className="muted mono">{e.process_path}</div>
                         ) : null}
+                      </td>
+                      <td>
+                        <div className="mono">
+                          {e.process_user_name || '—'}
+                        </div>
                       </td>
                       <td>
                         <div className="mono">
