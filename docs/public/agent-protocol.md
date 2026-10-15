@@ -6,7 +6,8 @@ This document describes the agent ↔ control plane contract at a product level.
 
 ## Lifecycle
 
-1. **Enroll** with a one-time (or limited-use) enrollment token via `POST /v1/agent/enroll` *(admins mint/revoke tokens in the console or API)*  
+1. **Enroll** with a one-time (or limited-use) enrollment token via `POST /v1/agent/enroll` *(admins mint/revoke tokens in the console or API)*. Windows endpoints may use an admin **installer package** (ZIP) from a chosen channel: **windows-legacy** (Win7 SP1+, Go 1.20) or **windows-current** (Win10/11, current Go) — `sailguard-agent-setup.exe` installs to Program Files / ProgramData; portable `start.bat` / `start-admin.bat` remain as a fallback.  
+
 2. Receive a unique **device credential** and recommended sync intervals; persist locally on the agent  
 3. Authenticate subsequent calls with `Authorization: Bearer <device_token>` *(whoami / events / policy)*  
 4. **Submit event batches** via `POST /v1/agent/events` — **heartbeat** refreshes `last_seen_at`; **`violation_detected`** / **`violation_blocked`** are persisted and listed for admins (`GET /v1/events` / console Events)  

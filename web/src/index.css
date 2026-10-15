@@ -918,6 +918,65 @@ input {
   margin-bottom: var(--space-2);
 }
 
+.channel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.channel-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  text-align: left;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.channel-card:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--ghost-hover);
+}
+
+.channel-card:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.channel-card-active {
+  border-color: var(--fg);
+  background: var(--ghost-hover);
+}
+
+.channel-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.channel-card-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.channel-card-desc {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.channel-card-meta {
+  margin: 0;
+  font-size: var(--text-xs);
+}
+
 .secret-value {
   margin-top: var(--space-3);
   word-break: break-all;

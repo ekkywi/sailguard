@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import {
   formatDateTime,
@@ -142,7 +143,12 @@ export default function TokensPage() {
           <p className="section-label">Inventory</p>
           <h1 className="title">Enrollment tokens</h1>
           <p className="lede">
-            One-time or limited-use secrets for agent enrollment.
+            One-time or limited-use secrets for agent enrollment. After create,
+            paste the secret into{' '}
+            <Link className="crumb" to="/agent-download">
+              Download agent
+            </Link>{' '}
+            to build a Windows ZIP with config.json.
             {tokens ? (
               <span className="page-meta">
                 {' '}

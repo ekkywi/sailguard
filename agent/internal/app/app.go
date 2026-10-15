@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -134,6 +135,14 @@ func ensureEnrolled(
 		AgentVersion:    cfg.AgentVersion,
 	})
 	if err != nil {
+		if strings.Contains(err.Error(), "device_exists") {
+			return nil, fmt.Errorf(
+				"enroll: device already registered on the server — reuse existing %s "+
+					"(keep data_dir / ProgramData) or remove the device in the lab DB before re-enrolling: %w",
+				credstore.Path(dataDir),
+				err,
+			)
+		}
 		return nil, fmt.Errorf("enroll: %w", err)
 	}
 

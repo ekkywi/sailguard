@@ -51,7 +51,7 @@ curl -s http://127.0.0.1:18080/v1/ready   # db + redis true
 ## Milestone orientation
 
 - M0–M3 magang core **done** (policy UI, audit match, Events persist/UI; mode PATCH + delete rules).
-- M4 **partial**: Linux `/proc` List+Terminate **done**; Windows Toolhelp List+Terminate+WMI Watch (PID-diff fallback)+scan **done**; Win7 Go 1.20 build **done**. Remaining: streams/dashboard, MachineGuid; optional ETW/Linux Watch.
+- M4 **partial**: Linux `/proc` List+Terminate **done**; Windows Toolhelp List+Terminate+WMI Watch (PID-diff fallback)+scan **done**; Win7 Go 1.20 build **done**; agent download installer ZIP (`sailguard-agent-setup.exe` → Program Files + ProgramData) **done**. Remaining: streams/dashboard, MachineGuid, Windows Service; optional ETW/Linux Watch; enroll reclaim.
 - Later: alerts, users admin, LDAP, etc.
 
 ## Agent timers / dual-path
@@ -61,6 +61,7 @@ curl -s http://127.0.0.1:18080/v1/ready   # db + redis true
 - Windows `Watch`: WMI `__InstanceCreationEvent` first; on failure → Toolhelp PID-diff ~500ms; Linux → `ErrWatchUnsupported` (poll only).
 - Shared `recentSet` dedupe (~45s) across watch + scan to avoid double kill/report.
 - Win7 build: `./scripts/build-agent-win7.sh` (sed go 1.20 + `go mod tidy` with Go 1.20).
+- Windows setup: `./scripts/build-agent-setup.sh` → `bin/sailguard-agent-setup.exe` (Go 1.20; required for Download agent packages).
 
 ## When resuming
 

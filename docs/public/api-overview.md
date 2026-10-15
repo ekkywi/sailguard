@@ -45,7 +45,7 @@ Administrative APIs are further protected by role-based permissions as routes co
 
 ### Agent channel
 
-- **Available now:** enrollment (`POST /v1/agent/enroll`); device auth (`GET /v1/agent/whoami`); event batch (`POST /v1/agent/events`) accepts **heartbeat**, **`violation_detected`**, and **`violation_blocked`** (persisted to `device_events`, idempotent by `client_event_id`); effective policy download (`GET /v1/agent/policy`, optional `?hash=` for unchanged). Agents evaluate cached policy: Linux `/proc` + Windows Toolhelp; Windows watch prefers WMI process-creation events with PID-diff + periodic scan fallbacks; enforce mode terminates matched processes (Level 1).
+- **Available now:** enrollment (`POST /v1/agent/enroll`); device auth (`GET /v1/agent/whoami`); event batch (`POST /v1/agent/events`) accepts **heartbeat**, **`violation_detected`**, and **`violation_blocked`** (persisted to `device_events`, idempotent by `client_event_id`); effective policy download (`GET /v1/agent/policy`, optional `?hash=` for unchanged). Agents evaluate cached policy: Linux `/proc` + Windows Toolhelp; Windows watch prefers WMI process-creation events with PID-diff + periodic scan fallbacks; enforce mode terminates matched processes (Level 1). Admin **Download agent** packages: `GET/POST /v1/agent-packages/windows` (lists channels `windows-legacy` / `windows-current` / `linux` plus setup binary metadata; ZIP download for Windows channels with `sailguard-agent-setup.exe`, channel agent exe, `config.json`, and portable start scripts; requires prebuilt binaries via `SG_AGENT_WIN7_PATH` / `SG_AGENT_WINDOWS_PATH` / `SG_AGENT_SETUP_PATH`).
 - **Planned:** ETW-based watch refinements; full async telemetry pipeline (streams/worker)
 
 ### Telemetry & operations

@@ -85,6 +85,26 @@ function IconTokens() {
   )
 }
 
+function IconDownload() {
+  return (
+    <svg className="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M12 4v10m0 0 3.5-3.5M12 14 8.5 10.5"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M5 16.5V18a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 18v-1.5"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
 function IconPolicies() {
   return (
     <svg className="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -193,6 +213,14 @@ export function AppShell({ children, userLabel }: AppShellProps) {
             <NavLink to="/tokens" className={navClass} title="Tokens">
               <IconTokens />
               <span className="nav-label">Tokens</span>
+            </NavLink>
+            <NavLink
+              to="/agent-download"
+              className={navClass}
+              title="Download agent"
+            >
+              <IconDownload />
+              <span className="nav-label">Download</span>
             </NavLink>
             <p className="sidebar-section">Control</p>
             <NavLink to="/policies" className={navClass} title="Policies">

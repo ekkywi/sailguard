@@ -49,11 +49,17 @@ Agents are installed on endpoints and are **not** packaged inside the control-pl
 
 Primary validation focus: Windows 10/11 and Linux; Windows 7 is in scope and should be regression-tested when agent binaries change. Use classic Win32 APIs for process list/terminate where possible so Windows 7–11 stay on one code path.
 
-**Windows 7 binaries:** Go 1.21+ does not run on Windows 7. Build with **Go 1.20** via `scripts/build-agent-win7.sh` → `bin/sailguard-agent-win7.exe`. Day-to-day development keeps the newer Go toolchain for Windows 10/11 and Linux.
+**Dual Windows channels:**  
+- **Legacy (Win7 SP1+ / 8.1):** Go **1.20** via `scripts/build-agent-win7.sh` → `bin/sailguard-agent-win7.exe` (`SG_AGENT_WIN7_PATH`). Go 1.21+ crashes on Windows 7.  
+- **Current (Win10 / 11):** current repo Go via `scripts/build-agent-windows.sh` → `bin/sailguard-agent-windows.exe` (`SG_AGENT_WINDOWS_PATH`).  
+
+Day-to-day control-plane development uses the newer Go toolchain; only the legacy agent artefact pins Go 1.20.
+
+**Endpoint packages:** Administrators use console **Download agent** to pick a channel and download an installer ZIP (`sailguard-agent-setup.exe` + channel agent exe + `config.json`). On the endpoint, run setup **as Administrator**; it installs to `C:\Program Files\SailGuard\Agent\` and stores config/credentials under `C:\ProgramData\SailGuard\agent\` (stable across reinstalls). Portable `start.bat` / `start-admin.bat` remain in the ZIP as a fallback. Build setup with `./scripts/build-agent-setup.sh` (`SG_AGENT_SETUP_PATH`). Optional `SG_PUBLIC_AGENT_URL` pre-fills the LAN API URL. Linux channel is reserved (coming soon).
 
 ## Configuration
 
-Runtime configuration is supplied through environment variables (database URL, Redis URL, HTTP bind address, token signing material, and similar). Example templates ship without production secrets.
+Runtime configuration is supplied through environment variables (database URL, Redis URL, HTTP bind address, token signing material, agent package path, and similar). Example templates ship without production secrets. Windows agents also accept a local `config.json` next to the executable (environment variables override file values).
 
 ## Capacity guidance (indicative)
 

@@ -41,6 +41,9 @@ func NewRouter(cfg config.Config, pool *pgxpool.Pool, rdb *redis.Client) http.Ha
 	mux.HandleFunc("POST /v1/enrollment-tokens", api.requirePermission("device.write", api.handleCreateEnrollmentToken))
 	mux.HandleFunc("POST /v1/enrollment-tokens/{id}/revoke", api.requirePermission("device.write", api.handleRevokeEnrollmentToken))
 
+	mux.HandleFunc("GET /v1/agent-packages/windows", api.requirePermission("device.write", api.handleAgentPackageMeta))
+	mux.HandleFunc("POST /v1/agent-packages/windows", api.requirePermission("device.write", api.handleDownloadWindowsAgentPackage))
+
 	mux.HandleFunc("GET /v1/policies", api.requirePermission("policy.read", api.handleListPolicies))
 	mux.HandleFunc("POST /v1/policies", api.requirePermission("policy.write", api.handleCreatePolicy))
 	mux.HandleFunc("GET /v1/policies/{id}", api.requirePermission("policy.read", api.handleGetPolicy))
