@@ -147,3 +147,26 @@ func (s *Store) ApplyHeartbeat(
 	}
 	return nil
 }
+
+func (s *Store) FindDeviceMachineGUID(ctx context.Context, machineGUID string) (*Device, error) {
+	const q = `
+		SELECT ID, hostname, display_name, os, os_version, agent_version,
+				machine_guid, status, last_seen_at, enrolled_at, created_at, updated_at
+		FROM devices
+		WHERE machine_guid = $1
+		LIMIT 1
+	`
+
+	var d Device
+	err := s.pool.QueryRow(ctx, q, machineGUID).Scan(
+		&d.ID, &d.Hostname, &d.DisplayName, &d.OS, &d.OSVersion, &d.AgentVersion,
+		&d.MachineGUID, &d.Status, &d.LastSeenAt, &d.EnrolledAt, &d.CreatedAt, &d.UpdatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &d, nil
+}

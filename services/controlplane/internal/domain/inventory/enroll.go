@@ -58,14 +58,54 @@ func (s *Store) EnrollDevice(
 		return nil, "", err
 	}
 
+	if mg != nil {
+		existing, findErr := s.FindDeviceMachineGUID(ctx, *mg)
+		if findErr == nil {
+			const updateDevice = `
+				UPDATE devices
+				SET hostname = $2,
+					display_name = $3,
+					os = $4,
+					os_version = $5,
+					agent_version = $6,
+					status = 'active',
+					updated_at = now()
+				WHERE id = $1
+				RETURNING id, hostname, display_name, os, os_version, agent_version,
+						machine_guid, status, last_seen_at, enrolled_at, created_at, updated_at
+			`
+			var d Device
+			err = tx.QueryRow(ctx, updateDevice,
+				existing.ID, hostname, displayName, osFamily, osVersion, agentVersion,
+			).Scan(
+				&d.ID, &d.Hostname, &d.DisplayName, &d.OS, &d.OSVersion, &d.AgentVersion,
+				&d.MachineGUID, &d.Status, &d.LastSeenAt, &d.EnrolledAt, &d.CreatedAt, &d.UpdatedAt,
+			)
+			if err != nil {
+				return nil, "", err
+			}
+			if err := s.rotateDeviceCredential(ctx, tx, d.ID, credHash); err != nil {
+				return nil, "", err
+			}
+			if err := tx.Commit(ctx); err != nil {
+				return nil, "", err
+			}
+			return &d, deviceTokenPlain, nil
+		}
+		if !errors.Is(findErr, ErrNotFound) {
+			return nil, "", findErr
+		}
+	}
+
 	const insertDevice = `
 	INSERT INTO devices (
 		hostname, display_name, os, os_version, agent_version,
 		machine_guid, status, enrolled_at
 	) VALUES ($1, $2, $3, $4, $5, $6, 'active', now())
-	RETURNING id, hostname, display_name, os, os_version, agent_version,
-	          machine_guid, status, last_seen_at, enrolled_at, created_at, updated_at
+	 RETURNING id, hostname, display_name, os, os_version, agent_version,
+	 			machine_guid, status, last_seen_at, enrolled_at, created_at, updated_at
 	`
+
 	var d Device
 	err = tx.QueryRow(ctx, insertDevice,
 		hostname, displayName, osFamily, osVersion, agentVersion, mg,
@@ -82,9 +122,10 @@ func (s *Store) EnrollDevice(
 	}
 
 	const insertCred = `
-	INSERT INTO device_credentials (device_id, token_hash)
-	VALUES ($1, $2)
-`
+		INSERT INTO device_credentials (device_id, token_hash)
+		VALUES ($1, $2)
+	`
+
 	if _, err := tx.Exec(ctx, insertCred, d.ID, credHash); err != nil {
 		return nil, "", err
 	}

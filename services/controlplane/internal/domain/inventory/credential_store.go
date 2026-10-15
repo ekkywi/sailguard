@@ -37,3 +37,25 @@ func (s *Store) FindDeviceIDByActiveTokenHash(ctx context.Context, tokenHash str
 	}
 	return id, nil
 }
+
+func (s *Store) rotateDeviceCredential(
+	ctx context.Context,
+	tx pgx.Tx,
+	deviceID uuid.UUID,
+	newTokenHash string,
+) error {
+	_, err := tx.Exec(ctx, `
+		UPDATE device_credentials
+		SET revoked_at = now()
+		WHERE device_id = $1
+		AND revoked_at IS NULL
+	`, deviceID)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `
+		INSERT INTO device_credentials (device_id, token_hash)
+		VALUES ($1, $2)
+	`, deviceID, newTokenHash)
+	return err
+}
