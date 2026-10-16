@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
+import { SailGuardLogo } from './SailGuardLogo'
 import { ThemeToggle } from './ThemeToggle'
 import { UserMenu } from './UserMenu'
 
@@ -182,6 +183,7 @@ export function AppShell({ children, userLabel }: AppShellProps) {
         <div className="sidebar-top">
           <div className="sidebar-brand-row">
             <Link to="/" className="brand" title="SailGuard">
+              <SailGuardLogo />
               <span className="brand-full">SailGuard</span>
             </Link>
             <button

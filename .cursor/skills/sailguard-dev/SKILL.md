@@ -51,7 +51,7 @@ curl -s http://127.0.0.1:18080/v1/ready   # db + redis true
 ## Milestone orientation
 
 - M0–M3 magang core **done** (policy UI, audit match, Events persist/UI; mode PATCH + delete rules).
-- M4 **partial**: Linux `/proc` List+Terminate **done**; Windows Toolhelp List+Terminate+WMI Watch+scan **done**; Win7 Go 1.20 build **done**; installer ZIP + setup **done**; MachineGuid/os-release **done**; process user on events **done**; enroll reclaim **done**; device/group PATCH+DELETE **done**. Remaining: policy DELETE/edit-rule, Windows Service, disabled-device auth gate, streams/dashboard; optional ETW/Linux Watch; credential ACL; re-enroll on 401.
+- M4 **partial**: Linux `/proc` List+Terminate **done**; Windows Toolhelp List+Terminate+WMI Watch+scan **done**; Win7 Go 1.20 build **done**; installer ZIP + setup **done**; MachineGuid/os-release **done**; process user on events **done**; enroll reclaim **done**; device/group/policy DELETE (and device/group PATCH) **done**. Remaining: edit-rule in place, Windows Service, disabled-device auth gate, streams/dashboard; optional ETW/Linux Watch; credential ACL; re-enroll on 401.
 - Later: alerts, users admin, LDAP, etc.
 
 ## Agent timers / dual-path
@@ -65,7 +65,7 @@ curl -s http://127.0.0.1:18080/v1/ready   # db + redis true
 
 ## When resuming
 
-State the next concrete step from `handoff.md` (currently: policy DELETE, disabled-device auth, or Windows Service). Prefer one complete method per guidance step. If handoff conflicts with the repo, trust the repo + checklist and update handoff.
+State the next concrete step from `handoff.md` (currently: disabled-device auth, Windows Service, or edit-rule). Prefer one complete method per guidance step. If handoff conflicts with the repo, trust the repo + checklist and update handoff.
 
 ## Lab smoke
 

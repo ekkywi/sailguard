@@ -119,3 +119,14 @@ func (s *Store) UpdatePolicyMode(ctx context.Context, id uuid.UUID, mode string)
 	}
 	return &p, nil
 }
+
+func (s *Store) DeletePolicy(ctx context.Context, id uuid.UUID) error {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM policies WHERE id = $1`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}

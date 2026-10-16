@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { formatRelativeTime } from '../../lib/format'
+import { toast } from '../../components/toast'
 import { createGroup, listGroups } from './api'
 import type { CreateGroupInput, DeviceGroup } from './types'
 
@@ -70,9 +71,13 @@ export default function GroupsPage() {
       setName('')
       setDescription('')
       setPage(1)
+      toast.success('Group created')
       load()
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'failed to create group')
+      const msg =
+        err instanceof Error ? err.message : 'failed to create group'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setCreating(false)
     }

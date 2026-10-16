@@ -5,6 +5,7 @@ import '@fontsource/geist-sans/400.css'
 import '@fontsource/geist-sans/500.css'
 import '@fontsource/geist-sans/600.css'
 import App from './App'
+import { ToastViewport } from './components/toast'
 import { initTheme } from './lib/theme'
 import './index.css'
 
@@ -14,6 +15,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <App />
+      <ToastViewport />
     </BrowserRouter>
   </StrictMode>,
 )

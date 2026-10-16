@@ -1,5 +1,6 @@
 import { FormEvent, useId, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
+import { SailGuardLogo } from '../../components/SailGuardLogo'
 import { ThemeToggle } from '../../components/ThemeToggle'
 import { getToken, setToken } from '../../lib/auth-storage'
 import { login } from './api'
@@ -82,7 +83,10 @@ export default function LoginPage() {
       </div>
 
       <div className="login-panel">
-        <h1 className="login-brand">SailGuard</h1>
+        <div className="login-brand-row">
+          <SailGuardLogo className="sg-logo sg-logo-lg" />
+          <h1 className="login-brand">SailGuard</h1>
+        </div>
         <p className="lede lede-tight">Sign in to the control plane</p>
 
         <form className="form" onSubmit={onSubmit} noValidate>

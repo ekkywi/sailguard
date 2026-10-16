@@ -52,6 +52,7 @@ func NewRouter(cfg config.Config, pool *pgxpool.Pool, rdb *redis.Client) http.Ha
 	mux.HandleFunc("POST /v1/policies", api.requirePermission("policy.write", api.handleCreatePolicy))
 	mux.HandleFunc("GET /v1/policies/{id}", api.requirePermission("policy.read", api.handleGetPolicy))
 	mux.HandleFunc("PATCH /v1/policies/{id}", api.requirePermission("policy.write", api.handlePatchPolicy))
+	mux.HandleFunc("DELETE /v1/policies/{id}", api.requirePermission("policy.write", api.handleDeletePolicy))
 	mux.HandleFunc("GET /v1/policies/{id}/rules", api.requirePermission("policy.read", api.handleListPolicyRules))
 	mux.HandleFunc("POST /v1/policies/{id}/rules", api.requirePermission("policy.write", api.handleAddPolicyRule))
 	mux.HandleFunc("DELETE /v1/policies/{id}/rules/{ruleId}", api.requirePermission("policy.write", api.handleDeletePolicyRule))

@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { toast } from '../../components/toast'
 import {
   formatDateTime,
   formatRelativeTime,
@@ -56,8 +57,12 @@ export default function DeviceDetailPage() {
       })
       setDevice(updated)
       setDisplayNameDraft(updated.display_name || '')
+      toast.success('Display name saved')
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'failed to update device')
+      const msg =
+        err instanceof Error ? err.message : 'failed to update device'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setSavingName(false)
     }
@@ -71,8 +76,12 @@ export default function DeviceDetailPage() {
     try {
       const updated = await patchDevice(id, { status: next })
       setDevice(updated)
+      toast.success(next === 'disabled' ? 'Device disabled' : 'Device enabled')
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'failed to update status')
+      const msg =
+        err instanceof Error ? err.message : 'failed to update status'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setTogglingStatus(false)
     }
@@ -84,9 +93,13 @@ export default function DeviceDetailPage() {
     setError(null)
     try {
       await deleteDevice(id)
+      toast.success('Device deleted')
       navigate('/devices')
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'failed to delete device')
+      const msg =
+        err instanceof Error ? err.message : 'failed to delete device'
+      setError(msg)
+      toast.error(msg)
       setDeleting(false)
       setConfirmDelete(false)
     }

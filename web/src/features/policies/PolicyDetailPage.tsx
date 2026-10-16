@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { toast } from '../../components/toast'
 import { formatRelativeTime } from '../../lib/format'
 import { listDevices } from '../devices/api'
 import type { Device } from '../devices/types'
@@ -10,6 +11,7 @@ import {
   addPolicyAssignment,
   addPolicyRule,
   deletePolicyRule,
+  deletePolicy,
   getPolicy,
   listPolicyAssignments,
   listPolicyRules,
@@ -21,6 +23,7 @@ import type { Policy, PolicyAssignment, PolicyRule } from './types'
 
 export default function PolicyDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
 
   const [policy, setPolicy] = useState<Policy | null>(null)
   const [rules, setRules] = useState<PolicyRule[] | null>(null)
@@ -53,6 +56,8 @@ export default function PolicyDetailPage() {
   const [publishing, setPublishing] = useState(false)
   const [modeDraft, setModeDraft] = useState('audit')
   const [savingMode, setSavingMode] = useState(false)
+  const [confirmDeletePolicy, setConfirmDeletePolicy] = useState(false)
+  const [deletingPolicy, setDeletingPolicy] = useState(false)
 
   const load = useCallback(() => {
     if (!id) {
@@ -111,9 +116,12 @@ export default function PolicyDetailPage() {
         value,
       })
       setRuleValue('')
+      toast.success('Rule added')
       load()
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'failed to add rule')
+      const msg = err instanceof Error ? err.message : 'failed to add rule'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setAddingRule(false)
     }
@@ -150,9 +158,13 @@ export default function PolicyDetailPage() {
       await addPolicyAssignment(id, body)
       setAssignGroupId('')
       setAssignDeviceId('')
+      toast.success('Assignment added')
       load()
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'failed to add assignment')
+      const msg =
+        err instanceof Error ? err.message : 'failed to add assignment'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setAddingAssign(false)
     }
@@ -165,11 +177,13 @@ export default function PolicyDetailPage() {
     try {
       await removePolicyAssignment(id, removeAssign.id)
       setRemoveAssign(null)
+      toast.success('Assignment removed')
       load()
     } catch (err: unknown) {
-      setError(
-        err instanceof Error ? err.message : 'failed to remove assignment',
-      )
+      const msg =
+        err instanceof Error ? err.message : 'failed to remove assignment'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setRemoving(false)
     }
@@ -182,9 +196,12 @@ export default function PolicyDetailPage() {
     try {
       await deletePolicyRule(id, removeRule.id)
       setRemoveRule(null)
+      toast.success('Rule deleted')
       load()
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'failed to delete rule')
+      const msg = err instanceof Error ? err.message : 'failed to delete rule'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setRemovingRule(false)
     }
@@ -198,8 +215,11 @@ export default function PolicyDetailPage() {
       const p = await patchPolicy(id, { mode: modeDraft })
       setPolicy(p)
       setModeDraft(p.mode)
+      toast.success(`Mode set to ${p.mode}`)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'failed to update mode')
+      const msg = err instanceof Error ? err.message : 'failed to update mode'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setSavingMode(false)
     }
@@ -212,11 +232,33 @@ export default function PolicyDetailPage() {
     try {
       const p = await publishPolicy(id)
       setPolicy(p)
+      toast.success('Policy published', `Version ${p.version}`)
       load()
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'failed to publish policy')
+      const msg =
+        err instanceof Error ? err.message : 'failed to publish policy'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setPublishing(false)
+    }
+  }
+
+  async function onConfirmDeletePolicy() {
+    if (!id) return
+    setDeletingPolicy(true)
+    setError(null)
+    try {
+      await deletePolicy(id)
+      toast.success('Policy deleted')
+      navigate('/policies')
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : 'failed to delete policy'
+      setError(msg)
+      toast.error(msg)
+      setDeletingPolicy(false)
+      setConfirmDeletePolicy(false)
     }
   }
 
@@ -255,7 +297,16 @@ export default function PolicyDetailPage() {
             ) : null}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div className="page-header-actions">
+          {policy ? (
+            <button
+              type="button"
+              className="btn btn-danger"
+              onClick={() => setConfirmDeletePolicy(true)}
+            >
+              Delete
+            </button>
+          ) : null}
           <button
             type="button"
             className="btn btn-ghost"
@@ -633,6 +684,19 @@ export default function PolicyDetailPage() {
         onConfirm={onConfirmRemoveRule}
         onCancel={() => {
           if (!removingRule) setRemoveRule(null)
+        }}
+      />
+
+      <ConfirmDialog
+        open={confirmDeletePolicy}
+        title="Delete policy?"
+        description="Rules and assignments for this policy will be removed. Agents keep a local cache until the next policy sync."
+        confirmLabel="Delete policy"
+        danger
+        busy={deletingPolicy}
+        onConfirm={onConfirmDeletePolicy}
+        onCancel={() => {
+          if (!deletingPolicy) setConfirmDeletePolicy(false)
         }}
       />
     </div>

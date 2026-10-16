@@ -356,6 +356,50 @@ func (a *API) handlePatchPolicy(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (a *API) handleDeletePolicy(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code": "validation_error",
+				"message": "invalid policy id",
+			},
+		})
+		return
+	}
+
+	store := policy.NewStore(a.pool)
+	err = store.DeletePolicy(r.Context(), id)
+	if errors.Is(err, policy.ErrNotFound) {
+		writeJSON(w, http.StatusNotFound, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code": "not_found",
+				"message": "policy not found",
+			},
+		})
+		return
+	}
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code": "internal_error",
+				"message": "failed to delete policy",
+			},
+		})
+		return
+	}
+	
+	writeJSON(w, http.StatusOK, envelope{
+		OK: true,
+		Data: map[string]any{
+			"deleted": true,
+		},
+	})
+}
+
 func (a *API) handleDeletePolicyRule(w http.ResponseWriter, r *http.Request) {
 	policyID, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {

@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { formatRelativeTime } from '../../lib/format'
+import { toast } from '../../components/toast'
 import { createPolicy, listPolicies } from './api'
 import type { CreatePolicyInput, Policy } from './types'
 
@@ -74,9 +75,13 @@ export default function PoliciesPage() {
       setDescription('')
       setMode('audit')
       setPage(1)
+      toast.success('Policy created')
       load()
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'failed to create policy')
+      const msg =
+        err instanceof Error ? err.message : 'failed to create policy'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setCreating(false)
     }

@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { toast } from '../../components/toast'
 import {
   formatRelativeTime,
   statusBadgeClass,
@@ -93,9 +94,12 @@ export default function GroupDetailPage() {
     try {
       await addGroupMember(id, selectedDeviceId)
       setSelectedDeviceId('')
+      toast.success('Member added')
       load()
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'failed to add member')
+      const msg = err instanceof Error ? err.message : 'failed to add member'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setAdding(false)
     }
@@ -109,9 +113,13 @@ export default function GroupDetailPage() {
     try {
       await removeGroupMember(id, removeTarget.id)
       setRemoveTarget(null)
+      toast.success('Member removed')
       load()
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'failed to remove member')
+      const msg =
+        err instanceof Error ? err.message : 'failed to remove member'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setRemoving(false)
     }
@@ -135,8 +143,12 @@ export default function GroupDetailPage() {
       setGroup(updated)
       setNameDraft(updated.name)
       setDescriptionDraft(updated.description || '')
+      toast.success('Group updated')
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'failed to update group')
+      const msg =
+        err instanceof Error ? err.message : 'failed to update group'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setSavingMeta(false)
     }
@@ -148,9 +160,13 @@ export default function GroupDetailPage() {
     setError(null)
     try {
       await deleteGroup(id)
+      toast.success('Group deleted')
       navigate('/groups')
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'failed to delete group')
+      const msg =
+        err instanceof Error ? err.message : 'failed to delete group'
+      setError(msg)
+      toast.error(msg)
       setDeleting(false)
       setConfirmDelete(false)
     }

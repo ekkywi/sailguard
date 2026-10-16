@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { toast } from '../../components/toast'
 import {
   downloadWindowsAgentPackage,
   getWindowsAgentPackageMeta,
@@ -85,8 +86,11 @@ export default function AgentDownloadPage() {
         enrollment_token: token,
         data_dir: dataDir.trim() || undefined,
       })
+      toast.success('Download started', 'Check your browser downloads folder.')
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'download failed')
+      const msg = err instanceof Error ? err.message : 'download failed'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setDownloading(false)
     }

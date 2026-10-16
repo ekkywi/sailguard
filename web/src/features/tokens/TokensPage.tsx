@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { toast } from '../../components/toast'
 import {
   formatDateTime,
   formatRelativeTime,
@@ -102,9 +103,13 @@ export default function TokensPage() {
       setMaxUses(1)
       setExpiresHours('')
       setPage(1)
+      toast.success('Token created', 'Copy the secret below — it is shown once.')
       load()
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'failed to create token')
+      const msg =
+        err instanceof Error ? err.message : 'failed to create token'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setCreating(false)
     }
@@ -117,9 +122,13 @@ export default function TokensPage() {
     try {
       await revokeEnrollmentToken(revokeTarget.id)
       setRevokeTarget(null)
+      toast.success('Token revoked')
       load()
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'failed to revoke token')
+      const msg =
+        err instanceof Error ? err.message : 'failed to revoke token'
+      setError(msg)
+      toast.error(msg)
       setRevokeTarget(null)
     } finally {
       setRevoking(false)
@@ -131,8 +140,11 @@ export default function TokensPage() {
     try {
       await navigator.clipboard.writeText(freshSecret)
       setCopyDone(true)
+      toast.success('Copied to clipboard')
     } catch {
-      setError('could not copy to clipboard')
+      const msg = 'could not copy to clipboard'
+      setError(msg)
+      toast.error(msg)
     }
   }
 

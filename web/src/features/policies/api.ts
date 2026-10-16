@@ -32,6 +32,11 @@ export function patchPolicy(id: string, body: { mode: string }) {
     body: JSON.stringify(body),
   })
 }
+export function deletePolicy(id: string) {
+  return apiFetch<{ deleted: boolean }>(`/v1/policies/${id}`, {
+    method: 'DELETE',
+  })
+}
 
 export function listPolicyRules(policyId: string) {
   return apiFetch<PolicyRuleListData>(`/v1/policies/${policyId}/rules`)
