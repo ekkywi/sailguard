@@ -4,8 +4,6 @@ import (
 	"context"
 	"log"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/ekkywi/sailguard/agent/internal/app"
 	"github.com/ekkywi/sailguard/agent/internal/config"
@@ -13,14 +11,13 @@ import (
 )
 
 func main() {
-	cfg := config.Load()
-	h := platform.NewHost()
-
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer cancel()
-
-	log.Printf("sailguard-agent starting os_family=%s version=%s", h.OSFamily(), cfg.AgentVersion)
-	if err := app.Run(ctx, cfg, h); err != nil {
+	err := platform.RunAgent(func(ctx context.Context) error {
+		cfg := config.Load()
+		h := platform.NewHost()
+		log.Printf("sailguard-agent starting os_family=%s version=%s", h.OSFamily(), cfg.AgentVersion)
+		return app.Run(ctx, cfg, h)
+	})
+	if err != nil {
 		log.Printf("agent stopped with error: %v", err)
 		os.Exit(1)
 	}

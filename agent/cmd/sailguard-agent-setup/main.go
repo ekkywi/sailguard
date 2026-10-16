@@ -12,7 +12,7 @@ import (
 
 func main() {
 	silent := flag.Bool("silent", false, "no prompts; do not pause at end")
-	runAfter := flag.Bool("run", false, "start the agent (elevated) after install")
+	runAfter := flag.Bool("run", false, "legacy flag; service always starts after install")
 	flag.Parse()
 
 	if err := runInstall(*silent, *runAfter); err != nil {

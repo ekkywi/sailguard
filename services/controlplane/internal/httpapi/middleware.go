@@ -99,6 +99,16 @@ func (a *API) requireDeviceAuth(next http.HandlerFunc) http.HandlerFunc {
 			})
 			return
 		}
+		if errors.Is(err, inventory.ErrDeviceDisabled) {
+			writeJSON(w, http.StatusForbidden, envelope{
+				OK: false,
+				Error: map[string]any{
+					"code": "device_disabled",
+					"message": "device is disabled",
+				},
+			})
+			return
+		}
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, envelope{
 				OK: false,

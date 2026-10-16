@@ -55,7 +55,11 @@ Primary validation focus: Windows 10/11 and Linux; Windows 7 is in scope and sho
 
 Day-to-day control-plane development uses the newer Go toolchain; only the legacy agent artefact pins Go 1.20.
 
-**Endpoint packages:** Administrators use console **Download agent** to pick a channel and download an installer ZIP (`sailguard-agent-setup.exe` + channel agent exe + `config.json`). On the endpoint, run setup **as Administrator**; it installs to `C:\Program Files\SailGuard\Agent\` and stores config/credentials under `C:\ProgramData\SailGuard\agent\` (stable across reinstalls). Portable `start.bat` / `start-admin.bat` remain in the ZIP as a fallback. Build setup with `./scripts/build-agent-setup.sh` (`SG_AGENT_SETUP_PATH`). Optional `SG_PUBLIC_AGENT_URL` pre-fills the LAN API URL. Linux channel is reserved (coming soon).
+**Endpoint packages:** Administrators use console **Download agent** to pick a channel and **package kind**:
+- **First install** — ZIP includes enrollment token in `config.json` (token required).
+- **Update** — same binaries, **no** enrollment token; keep `ProgramData\…\device.json` so the device stays enrolled.
+
+On the endpoint, run `sailguard-agent-setup.exe` **as Administrator**; it installs to `C:\Program Files\SailGuard\Agent\`, stores config/credentials under `C:\ProgramData\SailGuard\agent\`, and registers the **SailGuardAgent** Windows service (`SERVICE_AUTO_START`) so the agent starts at boot without a console UAC prompt. If Service Control Manager refuses start (common on locked-down Win7 labs: Access denied / marked-for-delete), setup falls back to a SYSTEM `ONSTART` scheduled task plus a detached process start so the agent still runs without leaving a console open. Setup requires an enrollment token only when `device.json` is missing. Service logs append to `ProgramData\…\agent-service.log`. Start Menu includes Start/Stop service shortcuts; console `start.bat` remains for debugging. Build setup with `./scripts/build-agent-setup.sh` (`SG_AGENT_SETUP_PATH`). Optional `SG_PUBLIC_AGENT_URL` pre-fills the LAN API URL. Linux channel is reserved (coming soon). Signed remote/fleet auto-update is planned later.
 
 ## Configuration
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,10 +14,24 @@ import (
 	"github.com/ekkywi/sailguard/pkgs/agentcontract"
 )
 
+// ErrDeviceDisabled is returned when the control plane rejects the device
+// because an admin set status=disabled (HTTP 403, code device_disabled).
+var ErrDeviceDisabled = errors.New("device disabled")
+
 type Client struct {
 	BaseURL    string
 	HTTPClient *http.Client
 	UserAgent  string
+}
+
+func apiError(status int, err *agentcontract.Error, raw []byte, op string) error {
+	if err != nil && err.Code == "device_disabled" {
+		return fmt.Errorf("%s: %w", op, ErrDeviceDisabled)
+	}
+	if err != nil {
+		return fmt.Errorf("%s rejected (%d): %s: %s", op, status, err.Code, err.Message)
+	}
+	return fmt.Errorf("%s rejected (%d): %s", op, status, strings.TrimSpace(string(raw)))
 }
 
 func NewClient(baseURL string) *Client {
@@ -74,12 +89,7 @@ func (c *Client) Enroll(ctx context.Context, req agentcontract.EnrollRequest) (*
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 || !env.OK || env.Data == nil {
-		if env.Error != nil {
-			return nil, fmt.Errorf("enroll rejected: (%d): %s: %s",
-				res.StatusCode, env.Error.Code, env.Error.Message,
-			)
-		}
-		return nil, fmt.Errorf("enroll rejected (%d): %s", res.StatusCode, strings.TrimSpace(string(raw)))
+		return nil, apiError(res.StatusCode, env.Error, raw, "enroll")
 	}
 
 	if env.Data.DeviceID == "" || env.Data.DeviceToken == "" {
@@ -141,10 +151,7 @@ func (c *Client) PostEvents(
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 || !env.OK || env.Data == nil {
-		if env.Error != nil {
-			return nil, fmt.Errorf("events rejected (%d): %s: %s", res.StatusCode, env.Error.Code, env.Error.Message)
-		}
-		return nil, fmt.Errorf("events rejected (%d): %s", res.StatusCode, strings.TrimSpace(string(raw)))
+		return nil, apiError(res.StatusCode, env.Error, raw, "events")
 	}
 	return env.Data, nil
 }
@@ -193,11 +200,7 @@ func (c *Client) GetPolicy(
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 || !env.OK || env.Data == nil {
-		if env.Error != nil {
-			return nil, fmt.Errorf("policy rejected (%d): %s: %s",
-				res.StatusCode, env.Error.Code, env.Error.Message)
-		}
-		return nil, fmt.Errorf("policy rejected (%d): %s", res.StatusCode, strings.TrimSpace(string(raw)))
+		return nil, apiError(res.StatusCode, env.Error, raw, "policy")
 	}
 	return env.Data, nil
 }

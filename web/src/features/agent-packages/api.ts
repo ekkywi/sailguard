@@ -43,7 +43,8 @@ export async function downloadWindowsAgentPackage(
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `sailguard-agent-${body.channel}.zip`
+  const kind = body.package_kind === 'update' ? 'update' : 'install'
+  a.download = `sailguard-agent-${body.channel}-${kind}.zip`
   document.body.appendChild(a)
   a.click()
   a.remove()

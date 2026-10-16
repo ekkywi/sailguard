@@ -17,9 +17,9 @@ SailGuard combines a privileged endpoint agent with a centralized policy control
 - Agent and administrator traffic are expected to use **TLS** in production  
 - Administrators authenticate with **local accounts** today and receive a **Bearer access token** for API calls; directory federation may be added later  
 - Each enrolled device receives a **unique credential**; credentials are stored hashed on the server  
-- Re-enrollment for the same machine identity (**reclaim**) still requires a valid enrollment token and rotates the device credential  
+- Re-enrollment for the same machine identity (**reclaim**) still requires a valid enrollment token and rotates the device credential; reclaim of a **disabled** device is refused (`403` `device_disabled`) so a token cannot re-enable it  
 - Administrative APIs require authenticated principals and **RBAC** permissions as those routes are enabled  
-- Operators may disable or delete devices from the console; rejecting agent traffic for disabled devices is a planned hardening step  
+- Operators may disable or delete devices from the console; disabled devices are rejected on agent auth (`whoami` / events / policy) with HTTP **403** and error code **`device_disabled`**  
 - Passwords are stored only as one-way hashes; JWT signing material must come from environment or a secret store—not source control  
 
 ### Authorization and change control

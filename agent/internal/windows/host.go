@@ -88,11 +88,6 @@ func (h *Host) Terminate(ctx context.Context, pid uint32) error {
 	return nil
 }
 
-func (h *Host) Run(ctx context.Context, fn func(context.Context) error) error {
-	// Windows Service wrapper lands later; foreground for now.
-	return fn(ctx)
-}
-
 func (h *Host) Watch(ctx context.Context, onCreate func(host.Process)) error {
 	if onCreate == nil {
 		return fmt.Errorf("windows watch: onCreate is nil")

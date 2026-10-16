@@ -26,9 +26,12 @@ export type AgentPackageMeta = {
   channels: AgentChannel[]
 }
 
+export type AgentPackageKind = 'install' | 'update'
+
 export type DownloadWindowsPackageInput = {
   channel: string
+  package_kind?: AgentPackageKind
   server_url: string
-  enrollment_token: string
+  enrollment_token?: string
   data_dir?: string
 }

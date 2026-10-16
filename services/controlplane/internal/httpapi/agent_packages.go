@@ -13,6 +13,7 @@ import (
 
 type windowsAgentPackageRequest struct {
 	Channel         string `json:"channel"` // windows-legacy | windows-current
+	PackageKind     string `json:"package_kind"` // install (default) | update
 	ServerURL       string `json:"server_url"`
 	EnrollmentToken string `json:"enrollment_token"`
 	DataDir         string `json:"data_dir"`
@@ -20,7 +21,7 @@ type windowsAgentPackageRequest struct {
 
 type agentFileConfig struct {
 	ServerURL       string `json:"server_url"`
-	EnrollmentToken string `json:"enrollment_token"`
+	EnrollmentToken string `json:"enrollment_token,omitempty"`
 	DataDir         string `json:"data_dir,omitempty"`
 }
 
@@ -187,21 +188,52 @@ func (a *API) handleDownloadWindowsAgentPackage(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	packageKind := strings.ToLower(strings.TrimSpace(req.PackageKind))
+	if packageKind == "" {
+		packageKind = "install"
+	}
+	switch packageKind {
+	case "install", "update":
+	default:
+		writeJSON(w, http.StatusBadRequest, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "validation_error",
+				"message": "package_kind must be install or update",
+			},
+		})
+		return
+	}
+
 	serverURL := strings.TrimSpace(req.ServerURL)
 	token := strings.TrimSpace(req.EnrollmentToken)
 	dataDir := strings.TrimSpace(req.DataDir)
 	if dataDir == "" {
 		dataDir = defaultWindowsDataDir
 	}
-	if serverURL == "" || token == "" {
+	if serverURL == "" {
 		writeJSON(w, http.StatusBadRequest, envelope{
 			OK: false,
 			Error: map[string]any{
 				"code":    "validation_error",
-				"message": "server_url and enrollment_token are required",
+				"message": "server_url is required",
 			},
 		})
 		return
+	}
+	if packageKind == "install" && token == "" {
+		writeJSON(w, http.StatusBadRequest, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "validation_error",
+				"message": "enrollment_token is required for install packages",
+			},
+		})
+		return
+	}
+	if packageKind == "update" {
+		// Update packages must not bake a token — upgrades reuse device.json.
+		token = ""
 	}
 	if !strings.HasPrefix(serverURL, "http://") && !strings.HasPrefix(serverURL, "https://") {
 		writeJSON(w, http.StatusBadRequest, envelope{
@@ -273,26 +305,49 @@ func (a *API) handleDownloadWindowsAgentPackage(w http.ResponseWriter, r *http.R
 		"powershell -NoProfile -Command \"Start-Process -FilePath '.\\" + ch.BinaryName + "' -WorkingDirectory '%~dp0' -Verb RunAs\"\r\n" +
 		"if errorlevel 1 pause\r\n")
 
-	readme := []byte(fmt.Sprintf(""+
-		"SailGuard agent installer package (%s)\n"+
-		"=====================================\n\n"+
-		"Channel: %s (%s)\n"+
-		"Toolchain: %s\n\n"+
-		"Recommended:\n"+
-		"1. Unzip this folder anywhere (e.g. Desktop).\n"+
-		"2. Right-click %s → Run as administrator.\n"+
-		"3. Setup copies the agent to:\n"+
-		"     C:\\Program Files\\SailGuard\\Agent\\\n"+
-		"   and writes config / device data under:\n"+
-		"     %s\n"+
-		"4. Use Start Menu → SailGuard → Start Agent (Administrator).\n\n"+
-		"Portable (optional): start.bat / start-admin.bat run from this folder\n"+
-		"without installing to Program Files.\n\n"+
-		"Server: %s\n",
-		ch.Label, ch.ID, ch.Description, ch.Toolchain,
-		setupBinaryName, dataDir, serverURL))
+	var readme []byte
+	if packageKind == "update" {
+		readme = []byte(fmt.Sprintf(""+
+			"SailGuard agent UPDATE package (%s)\n"+
+			"==================================\n\n"+
+			"Channel: %s (%s)\n"+
+			"Toolchain: %s\n"+
+			"Kind: update (no enrollment token)\n\n"+
+			"Use this when the device is already enrolled.\n"+
+			"Keep ProgramData so device.json is reused — do not delete:\n"+
+			"  %s\\device.json\n\n"+
+			"Steps:\n"+
+			"1. Unzip this folder.\n"+
+			"2. Right-click %s → Run as administrator.\n"+
+			"3. Setup stops the SailGuardAgent service, replaces files, then starts it again.\n"+
+			"4. Keep %s\\device.json — do not delete ProgramData.\n\n"+
+			"Enrollment token is NOT required and is not included.\n"+
+			"Server URL in config.json: %s\n"+
+			"Service name: SailGuardAgent (Automatic)\n",
+			ch.Label, ch.ID, ch.Description, ch.Toolchain,
+			setupBinaryName, dataDir, serverURL))
+	} else {
+		readme = []byte(fmt.Sprintf(""+
+			"SailGuard agent installer package (%s)\n"+
+			"=====================================\n\n"+
+			"Channel: %s (%s)\n"+
+			"Toolchain: %s\n"+
+			"Kind: first install (enrollment token baked into config.json)\n\n"+
+			"Recommended:\n"+
+			"1. Unzip this folder anywhere (e.g. Desktop).\n"+
+			"2. Right-click %s → Run as administrator.\n"+
+			"3. Setup installs to:\n"+
+			"     C:\\Program Files\\SailGuard\\Agent\\\n"+
+			"   data under:\n"+
+			"     %s\n"+
+			"4. Registers Windows service SailGuardAgent (Automatic) and starts it.\n"+
+			"5. Optional Start Menu: Start/Stop SailGuard Service; Console mode for debug.\n\n"+
+			"Server: %s\n",
+			ch.Label, ch.ID, ch.Description, ch.Toolchain,
+			setupBinaryName, dataDir, serverURL))
+	}
 
-	zipName := fmt.Sprintf("sailguard-agent-%s.zip", channelID)
+	zipName := fmt.Sprintf("sailguard-agent-%s-%s.zip", channelID, packageKind)
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, zipName))
 	w.WriteHeader(http.StatusOK)

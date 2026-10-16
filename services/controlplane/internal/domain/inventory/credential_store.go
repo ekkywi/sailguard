@@ -20,20 +20,25 @@ func (s *Store) CreateDeviceCredential(ctx context.Context, deviceID uuid.UUID, 
 
 func (s *Store) FindDeviceIDByActiveTokenHash(ctx context.Context, tokenHash string) (uuid.UUID, error) {
 	const q = `
-		SELECT device_id
-		FROM device_credentials
-		WHERE token_hash = $1
-			AND revoked_at IS NULL
+		SELECT c.device_id, d.status
+		FROM device_credentials c
+		JOIN devices d on d.id = c.device_id
+		WHERE c.token_hash = $1
+			AND c.revoked_at IS NULL
 		LIMIT 1
 	`
 
 	var id uuid.UUID
-	err := s.pool.QueryRow(ctx, q, tokenHash).Scan(&id)
+	var status string
+	err := s.pool.QueryRow(ctx, q, tokenHash).Scan(&id, &status)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return uuid.Nil, ErrNotFound
 	}
 	if err != nil {
 		return uuid.Nil, err
+	}
+	if status == "disabled" {
+		return uuid.Nil, ErrDeviceDisabled
 	}
 	return id, nil
 }

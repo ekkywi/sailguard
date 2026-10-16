@@ -54,13 +54,15 @@ func (s *Store) EnrollDevice(
 	}
 	defer tx.Rollback(ctx)
 
-	if err := s.IncrementEnrollmentTokenUse(ctx, tx, tok.ID); err != nil {
-		return nil, "", err
-	}
-
 	if mg != nil {
 		existing, findErr := s.FindDeviceMachineGUID(ctx, *mg)
 		if findErr == nil {
+			if existing.Status == "disabled" {
+				return nil, "", ErrDeviceDisabled
+			}
+			if err := s.IncrementEnrollmentTokenUse(ctx, tx, tok.ID); err != nil {
+				return nil, "", err
+			}
 			const updateDevice = `
 				UPDATE devices
 				SET hostname = $2,
@@ -95,6 +97,10 @@ func (s *Store) EnrollDevice(
 		if !errors.Is(findErr, ErrNotFound) {
 			return nil, "", findErr
 		}
+	}
+
+	if err := s.IncrementEnrollmentTokenUse(ctx, tx, tok.ID); err != nil {
+		return nil, "", err
 	}
 
 	const insertDevice = `

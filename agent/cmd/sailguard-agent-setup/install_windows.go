@@ -7,11 +7,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 
+	"github.com/ekkywi/sailguard/agent/internal/winsvc"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 )
@@ -60,9 +59,6 @@ func runInstall(silent, runAfter bool) error {
 	if strings.TrimSpace(cfg.ServerURL) == "" {
 		return fmt.Errorf("config.json: server_url is required")
 	}
-	if strings.TrimSpace(cfg.EnrollmentToken) == "" {
-		return fmt.Errorf("config.json: enrollment_token is required (first install)")
-	}
 
 	programFiles := os.Getenv("ProgramFiles")
 	if programFiles == "" {
@@ -77,14 +73,40 @@ func runInstall(silent, runAfter bool) error {
 	dataDir := filepath.Join(programData, dataSubdir)
 	cfg.DataDir = dataDir
 
+	deviceCredPath := filepath.Join(dataDir, "device.json")
+	_, deviceErr := os.Stat(deviceCredPath)
+	hasDevice := deviceErr == nil
+	if strings.TrimSpace(cfg.EnrollmentToken) == "" && !hasDevice {
+		return fmt.Errorf(
+			"config.json: enrollment_token is required for first install "+
+				"(or keep existing %s for an exe update)",
+			deviceCredPath,
+		)
+	}
+	if strings.TrimSpace(cfg.EnrollmentToken) == "" && hasDevice {
+		// Preserve prior token in ProgramData config if present (harmless after enroll).
+		if prev, err := loadConfig(filepath.Join(dataDir, "config.json")); err == nil {
+			if t := strings.TrimSpace(prev.EnrollmentToken); t != "" {
+				cfg.EnrollmentToken = t
+			}
+		}
+	}
+
 	if !silent {
 		fmt.Println(productName + " Setup")
 		fmt.Println("======================")
+		fmt.Println("Build:      ", "ensure-running/task-fallback")
 		fmt.Println("Source:     ", srcDir)
 		fmt.Println("Install to: ", installDir)
 		fmt.Println("Data dir:   ", dataDir)
 		fmt.Println("Server:     ", cfg.ServerURL)
+		fmt.Println("Service:    ", winsvc.Name, "(Automatic; task fallback if SCM blocked)")
 		fmt.Println()
+	}
+
+	// Stop service first so the agent exe is not locked during copy.
+	if err := winsvc.Stop(); err != nil {
+		return fmt.Errorf("stop existing service: %w", err)
 	}
 
 	if err := os.MkdirAll(installDir, 0o755); err != nil {
@@ -125,22 +147,50 @@ func runInstall(silent, runAfter bool) error {
 		return fmt.Errorf("registry uninstall entry: %w", err)
 	}
 
-	if !silent {
-		fmt.Println("Installed successfully.")
-		fmt.Println("Start Menu → SailGuard → Start Agent (Administrator)")
-		fmt.Println("Credentials after enroll stay in:", dataDir)
-		fmt.Println()
-	}
+	_ = winsvc.Uninstall() // best-effort; may fail if SCM locks a marked-for-delete service
+	_ = runAfter           // retained for CLI compatibility with older scripts
 
-	if runAfter {
-		if err := startAgentElevated(installDir, agentName); err != nil {
-			return fmt.Errorf("start agent: %w", err)
+	installErr := winsvc.Install(dstAgent)
+	if !silent {
+		if installErr != nil {
+			fmt.Println("WARNING: could not register Windows service:")
+			fmt.Println(" ", installErr)
+			fmt.Println("  Will try Task Scheduler / background start instead.")
+		} else {
+			fmt.Println("Service registered:", winsvc.QueryConfigLine())
 		}
 	}
 
+	mode, note, runErr := winsvc.EnsureRunning(dstAgent)
 	if !silent {
+		fmt.Println("Installed successfully.")
+		fmt.Println("Credentials after enroll stay in:", dataDir)
+		fmt.Println("Service log:", filepath.Join(dataDir, "agent-service.log"))
+		fmt.Println()
+		switch {
+		case runErr != nil:
+			fmt.Println("WARNING: could not start agent now:")
+			fmt.Println(" ", runErr)
+			if installErr != nil {
+				fmt.Println(" ", installErr)
+			}
+			fmt.Println("  Close services.msc if open, reboot, or run start.bat as Administrator.")
+		case mode == "service":
+			fmt.Println("Service started (running):", winsvc.Name)
+		default:
+			fmt.Println("Agent start mode:", mode)
+			if note != "" {
+				fmt.Println("NOTE:", note)
+			}
+			fmt.Println("Agent should be running without a console window.")
+		}
+		fmt.Println()
 		fmt.Println("Press Enter to close…")
 		_, _ = fmt.Scanln()
+	} else if runErr != nil {
+		fmt.Fprintf(os.Stderr, "warning: agent start failed: %v\n", runErr)
+	} else if note != "" {
+		fmt.Fprintf(os.Stderr, "note: %s\n", note)
 	}
 	return nil
 }
@@ -218,25 +268,48 @@ func writeStartScripts(installDir, agentName string) error {
 	startBat := "" +
 		"@echo off\r\n" +
 		"cd /d \"%~dp0\"\r\n" +
-		"echo SailGuard agent — close this window to stop the agent.\r\n" +
+		"echo SailGuard agent console mode — prefer the Windows service for production.\r\n" +
+		"echo Close this window to stop the console agent.\r\n" +
 		agentName + "\r\n" +
 		"echo.\r\n" +
 		"pause\r\n"
-	startAdmin := "" +
+	// sc.exe requires an elevated token; re-launch via runas if needed.
+	startService := "" +
 		"@echo off\r\n" +
-		"cd /d \"%~dp0\"\r\n" +
-		"powershell -NoProfile -Command \"Start-Process -FilePath '.\\" + agentName + "' -WorkingDirectory '%~dp0' -Verb RunAs\"\r\n" +
+		"net session >nul 2>&1\r\n" +
+		"if errorlevel 1 (\r\n" +
+		"  echo Requesting Administrator to start " + winsvc.Name + "...\r\n" +
+		"  powershell -NoProfile -Command \"Start-Process -FilePath 'sc.exe' -ArgumentList 'start " + winsvc.Name + "' -Verb RunAs -Wait\"\r\n" +
+		"  goto :eof\r\n" +
+		")\r\n" +
+		"sc start " + winsvc.Name + "\r\n" +
+		"if errorlevel 1 pause\r\n"
+	stopService := "" +
+		"@echo off\r\n" +
+		"net session >nul 2>&1\r\n" +
+		"if errorlevel 1 (\r\n" +
+		"  echo Requesting Administrator to stop " + winsvc.Name + "...\r\n" +
+		"  powershell -NoProfile -Command \"Start-Process -FilePath 'sc.exe' -ArgumentList 'stop " + winsvc.Name + "' -Verb RunAs -Wait\"\r\n" +
+		"  goto :eof\r\n" +
+		")\r\n" +
+		"sc stop " + winsvc.Name + "\r\n" +
 		"if errorlevel 1 pause\r\n"
 	if err := os.WriteFile(filepath.Join(installDir, "start.bat"), []byte(startBat), 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(installDir, "start-admin.bat"), []byte(startAdmin), 0o755)
+	if err := os.WriteFile(filepath.Join(installDir, "start-service.bat"), []byte(startService), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(installDir, "stop-service.bat"), []byte(stopService), 0o755)
 }
 
 func writeUninstallScript(installDir, dataDir, agentName string) error {
 	body := fmt.Sprintf(""+
 		"@echo off\r\n"+
 		"echo Uninstalling %s...\r\n"+
+		"sc stop %s >nul 2>&1\r\n"+
+		"sc delete %s >nul 2>&1\r\n"+
+		"schtasks /Delete /TN \"%s\" /F >nul 2>&1\r\n"+
 		"taskkill /F /IM %s >nul 2>&1\r\n"+
 		"rmdir /S /Q \"%s\" 2>nul\r\n"+
 		"echo.\r\n"+
@@ -248,7 +321,7 @@ func writeUninstallScript(installDir, dataDir, agentName string) error {
 		"rmdir /S /Q \"%%ProgramData%%\\Microsoft\\Windows\\Start Menu\\Programs\\SailGuard\" 2>nul\r\n"+
 		"echo.\r\n"+
 		"pause\r\n",
-		productName, agentName, installDir, dataDir, uninstallKey)
+		productName, winsvc.Name, winsvc.Name, winsvc.TaskName, agentName, installDir, dataDir, uninstallKey)
 	return os.WriteFile(filepath.Join(installDir, "uninstall.bat"), []byte(body), 0o755)
 }
 
@@ -261,14 +334,16 @@ func writeStartMenuShortcuts(installDir string) error {
 	if err := os.MkdirAll(menu, 0o755); err != nil {
 		return err
 	}
-	// .bat launchers in Start Menu (no COM/.lnk dependency — Win7 friendly).
 	entries := map[string]string{
-		"Start Agent.bat": "" +
+		"Start SailGuard Service.bat": "" +
+			"@echo off\r\n" +
+			"call \"" + filepath.Join(installDir, "start-service.bat") + "\"\r\n",
+		"Stop SailGuard Service.bat": "" +
+			"@echo off\r\n" +
+			"call \"" + filepath.Join(installDir, "stop-service.bat") + "\"\r\n",
+		"Start Agent (Console).bat": "" +
 			"@echo off\r\n" +
 			"call \"" + filepath.Join(installDir, "start.bat") + "\"\r\n",
-		"Start Agent (Administrator).bat": "" +
-			"@echo off\r\n" +
-			"call \"" + filepath.Join(installDir, "start-admin.bat") + "\"\r\n",
 		"Uninstall SailGuard Agent.bat": "" +
 			"@echo off\r\n" +
 			"call \"" + filepath.Join(installDir, "uninstall.bat") + "\"\r\n",
@@ -311,17 +386,6 @@ func writeUninstallRegistry(installDir, agentName string) error {
 		return err
 	}
 	return key.SetDWordValue("NoModify", 1)
-}
-
-func startAgentElevated(installDir, agentName string) error {
-	ps := fmt.Sprintf(
-		"Start-Process -FilePath '%s' -WorkingDirectory '%s' -Verb RunAs",
-		filepath.Join(installDir, agentName),
-		installDir,
-	)
-	cmd := exec.Command("powershell", "-NoProfile", "-Command", ps)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-	return cmd.Start()
 }
 
 func isElevated() (bool, error) {

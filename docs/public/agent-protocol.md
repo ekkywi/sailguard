@@ -6,10 +6,10 @@ This document describes the agent ↔ control plane contract at a product level.
 
 ## Lifecycle
 
-1. **Enroll** with a one-time (or limited-use) enrollment token via `POST /v1/agent/enroll` *(admins mint/revoke tokens in the console or API)*. The agent sends a stable **machine ID** (Windows Cryptography `MachineGuid`, Linux `/etc/machine-id`) and OS version. If that machine ID already exists, a valid token **reclaims** the device (credential rotation) instead of failing with “already enrolled”. Windows endpoints may use an admin **installer package** (ZIP) from a chosen channel: **windows-legacy** (Win7 SP1+, Go 1.20) or **windows-current** (Win10/11, current Go) — `sailguard-agent-setup.exe` installs to Program Files / ProgramData; portable `start.bat` / `start-admin.bat` remain as a fallback. Linux agents typically use `go run` / local binary + env or `config.json` until a download channel ships.
+1. **Enroll** with a one-time (or limited-use) enrollment token via `POST /v1/agent/enroll` *(admins mint/revoke tokens in the console or API)*. The agent sends a stable **machine ID** (Windows Cryptography `MachineGuid`, Linux `/etc/machine-id`) and OS version. If that machine ID already exists, a valid token **reclaims** the device (credential rotation) instead of failing with “already enrolled”. Reclaim is **refused** when the existing device `status` is `disabled` (`403` `device_disabled`) so enrollment cannot silently re-enable it. Windows endpoints may use an admin ZIP from a chosen channel (**windows-legacy** / **windows-current**): **first-install** packages bake an enrollment token into `config.json`; **update** packages omit the token and reuse ProgramData `device.json`. Run `sailguard-agent-setup.exe` as Administrator — it installs to Program Files / ProgramData and registers the **SailGuardAgent** Windows service for auto-start (with a scheduled-task / detached-process fallback when SCM start is blocked). Console mode remains available for debugging. Linux agents typically use `go run` / local binary + env or `config.json` until a download channel ships.
 
 2. Receive a unique **device credential** and recommended sync intervals; persist locally on the agent (`device.json` under the configured data directory)  
-3. Authenticate subsequent calls with `Authorization: Bearer <device_token>` *(whoami / events / policy)*  
+3. Authenticate subsequent calls with `Authorization: Bearer <device_token>` *(whoami / events / policy)*. If an operator has set the device to **disabled**, these calls return **403** with `device_disabled`; the agent should log and wait for admin re-enable (it must **not** treat this as a cue to re-enroll).  
 4. **Submit event batches** via `POST /v1/agent/events` — **heartbeat** refreshes `last_seen_at` and soft-updates hostname/OS/agent version; **`violation_detected`** / **`violation_blocked`** are persisted (including process owner when available) and listed for admins (`GET /v1/events` / console Events)  
 5. **Poll / pull effective policy** via `GET /v1/agent/policy` (optional `?hash=` → `unchanged`); replace local cache atomically when content changes  
 6. **Observe processes** and evaluate against cached policy:  
@@ -52,7 +52,7 @@ Batches include per-event client IDs to support idempotent ingestion. Servers ma
 
 ## Offline behavior
 
-Agents retain a local policy cache and may queue outbound events to durable local storage when the control plane is unreachable, then flush when connectivity returns (subject to size limits).
+Agents retain a local policy cache so audit/enforce continues while the control plane is unreachable. **Violation** events (`violation_detected` / `violation_blocked`) that fail to upload are appended to a durable local file (`events-queue.json` under the agent data directory, capped at a few hundred entries). On the heartbeat timer (and at startup), the agent flushes queued batches; the server’s `client_event_id` idempotency makes retries safe. Heartbeats are not queued.
 
 ## Safety constraints
 

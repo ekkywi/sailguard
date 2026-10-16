@@ -75,6 +75,14 @@ func (a *API) handleAgentEnroll(w http.ResponseWriter, r *http.Request) {
 					"message": "device already enrolled",
 				},
 			})
+		case errors.Is(err, inventory.ErrDeviceDisabled):
+			writeJSON(w, http.StatusForbidden, envelope{
+				OK: false,
+				Error: map[string]any{
+					"code":    "device_disabled",
+					"message": "device is disabled",
+				},
+			})
 		default:
 			writeJSON(w, http.StatusInternalServerError, envelope{
 				OK: false,

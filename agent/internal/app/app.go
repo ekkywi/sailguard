@@ -15,6 +15,7 @@ import (
 	"github.com/ekkywi/sailguard/agent/internal/credstore"
 	"github.com/ekkywi/sailguard/agent/internal/host"
 	"github.com/ekkywi/sailguard/agent/internal/policycache"
+	"github.com/ekkywi/sailguard/agent/internal/eventqueue"
 	"github.com/ekkywi/sailguard/pkgs/agentcontract"
 	policypkg "github.com/ekkywi/sailguard/pkgs/policy"
 )
@@ -71,6 +72,7 @@ func Run(ctx context.Context, cfg config.Config, h host.Host) error {
 		recent := &recentSet{}
 
 		syncPolicy(ctx, client, cred, dataDir)
+		flushQueuedEvents(ctx, client, cred, dataDir)
 		scanAndReport(ctx, client, cred, h, dataDir, recent)
 		sendHeartbeat(ctx, client, cred, cfg, hostname, osVersion)
 
@@ -94,6 +96,7 @@ func Run(ctx context.Context, cfg config.Config, h host.Host) error {
 			case <-scanTicker.C:
 				scanAndReport(ctx, client, cred, h, dataDir, recent)
 			case <-hbTicker.C:
+				flushQueuedEvents(ctx, client, cred, dataDir)
 				syncPolicy(ctx, client, cred, dataDir)
 				sendHeartbeat(ctx, client, cred, cfg, hostname, osVersion)
 			}
@@ -184,7 +187,7 @@ func sendHeartbeat(
 
 	res, err := client.PostEvents(ctx, cred.DeviceToken, req)
 	if err != nil {
-		log.Printf("heartbeat failed: device_id=%s err=%v", cred.DeviceID, err)
+		logDeviceCallFailed("heartbeat", cred.DeviceID, err)
 		return
 	}
 	log.Printf(
@@ -202,7 +205,7 @@ func syncPolicy(
 	currentHash := policycache.Hash(dataDir)
 	data, err := client.GetPolicy(ctx, cred.DeviceToken, currentHash)
 	if err != nil {
-		log.Printf("policy sync failed: device_id=%s err=%v", cred.DeviceID, err)
+		logDeviceCallFailed("policy sync", cred.DeviceID, err)
 		return
 	}
 
@@ -270,20 +273,8 @@ func scanAndReport(
 		return
 	}
 
-	res, err := client.PostEvents(ctx, cred.DeviceToken, agentcontract.EventBatchRequest{
-		SchemaVersion: 1,
-		DeviceID:      cred.DeviceID,
-		SentAt:        now,
-		Events:        events,
-	})
-	if err != nil {
-		log.Printf("violation flush failed: %v", err)
-		return
-	}
-	log.Printf(
-		"audit scan: processes=%d violations=%d accepted=%d rejected=%d",
-		len(procs), len(events), res.Accepted, len(res.Rejected),
-	)
+	log.Printf("audit scan: processes=%d violations=%d", len(procs), len(events))
+	flushEvents(ctx, client, cred, dataDir, events, "audit scan")
 }
 
 func evaluateAndReport(
@@ -393,10 +384,16 @@ func (r *recentSet) seenRecently(key string, window time.Duration) bool {
 	return false
 }
 
+const (
+	eventQueueMax   = 500
+	eventQueueBatch = 50
+)
+
 func flushEvents(
 	ctx context.Context,
 	client *controlplane.Client,
 	cred *credstore.Credential,
+	dataDir string,
 	events []agentcontract.Event,
 	label string,
 ) {
@@ -411,11 +408,69 @@ func flushEvents(
 		Events:        events,
 	})
 	if err != nil {
-		log.Printf("%s flush failed: %v", label, err)
+		if errors.Is(err, controlplane.ErrDeviceDisabled) {
+			logDeviceCallFailed(label+" flush", cred.DeviceID, err)
+			return
+		}
+		if qerr := eventqueue.Enqueue(dataDir, events, eventQueueMax); qerr != nil {
+			log.Printf("%s: queue enqueue failed: %v", label, qerr)
+		} else {
+			log.Printf("%s: queued %d event(s) for retry (device_id=%s)", label, len(events), cred.DeviceID)
+		}
+		logDeviceCallFailed(label+" flush", cred.DeviceID, err)
 		return
 	}
 	log.Printf("%s: violations=%d accepted=%d rejected=%d",
 		label, len(events), res.Accepted, len(res.Rejected))
+}
+
+func flushQueuedEvents(
+	ctx context.Context,
+	client *controlplane.Client,
+	cred *credstore.Credential,
+	dataDir string,
+) {
+	pending, err := eventqueue.Peek(dataDir, eventQueueBatch)
+	if err != nil {
+		log.Printf("queue peek failed: %v", err)
+		return
+	}
+	if len(pending) == 0 {
+		return
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	res, err := client.PostEvents(ctx, cred.DeviceToken, agentcontract.EventBatchRequest{
+		SchemaVersion: 1,
+		DeviceID:      cred.DeviceID,
+		SentAt:        now,
+		Events:        pending,
+	})
+	if err != nil {
+		logDeviceCallFailed("queue flush", cred.DeviceID, err)
+		return
+	}
+
+	ids := make([]string, 0, len(pending))
+	for _, ev := range pending {
+		ids = append(ids, ev.ClientEventID)
+	}
+	if rerr := eventqueue.RemoveIDs(dataDir, ids); rerr != nil {
+		log.Printf("queue remove failed: %v", rerr)
+		return
+	}
+	log.Printf(
+		"queue flush: sent=%d accepted=%d rejected=%d remaining_batch_cleared",
+		len(pending), res.Accepted, len(res.Rejected),
+	)
+}
+
+func logDeviceCallFailed(op, deviceID string, err error) {
+	if errors.Is(err, controlplane.ErrDeviceDisabled) {
+		log.Printf("%s: device disabled by server — waiting for admin (device_id=%s)", op, deviceID)
+		return
+	}
+	log.Printf("%s failed: device_id=%s err=%v", op, deviceID, err)
 }
 
 func handleProcessEvent(
@@ -437,5 +492,5 @@ func handleProcessEvent(
 	if !ok {
 		return
 	}
-	flushEvents(ctx, client, cred, []agentcontract.Event{ev}, label)
+	flushEvents(ctx, client, cred, dataDir, []agentcontract.Event{ev}, label)
 }
