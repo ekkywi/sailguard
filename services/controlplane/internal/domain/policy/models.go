@@ -39,6 +39,14 @@ type AddRuleInput struct {
 	CategoryCode string
 }
 
+type UpdateRuleInput struct {
+	Action       string
+	RuleType     string
+	Operator     string
+	Value        string
+	CategoryCode string
+}
+
 type PolicyAssignment struct {
 	ID        uuid.UUID
 	PolicyID  uuid.UUID

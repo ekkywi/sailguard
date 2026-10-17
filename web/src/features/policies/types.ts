@@ -46,6 +46,8 @@ export type AddPolicyRuleInput = {
   category_code?: string
 }
 
+export type UpdatePolicyRuleInput = AddPolicyRuleInput
+
 export type PolicyAssignment = {
   id: string
   policy_id: string

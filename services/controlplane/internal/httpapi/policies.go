@@ -292,6 +292,87 @@ func (a *API) handleAddPolicyRule(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (a *API) handlePatchPolicyRule(w http.ResponseWriter, r *http.Request) {
+	policyID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "validation_error",
+				"message": "invalid policy id",
+			},
+		})
+		return
+	}
+	ruleID, err := uuid.Parse(r.PathValue("ruleId"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "validation_error",
+				"message": "invalid rule id",
+			},
+		})
+		return
+	}
+
+	var req addPolicyRuleRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "validation_error",
+				"message": "invalid JSON body",
+			},
+		})
+		return
+	}
+
+	store := policy.NewStore(a.pool)
+	rule, err := store.UpdateRule(r.Context(), policyID, ruleID, policy.UpdateRuleInput{
+		Action:       strings.TrimSpace(req.Action),
+		RuleType:     strings.TrimSpace(req.RuleType),
+		Operator:     strings.TrimSpace(req.Operator),
+		Value:        strings.TrimSpace(req.Value),
+		CategoryCode: strings.TrimSpace(req.CategoryCode),
+	})
+	if errors.Is(err, policy.ErrNotFound) {
+		writeJSON(w, http.StatusNotFound, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "not_found",
+				"message": "rule not found",
+			},
+		})
+		return
+	}
+	if errors.Is(err, policy.ErrInvalid) {
+		writeJSON(w, http.StatusBadRequest, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "validation_error",
+				"message": "invalid rule fields",
+			},
+		})
+		return
+	}
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "internal_error",
+				"message": "failed to update rule",
+			},
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, envelope{
+		OK:   true,
+		Data: policyRuleJSON(*rule),
+	})
+}
+
 func (a *API) handlePatchPolicy(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
@@ -362,7 +443,7 @@ func (a *API) handleDeletePolicy(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, envelope{
 			OK: false,
 			Error: map[string]any{
-				"code": "validation_error",
+				"code":    "validation_error",
 				"message": "invalid policy id",
 			},
 		})
@@ -375,7 +456,7 @@ func (a *API) handleDeletePolicy(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, envelope{
 			OK: false,
 			Error: map[string]any{
-				"code": "not_found",
+				"code":    "not_found",
 				"message": "policy not found",
 			},
 		})
@@ -385,13 +466,13 @@ func (a *API) handleDeletePolicy(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, envelope{
 			OK: false,
 			Error: map[string]any{
-				"code": "internal_error",
+				"code":    "internal_error",
 				"message": "failed to delete policy",
 			},
 		})
 		return
 	}
-	
+
 	writeJSON(w, http.StatusOK, envelope{
 		OK: true,
 		Data: map[string]any{

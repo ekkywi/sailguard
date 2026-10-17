@@ -2,6 +2,7 @@ import { apiFetch } from '../../lib/api'
 import type {
   AddPolicyAssignmentInput,
   AddPolicyRuleInput,
+  UpdatePolicyRuleInput,
   CreatePolicyInput,
   Policy,
   PolicyAssignment,
@@ -47,6 +48,20 @@ export function addPolicyRule(policyId: string, body: AddPolicyRuleInput) {
     method: 'POST',
     body: JSON.stringify(body),
   })
+}
+
+export function updatePolicyRule(
+  policyId: string,
+  ruleId: string,
+  body: UpdatePolicyRuleInput
+) {
+  return apiFetch<PolicyRule>(
+    `/v1/policies/${policyId}/rules/${ruleId}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    },
+  )
 }
 
 export function deletePolicyRule(policyId: string, ruleId: string) {

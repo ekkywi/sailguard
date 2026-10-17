@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { toast } from '../../components/toast'
@@ -18,6 +18,7 @@ import {
   patchPolicy,
   publishPolicy,
   removePolicyAssignment,
+  updatePolicyRule,
 } from './api'
 import type { Policy, PolicyAssignment, PolicyRule } from './types'
 
@@ -41,6 +42,15 @@ export default function PolicyDetailPage() {
   const [ruleOperator, setRuleOperator] = useState('equals')
   const [ruleValue, setRuleValue] = useState('')
   const [addingRule, setAddingRule] = useState(false)
+
+  const [editingRule, setEditingRule] = useState<PolicyRule | null>(null)
+  const [editAction, setEditAction] = useState('block')
+  const [editType, setEditType] = useState('process_name')
+  const [editOperator, setEditOperator] = useState('equals')
+  const [editValue, setEditValue] = useState('')
+  const [savingRule, setSavingRule] = useState(false)
+  const editTitleId = useId()
+  const editFirstFieldRef = useRef<HTMLSelectElement>(null)
 
   const [assignScope, setAssignScope] = useState('org')
   const [assignGroupId, setAssignGroupId] = useState('')
@@ -97,6 +107,39 @@ export default function PolicyDetailPage() {
     load()
   }, [load])
 
+  useEffect(() => {
+    if (!editingRule) return
+    editFirstFieldRef.current?.focus()
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !savingRule) {
+        setEditingRule(null)
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = prevOverflow
+    }
+  }, [editingRule, savingRule])
+
+  function beginEditRule(r: PolicyRule) {
+    setEditingRule(r)
+    setEditAction(r.action || 'block')
+    setEditType(r.rule_type || 'process_name')
+    setEditOperator(r.operator || 'equals')
+    setEditValue(r.value || '')
+    setError(null)
+  }
+
+  function cancelEditRule() {
+    if (savingRule) return
+    setEditingRule(null)
+  }
+
   async function onAddRule(e: FormEvent) {
     e.preventDefault()
     if (!id) return
@@ -124,6 +167,51 @@ export default function PolicyDetailPage() {
       toast.error(msg)
     } finally {
       setAddingRule(false)
+    }
+  }
+
+  async function onSaveEditRule(e: FormEvent) {
+    e.preventDefault()
+    if (!id || !editingRule) return
+    const value = editValue.trim()
+    if (!value) {
+      setError('rule value is required')
+      return
+    }
+
+    setSavingRule(true)
+    setError(null)
+    try {
+      await updatePolicyRule(id, editingRule.id, {
+        action: editAction,
+        rule_type: editType,
+        operator: editOperator,
+        value,
+      })
+      setEditingRule(null)
+      toast.success('Rule updated')
+      load()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'failed to update rule'
+      setError(msg)
+      toast.error(msg)
+    } finally {
+      setSavingRule(false)
+    }
+  }
+
+  function ruleValuePlaceholder(type: string) {
+    switch (type) {
+      case 'path':
+        return 'C:\\Windows\\System32\\notepad.exe'
+      case 'hash_sha256':
+        return 'sha256 hex digest'
+      case 'publisher':
+        return 'Microsoft Corporation'
+      case 'product_name':
+        return 'Notepad'
+      default:
+        return 'notepad.exe'
     }
   }
 
@@ -406,7 +494,10 @@ export default function PolicyDetailPage() {
           <h2 id="add-rule-heading" className="panel-title">
             Add rule
           </h2>
-          <form className="token-create-grid" onSubmit={onAddRule}>
+          <p className="muted panel-lead">
+            New rules apply after the next publish (agents sync the new version).
+          </p>
+          <form className="rule-form-grid" onSubmit={onAddRule}>
             <div className="field">
               <label className="label" htmlFor="rule-action">
                 Action
@@ -453,7 +544,7 @@ export default function PolicyDetailPage() {
                 <option value="contains">contains</option>
               </select>
             </div>
-            <div className="field" style={{ gridColumn: 'span 2' }}>
+            <div className="field rule-form-value">
               <label className="label" htmlFor="rule-value">
                 Value
               </label>
@@ -462,11 +553,11 @@ export default function PolicyDetailPage() {
                 className="input"
                 value={ruleValue}
                 onChange={(e) => setRuleValue(e.target.value)}
-                placeholder="notepad.exe"
+                placeholder={ruleValuePlaceholder(ruleType)}
                 required
               />
             </div>
-            <div className="token-create-submit">
+            <div className="rule-form-actions">
               <button
                 type="submit"
                 className="btn btn-primary"
@@ -505,7 +596,12 @@ export default function PolicyDetailPage() {
               </thead>
               <tbody>
                 {rules.map((r) => (
-                  <tr key={r.id}>
+                  <tr
+                    key={r.id}
+                    className={
+                      editingRule?.id === r.id ? 'is-editing' : undefined
+                    }
+                  >
                     <td className="mono">{r.action}</td>
                     <td className="mono">{r.rule_type}</td>
                     <td className="muted">{r.operator}</td>
@@ -513,13 +609,22 @@ export default function PolicyDetailPage() {
                       <div className="cell-primary mono">{r.value || '—'}</div>
                     </td>
                     <td>
-                      <button
-                        type="button"
-                        className="btn btn-ghost"
-                        onClick={() => setRemoveRule(r)}
-                      >
-                        Delete
-                      </button>
+                      <div className="table-row-actions">
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => beginEditRule(r)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => setRemoveRule(r)}
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -650,6 +755,117 @@ export default function PolicyDetailPage() {
           </div>
         ) : null}
       </section>
+
+      {editingRule ? (
+        <div className="dialog-root" role="presentation">
+          <button
+            type="button"
+            className="dialog-backdrop"
+            aria-label="Close dialog"
+            disabled={savingRule}
+            onClick={cancelEditRule}
+          />
+          <div
+            className="dialog-panel dialog-panel--form"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={editTitleId}
+          >
+            <h2 id={editTitleId} className="dialog-title">
+              Edit rule
+            </h2>
+            <p className="dialog-desc muted">
+              {editingRule.action} · {editingRule.rule_type}{' '}
+              <span className="mono">{editingRule.value || '(empty)'}</span>
+              . Publish after saving so agents pick up the change.
+            </p>
+            <form className="rule-form-grid rule-form-grid--dialog" onSubmit={onSaveEditRule}>
+              <div className="field">
+                <label className="label" htmlFor="edit-rule-action">
+                  Action
+                </label>
+                <select
+                  ref={editFirstFieldRef}
+                  id="edit-rule-action"
+                  className="input"
+                  value={editAction}
+                  onChange={(e) => setEditAction(e.target.value)}
+                  disabled={savingRule}
+                >
+                  <option value="block">block</option>
+                  <option value="allow">allow</option>
+                </select>
+              </div>
+              <div className="field">
+                <label className="label" htmlFor="edit-rule-type">
+                  Type
+                </label>
+                <select
+                  id="edit-rule-type"
+                  className="input"
+                  value={editType}
+                  onChange={(e) => setEditType(e.target.value)}
+                  disabled={savingRule}
+                >
+                  <option value="process_name">process_name</option>
+                  <option value="path">path</option>
+                  <option value="hash_sha256">hash_sha256</option>
+                  <option value="publisher">publisher</option>
+                  <option value="product_name">product_name</option>
+                </select>
+              </div>
+              <div className="field">
+                <label className="label" htmlFor="edit-rule-op">
+                  Operator
+                </label>
+                <select
+                  id="edit-rule-op"
+                  className="input"
+                  value={editOperator}
+                  onChange={(e) => setEditOperator(e.target.value)}
+                  disabled={savingRule}
+                >
+                  <option value="equals">equals</option>
+                  <option value="prefix">prefix</option>
+                  <option value="contains">contains</option>
+                </select>
+              </div>
+              <div className="field rule-form-value">
+                <label className="label" htmlFor="edit-rule-value">
+                  Value
+                </label>
+                <input
+                  id="edit-rule-value"
+                  className="input"
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  placeholder={ruleValuePlaceholder(editType)}
+                  required
+                  disabled={savingRule}
+                />
+              </div>
+              <div className="dialog-actions rule-form-actions">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={cancelEditRule}
+                  disabled={savingRule}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={savingRule}
+                  aria-busy={savingRule}
+                >
+                  {savingRule ? 'Saving…' : 'Save rule'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
 
       <ConfirmDialog
         open={removeAssign !== null}

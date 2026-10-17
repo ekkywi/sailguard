@@ -2,9 +2,11 @@ package policy
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 func (s *Store) ListRulesByPolicyID(ctx context.Context, policyID uuid.UUID) ([]PolicyRule, error) {
@@ -90,6 +92,77 @@ func (s *Store) AddRule(ctx context.Context, policyID uuid.UUID, in AddRuleInput
 		&r.ID, &r.PolicyID, &r.Action, &r.RuleType, &r.Operator, &r.Value, &r.CategoryCode,
 		&r.Enabled, &r.CreatedAt, &r.UpdatedAt,
 	)
+	if err != nil {
+		return nil, err
+	}
+	return &r, nil
+}
+
+func (s *Store) UpdateRule(ctx context.Context, policyID, ruleID uuid.UUID, in UpdateRuleInput) (*PolicyRule, error) {
+	action := strings.TrimSpace(strings.ToLower(in.Action))
+	ruleType := strings.TrimSpace(strings.ToLower(in.RuleType))
+	op := strings.TrimSpace(strings.ToLower(in.Operator))
+	if op == "" {
+		op = "equals"
+	}
+	value := strings.TrimSpace(in.Value)
+	cat := strings.TrimSpace(in.CategoryCode)
+
+	switch action {
+	case "allow", "block":
+	default:
+		return nil, ErrInvalid
+	}
+	switch ruleType {
+	case "process_name", "path", "hash_sha256", "publisher", "product_name", "category":
+	default:
+		return nil, ErrInvalid
+	}
+	switch op {
+	case "equals", "prefix", "contains":
+	default:
+		return nil, ErrInvalid
+	}
+	switch op {
+	case "equals", "prefix", "contains":
+	default:
+		return nil, ErrInvalid
+	}
+
+	var categoryCode *string
+	if ruleType == "category" {
+		if cat == "" {
+			return nil, ErrInvalid
+		}
+		categoryCode = &cat
+		if value == "" {
+			value = cat
+		}
+	} else if value == "" {
+		return nil, ErrInvalid
+	}
+
+	const q = `
+		UPDATE policy_rules
+		SET action = $3,
+			rule_type = $4,
+			operator = $5,
+			value = $6,
+			category_code = $7,
+			updated_at = now()
+		WHERE id = $1 and policy_id = $2
+		RETURNING id, policy_id, action, rule_type, operator, value, category_code,
+					enabled, created_at, updated_at
+	`
+
+	var r PolicyRule
+	err := s.pool.QueryRow(ctx, q, ruleID, policyID, action, ruleType, op, value, categoryCode).Scan(
+		&r.ID, &r.PolicyID, &r.Action, &r.RuleType, &r.Operator, &r.Value, &r.CategoryCode,
+		&r.Enabled, &r.CreatedAt, &r.UpdatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
 	if err != nil {
 		return nil, err
 	}

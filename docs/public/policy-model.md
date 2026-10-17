@@ -50,7 +50,7 @@ For each observed process (Linux `/proc` list; Windows Toolhelp list, WMI creati
    - `enforce` → terminate the process and record a `violation_blocked` event  
 3. Critical operating-system processes are protected by a safety rail and are never terminated by policy  
 
-Administrators can switch a policy between `audit` and `enforce` (PATCH + publish) and delete unused rules from the policy detail console.
+Administrators can switch a policy between `audit` and `enforce` (PATCH + publish) and add, edit, or delete rules from the policy detail console.
 
 ## Privacy posture
 
