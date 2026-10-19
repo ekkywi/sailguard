@@ -1832,6 +1832,109 @@ input {
   gap: var(--space-3);
 }
 
+.dash-range {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.dash-range .btn {
+  padding: 0.25rem 0.6rem;
+  font-size: var(--text-xs);
+}
+
+.dash-range-active {
+  border-color: var(--border-strong);
+  background: var(--ghost-hover);
+  font-weight: 600;
+}
+
+.ts-chart {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 0 var(--space-3) var(--space-3);
+}
+
+.ts-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 140px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 2px;
+}
+
+.ts-col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  gap: 4px;
+}
+
+.ts-stack {
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 18px;
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: flex-start;
+  align-self: center;
+  min-height: 0;
+}
+
+.ts-seg {
+  width: 100%;
+  min-height: 0;
+}
+
+.ts-seg-detected {
+  background: var(--muted);
+}
+
+.ts-seg-blocked {
+  background: var(--danger);
+}
+
+.ts-label {
+  font-size: 9px;
+  color: var(--muted);
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+  max-width: 100%;
+  transform: rotate(-45deg);
+  transform-origin: top center;
+  height: 1.6em;
+  margin-top: 2px;
+}
+
+.ts-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.ts-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: inherit;
+}
+
+.ts-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
 @media (max-width: 720px) {
   .stat-grid {
     grid-template-columns: 1fr;

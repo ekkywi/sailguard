@@ -51,8 +51,8 @@ Administrative APIs are further protected by role-based permissions as routes co
 
 ### Telemetry & operations
 
-- **Available now:** health/ready; agents submit `violation_detected` / `violation_blocked` (persisted, including optional process user); admin `GET /v1/events`; web console **Events** page (`/events`, User column); fleet **dashboard summary** `GET /v1/dashboard/summary` (`event.read` — device online/stale within online window, violations in last 24h, recent violation rows, top processes/hosts 24h, stale device list; Home overview)
-- **Planned:** event detail filters, alerts, violations timeseries, administrative audit logs, alert-channel configuration, async stream pipeline
+- **Available now:** health/ready; agents submit `violation_detected` / `violation_blocked` (persisted, including optional process user); admin `GET /v1/events`; web console **Events** page (`/events`, User column); fleet **dashboard summary** `GET /v1/dashboard/summary` (`event.read` — device online/stale within online window, violations in last 24h, recent violation rows, top processes/hosts 24h, stale device list; Home overview); **violations timeseries** `GET /v1/dashboard/violations-timeseries?range=24h|7d` (filled hourly/daily buckets; Home chart)
+- **Planned:** event detail filters, alerts, administrative audit logs, alert-channel configuration, async stream pipeline
 
 ## Health
 

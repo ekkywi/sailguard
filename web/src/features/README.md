@@ -7,6 +7,6 @@
 - policies/ — **done** (list/detail, rules, publish)
 - events/ — **done** (violation list)
 - categories/ — **done**
-- dashboard/ — **done** (`GET /v1/dashboard/summary` on Home)
+- dashboard/ — **done** (`GET /v1/dashboard/summary` + violations-timeseries chart on Home)
 - alerts/ — planned
 - users/ — planned

@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/ekkywi/sailguard/services/controlplane/internal/domain/telemetry"
 )
@@ -79,6 +80,56 @@ func (a *API) handleDashboardSummary(w http.ResponseWriter, r *http.Request) {
 			"top_processes":     topProcesses,
 			"top_hosts":         topHosts,
 			"stale_devices":     staleDevices,
+		},
+	})
+}
+
+func (a *API) handleDashboardViolationsTimeseries(w http.ResponseWriter, r *http.Request) {
+	rangeKey := strings.TrimSpace(r.URL.Query().Get("range"))
+	if rangeKey == "" {
+		rangeKey = "24h"
+	}
+
+	store := telemetry.NewStore(a.pool)
+	series, err := store.ViolationsTimeseries(r.Context(), rangeKey)
+	if err != nil {
+		if strings.Contains(err.Error(), "invalid range") {
+			writeJSON(w, http.StatusBadRequest, envelope{
+				OK: false,
+				Error: map[string]any{
+					"code":    "validation_error",
+					"message": err.Error(),
+				},
+			})
+			return
+		}
+		writeJSON(w, http.StatusInternalServerError, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "internal_error",
+				"message": "failed to load violations timeseries",
+			},
+		})
+		return
+	}
+
+	points := make([]map[string]any, 0, len(series.Points))
+	for _, p := range series.Points {
+		points = append(points, map[string]any{
+			"t":        p.T,
+			"detected": p.Detected,
+			"blocked":  p.Blocked,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, envelope{
+		OK: true,
+		Data: map[string]any{
+			"range":  series.Range,
+			"bucket": series.Bucket,
+			"from":   series.From,
+			"to":     series.To,
+			"points": points,
 		},
 	})
 }

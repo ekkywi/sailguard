@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
-import { getDashboardSummary } from '../features/dashboard/api'
-import type { DashboardSummary } from '../features/dashboard/types'
+import {
+  getDashboardSummary,
+  getViolationsTimeseries,
+} from '../features/dashboard/api'
+import ViolationsChart from '../features/dashboard/ViolationsChart'
+import type {
+  DashboardSummary,
+  ViolationsTimeseries,
+  ViolationsTimeseriesRange,
+} from '../features/dashboard/types'
 import { formatDateTime, formatRelativeTime } from '../lib/format'
 import type { AppOutletContext } from '../layouts/AppLayout'
 
@@ -16,6 +24,10 @@ export default function HomePage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [summaryError, setSummaryError] = useState<string | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(true)
+  const [tsRange, setTsRange] = useState<ViolationsTimeseriesRange>('24h')
+  const [timeseries, setTimeseries] = useState<ViolationsTimeseries | null>(null)
+  const [tsLoading, setTsLoading] = useState(true)
+  const [tsError, setTsError] = useState<string | null>(null)
 
   const loadSummary = useCallback(() => {
     setSummaryLoading(true)
@@ -34,9 +46,35 @@ export default function HomePage() {
       .finally(() => setSummaryLoading(false))
   }, [])
 
+  const loadTimeseries = useCallback((range: ViolationsTimeseriesRange) => {
+    setTsLoading(true)
+    setTsError(null)
+    getViolationsTimeseries(range)
+      .then((data) => {
+        setTimeseries(data)
+        setTsError(null)
+      })
+      .catch((err: unknown) => {
+        setTimeseries(null)
+        setTsError(
+          err instanceof Error ? err.message : 'failed to load timeseries',
+        )
+      })
+      .finally(() => setTsLoading(false))
+  }, [])
+
   useEffect(() => {
     loadSummary()
   }, [loadSummary])
+
+  useEffect(() => {
+    loadTimeseries(tsRange)
+  }, [loadTimeseries, tsRange])
+
+  const refreshAll = () => {
+    loadSummary()
+    loadTimeseries(tsRange)
+  }
 
   const devices = summary?.devices
   const violations = summary?.violations_24h
@@ -64,8 +102,8 @@ export default function HomePage() {
         <button
           type="button"
           className="btn btn-ghost"
-          onClick={loadSummary}
-          disabled={summaryLoading}
+          onClick={refreshAll}
+          disabled={summaryLoading || tsLoading}
         >
           Refresh
         </button>
@@ -80,6 +118,12 @@ export default function HomePage() {
       {summaryError ? (
         <p className="error" role="alert">
           {summaryError}
+        </p>
+      ) : null}
+
+      {tsError ? (
+        <p className="error" role="alert">
+          {tsError}
         </p>
       ) : null}
 
@@ -120,6 +164,13 @@ export default function HomePage() {
           </span>
         </Link>
       </div>
+
+      <ViolationsChart
+        series={timeseries}
+        loading={tsLoading}
+        range={tsRange}
+        onRangeChange={setTsRange}
+      />
 
       <div className="dash-split" aria-label="Top offenders and stale devices">
         <section className="list-panel" aria-labelledby="dash-top-proc-heading">

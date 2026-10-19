@@ -48,3 +48,19 @@ export type DashboardSummary = {
   top_hosts: DashboardTopHost[]
   stale_devices: DashboardStaleDevice[]
 }
+
+export type ViolationsTimeseriesRange = '24h' | '7d'
+
+export type ViolationsTimeseriesPoint = {
+  t: string
+  detected: number
+  blocked: number
+}
+
+export type ViolationsTimeseries = {
+  range: ViolationsTimeseriesRange | string
+  bucket: 'hour' | 'day' | string
+  from: string
+  to: string
+  points: ViolationsTimeseriesPoint[]
+}
