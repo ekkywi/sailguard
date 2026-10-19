@@ -126,6 +126,31 @@ function IconPolicies() {
   )
 }
 
+function IconCategories() {
+  return (
+    <svg className="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M4.5 7.5h6.5v6.5H4.5V7.5Z"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M13 7.5h6.5v3H13v-3Z"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M13 13h6.5v3.5H13V13Z"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 function IconEvents() {
   return (
     <svg className="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -228,6 +253,10 @@ export function AppShell({ children, userLabel }: AppShellProps) {
             <NavLink to="/policies" className={navClass} title="Policies">
               <IconPolicies />
               <span className="nav-label">Policies</span>
+            </NavLink>
+            <NavLink to="/categories" className={navClass} title="Categories">
+              <IconCategories />
+              <span className="nav-label">Categories</span>
             </NavLink>
             <p className="sidebar-section">Telemetry</p>
             <NavLink to="/events" className={navClass} title="Events">

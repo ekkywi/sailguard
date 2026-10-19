@@ -7,6 +7,8 @@ import { listDevices } from '../devices/api'
 import type { Device } from '../devices/types'
 import { listGroups } from '../groups/api'
 import type { DeviceGroup } from '../groups/types'
+import { listCategories } from '../categories/api'
+import type { Category } from '../categories/types'
 import {
   addPolicyAssignment,
   addPolicyRule,
@@ -37,10 +39,13 @@ export default function PolicyDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
+  const [categories, setCategories] = useState<Category[]>([])
+
   const [ruleAction, setRuleAction] = useState('block')
   const [ruleType, setRuleType] = useState('process_name')
   const [ruleOperator, setRuleOperator] = useState('equals')
   const [ruleValue, setRuleValue] = useState('')
+  const [ruleCategory, setRuleCategory] = useState('')
   const [addingRule, setAddingRule] = useState(false)
 
   const [editingRule, setEditingRule] = useState<PolicyRule | null>(null)
@@ -48,6 +53,7 @@ export default function PolicyDetailPage() {
   const [editType, setEditType] = useState('process_name')
   const [editOperator, setEditOperator] = useState('equals')
   const [editValue, setEditValue] = useState('')
+  const [editCategory, setEditCategory] = useState('')
   const [savingRule, setSavingRule] = useState(false)
   const editTitleId = useId()
   const editFirstFieldRef = useRef<HTMLSelectElement>(null)
@@ -85,14 +91,19 @@ export default function PolicyDetailPage() {
       listPolicyAssignments(id),
       listGroups(),
       listDevices(),
+      listCategories(),
     ])
-      .then(([p, ruleData, assignData, groupData, deviceData]) => {
+      .then(([p, ruleData, assignData, groupData, deviceData, categoryData]) => {
         setPolicy(p)
         setModeDraft(p.mode || 'audit')
         setRules(ruleData.items)
         setAssignments(assignData.items)
         setGroups(groupData.items)
         setDevices(deviceData.items)
+        setCategories(categoryData.items)
+        setRuleCategory((prev) =>
+          prev || (categoryData.items[0]?.code ?? ''),
+        )
       })
       .catch((err: unknown) => {
         setPolicy(null)
@@ -132,6 +143,7 @@ export default function PolicyDetailPage() {
     setEditType(r.rule_type || 'process_name')
     setEditOperator(r.operator || 'equals')
     setEditValue(r.value || '')
+    setEditCategory(r.category_code || r.value || categories[0]?.code || '')
     setError(null)
   }
 
@@ -143,8 +155,14 @@ export default function PolicyDetailPage() {
   async function onAddRule(e: FormEvent) {
     e.preventDefault()
     if (!id) return
-    const value = ruleValue.trim()
-    if (!value) {
+
+    const isCategory = ruleType === 'category'
+    if (isCategory) {
+      if (!ruleCategory.trim()) {
+        setError('category is required')
+        return
+      }
+    } else if (!ruleValue.trim()) {
       setError('rule value is required')
       return
     }
@@ -152,13 +170,23 @@ export default function PolicyDetailPage() {
     setAddingRule(true)
     setError(null)
     try {
-      await addPolicyRule(id, {
-        action: ruleAction,
-        rule_type: ruleType,
-        operator: ruleOperator,
-        value,
-      })
-      setRuleValue('')
+      await addPolicyRule(
+        id,
+        isCategory
+          ? {
+              action: ruleAction,
+              rule_type: 'category',
+              category_code: ruleCategory.trim(),
+              operator: 'equals',
+            }
+          : {
+              action: ruleAction,
+              rule_type: ruleType,
+              operator: ruleOperator,
+              value: ruleValue.trim(),
+            },
+      )
+      if (!isCategory) setRuleValue('')
       toast.success('Rule added')
       load()
     } catch (err: unknown) {
@@ -173,8 +201,14 @@ export default function PolicyDetailPage() {
   async function onSaveEditRule(e: FormEvent) {
     e.preventDefault()
     if (!id || !editingRule) return
-    const value = editValue.trim()
-    if (!value) {
+
+    const isCategory = editType === 'category'
+    if (isCategory) {
+      if (!editCategory.trim()) {
+        setError('category is required')
+        return
+      }
+    } else if (!editValue.trim()) {
       setError('rule value is required')
       return
     }
@@ -182,12 +216,23 @@ export default function PolicyDetailPage() {
     setSavingRule(true)
     setError(null)
     try {
-      await updatePolicyRule(id, editingRule.id, {
-        action: editAction,
-        rule_type: editType,
-        operator: editOperator,
-        value,
-      })
+      await updatePolicyRule(
+        id,
+        editingRule.id,
+        isCategory
+          ? {
+              action: editAction,
+              rule_type: 'category',
+              category_code: editCategory.trim(),
+              operator: 'equals',
+            }
+          : {
+              action: editAction,
+              rule_type: editType,
+              operator: editOperator,
+              value: editValue.trim(),
+            },
+      )
       setEditingRule(null)
       toast.success('Rule updated')
       load()
@@ -198,6 +243,13 @@ export default function PolicyDetailPage() {
     } finally {
       setSavingRule(false)
     }
+  }
+
+  function ruleMatchLabel(r: PolicyRule) {
+    if (r.rule_type === 'category') {
+      return r.category_code || r.value || '—'
+    }
+    return r.value || '—'
   }
 
   function ruleValuePlaceholder(type: string) {
@@ -527,36 +579,64 @@ export default function PolicyDetailPage() {
                 <option value="hash_sha256">hash_sha256</option>
                 <option value="publisher">publisher</option>
                 <option value="product_name">product_name</option>
+                <option value="category">category</option>
               </select>
             </div>
-            <div className="field">
-              <label className="label" htmlFor="rule-op">
-                Operator
-              </label>
-              <select
-                id="rule-op"
-                className="input"
-                value={ruleOperator}
-                onChange={(e) => setRuleOperator(e.target.value)}
-              >
-                <option value="equals">equals</option>
-                <option value="prefix">prefix</option>
-                <option value="contains">contains</option>
-              </select>
-            </div>
-            <div className="field rule-form-value">
-              <label className="label" htmlFor="rule-value">
-                Value
-              </label>
-              <input
-                id="rule-value"
-                className="input"
-                value={ruleValue}
-                onChange={(e) => setRuleValue(e.target.value)}
-                placeholder={ruleValuePlaceholder(ruleType)}
-                required
-              />
-            </div>
+            {ruleType === 'category' ? (
+              <div className="field rule-form-value">
+                <label className="label" htmlFor="rule-category">
+                  Category
+                </label>
+                <select
+                  id="rule-category"
+                  className="input"
+                  value={ruleCategory}
+                  onChange={(e) => setRuleCategory(e.target.value)}
+                  required
+                >
+                  {categories.length === 0 ? (
+                    <option value="">No categories</option>
+                  ) : (
+                    categories.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.name} ({c.code})
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+            ) : (
+              <>
+                <div className="field">
+                  <label className="label" htmlFor="rule-op">
+                    Operator
+                  </label>
+                  <select
+                    id="rule-op"
+                    className="input"
+                    value={ruleOperator}
+                    onChange={(e) => setRuleOperator(e.target.value)}
+                  >
+                    <option value="equals">equals</option>
+                    <option value="prefix">prefix</option>
+                    <option value="contains">contains</option>
+                  </select>
+                </div>
+                <div className="field rule-form-value">
+                  <label className="label" htmlFor="rule-value">
+                    Value
+                  </label>
+                  <input
+                    id="rule-value"
+                    className="input"
+                    value={ruleValue}
+                    onChange={(e) => setRuleValue(e.target.value)}
+                    placeholder={ruleValuePlaceholder(ruleType)}
+                    required
+                  />
+                </div>
+              </>
+            )}
             <div className="rule-form-actions">
               <button
                 type="submit"
@@ -604,9 +684,13 @@ export default function PolicyDetailPage() {
                   >
                     <td className="mono">{r.action}</td>
                     <td className="mono">{r.rule_type}</td>
-                    <td className="muted">{r.operator}</td>
+                    <td className="muted">
+                      {r.rule_type === 'category' ? '—' : r.operator}
+                    </td>
                     <td>
-                      <div className="cell-primary mono">{r.value || '—'}</div>
+                      <div className="cell-primary mono">
+                        {ruleMatchLabel(r)}
+                      </div>
                     </td>
                     <td>
                       <div className="table-row-actions">
@@ -812,38 +896,67 @@ export default function PolicyDetailPage() {
                   <option value="hash_sha256">hash_sha256</option>
                   <option value="publisher">publisher</option>
                   <option value="product_name">product_name</option>
+                  <option value="category">category</option>
                 </select>
               </div>
-              <div className="field">
-                <label className="label" htmlFor="edit-rule-op">
-                  Operator
-                </label>
-                <select
-                  id="edit-rule-op"
-                  className="input"
-                  value={editOperator}
-                  onChange={(e) => setEditOperator(e.target.value)}
-                  disabled={savingRule}
-                >
-                  <option value="equals">equals</option>
-                  <option value="prefix">prefix</option>
-                  <option value="contains">contains</option>
-                </select>
-              </div>
-              <div className="field rule-form-value">
-                <label className="label" htmlFor="edit-rule-value">
-                  Value
-                </label>
-                <input
-                  id="edit-rule-value"
-                  className="input"
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  placeholder={ruleValuePlaceholder(editType)}
-                  required
-                  disabled={savingRule}
-                />
-              </div>
+              {editType === 'category' ? (
+                <div className="field rule-form-value">
+                  <label className="label" htmlFor="edit-rule-category">
+                    Category
+                  </label>
+                  <select
+                    id="edit-rule-category"
+                    className="input"
+                    value={editCategory}
+                    onChange={(e) => setEditCategory(e.target.value)}
+                    required
+                    disabled={savingRule}
+                  >
+                    {categories.length === 0 ? (
+                      <option value="">No categories</option>
+                    ) : (
+                      categories.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.name} ({c.code})
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+              ) : (
+                <>
+                  <div className="field">
+                    <label className="label" htmlFor="edit-rule-op">
+                      Operator
+                    </label>
+                    <select
+                      id="edit-rule-op"
+                      className="input"
+                      value={editOperator}
+                      onChange={(e) => setEditOperator(e.target.value)}
+                      disabled={savingRule}
+                    >
+                      <option value="equals">equals</option>
+                      <option value="prefix">prefix</option>
+                      <option value="contains">contains</option>
+                    </select>
+                  </div>
+                  <div className="field rule-form-value">
+                    <label className="label" htmlFor="edit-rule-value">
+                      Value
+                    </label>
+                    <input
+                      id="edit-rule-value"
+                      className="input"
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      placeholder={ruleValuePlaceholder(editType)}
+                      required
+                      disabled={savingRule}
+                    />
+                  </div>
+                </>
+              )}
               <div className="dialog-actions rule-form-actions">
                 <button
                   type="button"

@@ -48,6 +48,15 @@ func NewRouter(cfg config.Config, pool *pgxpool.Pool, rdb *redis.Client) http.Ha
 	mux.HandleFunc("GET /v1/agent-packages/windows", api.requirePermission("device.write", api.handleAgentPackageMeta))
 	mux.HandleFunc("POST /v1/agent-packages/windows", api.requirePermission("device.write", api.handleDownloadWindowsAgentPackage))
 
+	mux.HandleFunc("GET /v1/categories", api.requirePermission("policy.read", api.handleListCategories))
+	mux.HandleFunc("POST /v1/categories", api.requirePermission("policy.write", api.handleCreateCategory))
+	mux.HandleFunc("GET /v1/categories/{code}", api.requirePermission("policy.read", api.handleGetCategory))
+	mux.HandleFunc("PATCH /v1/categories/{code}", api.requirePermission("policy.write", api.handlePatchCategory))
+	mux.HandleFunc("DELETE /v1/categories/{code}", api.requirePermission("policy.write", api.handleDeleteCategory))
+	mux.HandleFunc("GET /v1/categories/{code}/signatures", api.requirePermission("policy.read", api.handleListCategorySignatures))
+	mux.HandleFunc("POST /v1/categories/{code}/signatures", api.requirePermission("policy.write", api.handleAddCategorySignature))
+	mux.HandleFunc("DELETE /v1/categories/{code}/signatures/{signatureId}", api.requirePermission("policy.write", api.handleDeleteCategorySignature))
+
 	mux.HandleFunc("GET /v1/policies", api.requirePermission("policy.read", api.handleListPolicies))
 	mux.HandleFunc("POST /v1/policies", api.requirePermission("policy.write", api.handleCreatePolicy))
 	mux.HandleFunc("GET /v1/policies/{id}", api.requirePermission("policy.read", api.handleGetPolicy))

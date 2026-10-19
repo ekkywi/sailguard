@@ -40,8 +40,8 @@ Administrative APIs are further protected by role-based permissions as routes co
 
 ### Policy
 
-- **Available now:** list/create/get/**DELETE** policies; **PATCH** mode (`audit`/`enforce`); list/add/**PATCH**/delete rules; list/add/remove assignments; publish (bumps version); effective-policy preview `GET /v1/devices/{id}/policy`. Admin web: `/policies` and `/policies/:id` (change mode, add/edit/delete rules, delete policy). Schema also includes categories and overrides.
-- **Planned:** category signature admin, device override APIs, category rules in the policy builder
+- **Available now:** list/create/get/**DELETE** policies; **PATCH** mode (`audit`/`enforce`); list/add/**PATCH**/delete rules (including `rule_type=category`); categories CRUD (`GET/POST /v1/categories`, `GET/PATCH/DELETE /v1/categories/{code}`) and signatures (`GET/POST …/signatures`, `DELETE …/signatures/{id}`); list/add/remove assignments; publish (bumps version); effective-policy preview `GET /v1/devices/{id}/policy`. Admin web: `/policies`, `/policies/:id`, `/categories`, `/categories/:code`. Schema includes categories, category signatures, and overrides.
+- **Planned:** device override APIs
 
 ### Agent channel
 
