@@ -18,6 +18,14 @@ import (
 // because an admin set status=disabled (HTTP 403, code device_disabled).
 var ErrDeviceDisabled = errors.New("device disabled")
 
+// ErrUnauthorized is returned when a device Bearer token is rejected
+// (HTTP 401, code unauthorized — invalid/revoked device credential).
+var ErrUnauthorized = errors.New("device unauthorized")
+
+// ErrEnrollmentInvalid is returned when an enrollment token is rejected
+// (HTTP 401, code enrollment_invalid — not a device-token failure).
+var ErrEnrollmentInvalid = errors.New("enrollment token invalid")
+
 type Client struct {
 	BaseURL    string
 	HTTPClient *http.Client
@@ -25,8 +33,17 @@ type Client struct {
 }
 
 func apiError(status int, err *agentcontract.Error, raw []byte, op string) error {
-	if err != nil && err.Code == "device_disabled" {
-		return fmt.Errorf("%s: %w", op, ErrDeviceDisabled)
+	if err != nil {
+		switch err.Code {
+		case "device_disabled":
+			return fmt.Errorf("%s: %w", op, ErrDeviceDisabled)
+		case "enrollment_invalid":
+			return fmt.Errorf("%s: %w", op, ErrEnrollmentInvalid)
+		}
+	}
+	// Device auth only — do not treat enrollment_invalid (also HTTP 401) as this.
+	if status == http.StatusUnauthorized && (err == nil || err.Code == "unauthorized" || err.Code == "") {
+		return fmt.Errorf("%s: %w", op, ErrUnauthorized)
 	}
 	if err != nil {
 		return fmt.Errorf("%s rejected (%d): %s: %s", op, status, err.Code, err.Message)

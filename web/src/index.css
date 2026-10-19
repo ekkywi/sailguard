@@ -1826,8 +1826,18 @@ input {
   margin-top: var(--space-1);
 }
 
+.dash-split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
 @media (max-width: 720px) {
   .stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dash-split {
     grid-template-columns: 1fr;
   }
 

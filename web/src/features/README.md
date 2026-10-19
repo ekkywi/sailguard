@@ -4,8 +4,9 @@
 - `devices/` — **done** (list + detail)
 - `tokens/` — **done** (create/list/revoke enrollment tokens)
 - `groups/` — **done** (list + create; membership UI later)
-- policies/ — planned
-- events/ — planned
+- policies/ — **done** (list/detail, rules, publish)
+- events/ — **done** (violation list)
+- categories/ — **done**
+- dashboard/ — **done** (`GET /v1/dashboard/summary` on Home)
 - alerts/ — planned
 - users/ — planned
-- dashboard/ — planned

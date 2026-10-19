@@ -36,7 +36,8 @@ Administrative APIs are further protected by role-based permissions as routes co
 ### Inventory
 
 - **Available now:** list/create/get/**PATCH**/**DELETE** device groups; list/add/remove group members; list/get/**PATCH**/**DELETE** devices (`display_name`, `status` active|disabled); create/list/revoke enrollment tokens (admin Bearer + `device.read` / `device.write`). Create enrollment token returns the plaintext secret once. Admin web console covers Devices and Groups detail actions, plus Tokens pages. Agent auth rejects `disabled` devices with HTTP **403** `device_disabled`; enroll reclaim of a disabled device is also refused (same code) so a token cannot re-enable it.
-- **Planned:** credential rotation; agent re-enroll on invalid token (401) only
+- **Available now (agent):** on HTTP **401** (invalid/revoked device token), if `enrollment_token` is still in agent config, the agent reclaims via enroll and refreshes `device.json` (cooldown ~1m). **403** `device_disabled` never triggers re-enroll.
+- **Planned:** dedicated admin rotate-credential API
 
 ### Policy
 
@@ -50,8 +51,8 @@ Administrative APIs are further protected by role-based permissions as routes co
 
 ### Telemetry & operations
 
-- **Available now:** health/ready; agents submit `violation_detected` / `violation_blocked` (persisted, including optional process user); admin `GET /v1/events`; web console **Events** page (`/events`, User column)
-- **Planned:** event detail filters, alerts, dashboard summaries, administrative audit logs, alert-channel configuration, async stream pipeline
+- **Available now:** health/ready; agents submit `violation_detected` / `violation_blocked` (persisted, including optional process user); admin `GET /v1/events`; web console **Events** page (`/events`, User column); fleet **dashboard summary** `GET /v1/dashboard/summary` (`event.read` — device online/stale within online window, violations in last 24h, recent violation rows, top processes/hosts 24h, stale device list; Home overview)
+- **Planned:** event detail filters, alerts, violations timeseries, administrative audit logs, alert-channel configuration, async stream pipeline
 
 ## Health
 
