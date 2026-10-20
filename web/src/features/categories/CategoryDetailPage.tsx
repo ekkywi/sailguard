@@ -1,8 +1,11 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { PermissionDenied } from '../../components/PermissionDenied'
 import { toast } from '../../components/toast'
+import type { AppOutletContext } from '../../layouts/AppLayout'
 import { formatRelativeTime } from '../../lib/format'
+import { hasPermission } from '../../lib/permissions'
 import {
   addCategorySignature,
   deleteCategory,
@@ -14,6 +17,9 @@ import {
 import type { Category, CategorySignature } from './types'
 
 export default function CategoryDetailPage() {
+  const { me } = useOutletContext<AppOutletContext>()
+  const canRead = hasPermission(me, 'policy.read')
+  const canWrite = hasPermission(me, 'policy.write')
   const { code } = useParams<{ code: string }>()
   const navigate = useNavigate()
 
@@ -37,6 +43,10 @@ export default function CategoryDetailPage() {
   const [deleting, setDeleting] = useState(false)
 
   const load = useCallback(() => {
+    if (!canRead) {
+      setLoading(false)
+      return
+    }
     if (!code) {
       setError('missing category code')
       setLoading(false)
@@ -61,7 +71,7 @@ export default function CategoryDetailPage() {
         )
       })
       .finally(() => setLoading(false))
-  }, [code])
+  }, [code, canRead])
 
   useEffect(() => {
     load()
@@ -165,6 +175,10 @@ export default function CategoryDetailPage() {
     }
   }
 
+  if (!canRead) {
+    return <PermissionDenied permission="policy.read" title="Category" />
+  }
+
   return (
     <div className="stack">
       <header className="page-header">
@@ -191,14 +205,16 @@ export default function CategoryDetailPage() {
           >
             Refresh
           </button>
-          <button
-            type="button"
-            className="btn btn-danger"
-            onClick={() => setConfirmDelete(true)}
-            disabled={!category || deleting}
-          >
-            Delete
-          </button>
+          {canWrite ? (
+            <button
+              type="button"
+              className="btn btn-danger"
+              onClick={() => setConfirmDelete(true)}
+              disabled={!category || deleting}
+            >
+              Delete
+            </button>
+          ) : null}
         </div>
       </header>
 
@@ -210,7 +226,7 @@ export default function CategoryDetailPage() {
 
       {loading && !category ? <p className="loading">Loading…</p> : null}
 
-      {category ? (
+      {category && canWrite ? (
         <section className="panel" aria-labelledby="category-meta-heading">
           <h2 id="category-meta-heading" className="panel-title">
             Details
@@ -268,7 +284,24 @@ export default function CategoryDetailPage() {
         </section>
       ) : null}
 
-      {category ? (
+      {category && !canWrite ? (
+        <div className="info-list" aria-label="Category details">
+          <div className="info-row">
+            <span className="info-key">Code</span>
+            <span className="info-val mono">{category.code}</span>
+          </div>
+          <div className="info-row">
+            <span className="info-key">Name</span>
+            <span className="info-val">{category.name}</span>
+          </div>
+          <div className="info-row">
+            <span className="info-key">Description</span>
+            <span className="info-val">{category.description || '—'}</span>
+          </div>
+        </div>
+      ) : null}
+
+      {category && canWrite ? (
         <section className="panel" aria-labelledby="add-sig-heading">
           <h2 id="add-sig-heading" className="panel-title">
             Add signature
@@ -354,8 +387,9 @@ export default function CategoryDetailPage() {
           <div className="empty-state" role="status">
             <p className="empty-title">No signatures yet</p>
             <p className="muted">
-              Add process names or other matchers above so category policies can
-              expand.
+              {canWrite
+                ? 'Add process names or other matchers above so category policies can expand.'
+                : 'No signatures on this category.'}
             </p>
           </div>
         ) : null}
@@ -369,7 +403,7 @@ export default function CategoryDetailPage() {
                   <th>Operator</th>
                   <th>Value</th>
                   <th>Added</th>
-                  <th />
+                  {canWrite ? <th /> : null}
                 </tr>
               </thead>
               <tbody>
@@ -383,15 +417,17 @@ export default function CategoryDetailPage() {
                     <td className="muted" title={s.created_at}>
                       {formatRelativeTime(s.created_at)}
                     </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn btn-ghost"
-                        onClick={() => setRemoveSig(s)}
-                      >
-                        Delete
-                      </button>
-                    </td>
+                    {canWrite ? (
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => setRemoveSig(s)}
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>

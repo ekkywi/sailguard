@@ -1,11 +1,14 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { PermissionDenied } from '../../components/PermissionDenied'
 import { toast } from '../../components/toast'
+import type { AppOutletContext } from '../../layouts/AppLayout'
 import {
   formatRelativeTime,
   statusBadgeClass,
 } from '../../lib/format'
+import { hasPermission } from '../../lib/permissions'
 import { listDevices } from '../devices/api'
 import type { Device } from '../devices/types'
 import {
@@ -19,6 +22,9 @@ import {
 import type { DeviceGroup } from './types'
 
 export default function GroupDetailPage() {
+  const { me } = useOutletContext<AppOutletContext>()
+  const canRead = hasPermission(me, 'device.read')
+  const canWrite = hasPermission(me, 'device.write')
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
@@ -42,6 +48,10 @@ export default function GroupDetailPage() {
   const [deleting, setDeleting] = useState(false)
 
   const load = useCallback(() => {
+    if (!canRead) {
+      setLoading(false)
+      return
+    }
     if (!id) {
       setError('missing group id')
       setLoading(false)
@@ -66,7 +76,7 @@ export default function GroupDetailPage() {
         setError(err instanceof Error ? err.message : 'failed to load group')
       })
       .finally(() => setLoading(false))
-  }, [id])
+  }, [id, canRead])
 
   useEffect(() => {
     load()
@@ -81,6 +91,15 @@ export default function GroupDetailPage() {
     if (!allDevices) return []
     return allDevices.filter((d) => !memberIds.has(d.id))
   }, [allDevices, memberIds])
+
+  const metaDirty =
+    !!group &&
+    (nameDraft.trim() !== group.name ||
+      descriptionDraft.trim() !== (group.description || ''))
+
+  if (!canRead) {
+    return <PermissionDenied permission="device.read" title="Group" />
+  }
 
   async function onAdd(e: FormEvent) {
     e.preventDefault()
@@ -172,11 +191,6 @@ export default function GroupDetailPage() {
     }
   }
 
-  const metaDirty =
-    !!group &&
-    (nameDraft.trim() !== group.name ||
-      descriptionDraft.trim() !== (group.description || ''))
-
   return (
     <div className="stack">
       <header className="page-header">
@@ -208,7 +222,7 @@ export default function GroupDetailPage() {
           >
             Refresh
           </button>
-          {group ? (
+          {group && canWrite ? (
             <button
               type="button"
               className="btn btn-danger"
@@ -243,50 +257,52 @@ export default function GroupDetailPage() {
             </div>
           </div>
 
-          <section className="panel" aria-labelledby="edit-group-heading">
-            <h2 id="edit-group-heading" className="panel-title">
-              Edit group
-            </h2>
-            <form className="token-create-grid" onSubmit={onSaveMeta}>
-              <div className="field" style={{ gridColumn: '1 / -1' }}>
-                <label className="label" htmlFor="group-name">
-                  Name
-                </label>
-                <input
-                  id="group-name"
-                  className="input"
-                  value={nameDraft}
-                  onChange={(e) => setNameDraft(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="field" style={{ gridColumn: '1 / -1' }}>
-                <label className="label" htmlFor="group-description">
-                  Description
-                </label>
-                <input
-                  id="group-description"
-                  className="input"
-                  value={descriptionDraft}
-                  onChange={(e) => setDescriptionDraft(e.target.value)}
-                  placeholder="optional"
-                />
-              </div>
-              <div className="token-create-submit">
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={savingMeta || !metaDirty}
-                >
-                  {savingMeta ? 'Saving…' : 'Save'}
-                </button>
-              </div>
-            </form>
-          </section>
+          {canWrite ? (
+            <section className="panel" aria-labelledby="edit-group-heading">
+              <h2 id="edit-group-heading" className="panel-title">
+                Edit group
+              </h2>
+              <form className="token-create-grid" onSubmit={onSaveMeta}>
+                <div className="field" style={{ gridColumn: '1 / -1' }}>
+                  <label className="label" htmlFor="group-name">
+                    Name
+                  </label>
+                  <input
+                    id="group-name"
+                    className="input"
+                    value={nameDraft}
+                    onChange={(e) => setNameDraft(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="field" style={{ gridColumn: '1 / -1' }}>
+                  <label className="label" htmlFor="group-description">
+                    Description
+                  </label>
+                  <input
+                    id="group-description"
+                    className="input"
+                    value={descriptionDraft}
+                    onChange={(e) => setDescriptionDraft(e.target.value)}
+                    placeholder="optional"
+                  />
+                </div>
+                <div className="token-create-submit">
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={savingMeta || !metaDirty}
+                  >
+                    {savingMeta ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+              </form>
+            </section>
+          ) : null}
         </>
       ) : null}
 
-      {group ? (
+      {group && canWrite ? (
         <section className="panel" aria-labelledby="add-member-heading">
           <h2 id="add-member-heading" className="panel-title">
             Add member
@@ -361,7 +377,7 @@ export default function GroupDetailPage() {
                   <th>OS</th>
                   <th>Status</th>
                   <th>Last seen</th>
-                  <th />
+                  {canWrite ? <th /> : null}
                 </tr>
               </thead>
               <tbody>
@@ -392,15 +408,17 @@ export default function GroupDetailPage() {
                     >
                       {formatRelativeTime(d.last_seen_at)}
                     </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn btn-ghost"
-                        onClick={() => setRemoveTarget(d)}
-                      >
-                        Remove
-                      </button>
-                    </td>
+                    {canWrite ? (
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => setRemoveTarget(d)}
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>

@@ -1,12 +1,15 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useOutletContext } from 'react-router-dom'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { PermissionDenied } from '../../components/PermissionDenied'
 import { toast } from '../../components/toast'
+import type { AppOutletContext } from '../../layouts/AppLayout'
 import {
   formatDateTime,
   formatRelativeTime,
   statusBadgeClass,
 } from '../../lib/format'
+import { hasPermission } from '../../lib/permissions'
 import {
   createEnrollmentToken,
   listEnrollmentTokens,
@@ -25,6 +28,8 @@ function tokenStatus(t: EnrollmentToken): 'active' | 'expired' | 'revoked' {
 }
 
 export default function TokensPage() {
+  const { me } = useOutletContext<AppOutletContext>()
+  const canWrite = hasPermission(me, 'device.write')
   const [tokens, setTokens] = useState<EnrollmentToken[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -43,6 +48,10 @@ export default function TokensPage() {
   const [page, setPage] = useState(1)
 
   const load = useCallback(() => {
+    if (!canWrite) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setError(null)
     listEnrollmentTokens()
@@ -52,7 +61,7 @@ export default function TokensPage() {
         setError(err instanceof Error ? err.message : 'failed to load tokens')
       })
       .finally(() => setLoading(false))
-  }, [])
+  }, [canWrite])
 
   useEffect(() => {
     load()
@@ -73,6 +82,12 @@ export default function TokensPage() {
 
   const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
   const rangeEnd = Math.min(page * PAGE_SIZE, total)
+
+  if (!canWrite) {
+    return (
+      <PermissionDenied permission="device.write" title="Enrollment tokens" />
+    )
+  }
 
   async function onCreate(e: FormEvent) {
     e.preventDefault()

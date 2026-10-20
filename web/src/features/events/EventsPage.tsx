@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useOutletContext } from 'react-router-dom'
+import { PermissionDenied } from '../../components/PermissionDenied'
+import type { AppOutletContext } from '../../layouts/AppLayout'
 import { formatDateTime, formatRelativeTime } from '../../lib/format'
+import { hasPermission } from '../../lib/permissions'
 import { listEvents } from './api'
 import type { DeviceEvent } from './types'
 
@@ -13,12 +16,18 @@ function eventTypeLabel(t: string): string {
 }
 
 export default function EventsPage() {
+  const { me } = useOutletContext<AppOutletContext>()
+  const canRead = hasPermission(me, 'event.read')
   const [events, setEvents] = useState<DeviceEvent[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
 
   const load = useCallback(() => {
+    if (!canRead) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setError(null)
     listEvents()
@@ -28,7 +37,7 @@ export default function EventsPage() {
         setError(err instanceof Error ? err.message : 'failed to load events')
       })
       .finally(() => setLoading(false))
-  }, [])
+  }, [canRead])
 
   useEffect(() => {
     load()
@@ -49,6 +58,10 @@ export default function EventsPage() {
 
   const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
   const rangeEnd = Math.min(page * PAGE_SIZE, total)
+
+  if (!canRead) {
+    return <PermissionDenied permission="event.read" title="Events" />
+  }
 
   return (
     <div className="stack">

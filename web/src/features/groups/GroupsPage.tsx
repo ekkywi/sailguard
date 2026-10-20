@@ -1,13 +1,19 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { formatRelativeTime } from '../../lib/format'
+import { useNavigate, useOutletContext } from 'react-router-dom'
+import { PermissionDenied } from '../../components/PermissionDenied'
 import { toast } from '../../components/toast'
+import type { AppOutletContext } from '../../layouts/AppLayout'
+import { formatRelativeTime } from '../../lib/format'
+import { hasPermission } from '../../lib/permissions'
 import { createGroup, listGroups } from './api'
 import type { CreateGroupInput, DeviceGroup } from './types'
 
 const PAGE_SIZE = 10
 
 export default function GroupsPage() {
+  const { me } = useOutletContext<AppOutletContext>()
+  const canRead = hasPermission(me, 'device.read')
+  const canWrite = hasPermission(me, 'device.write')
   const navigate = useNavigate()
   const [groups, setGroups] = useState<DeviceGroup[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -20,6 +26,10 @@ export default function GroupsPage() {
   const [page, setPage] = useState(1)
 
   const load = useCallback(() => {
+    if (!canRead) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setError(null)
     listGroups()
@@ -29,7 +39,7 @@ export default function GroupsPage() {
         setError(err instanceof Error ? err.message : 'failed to load groups')
       })
       .finally(() => setLoading(false))
-  }, [])
+  }, [canRead])
 
   useEffect(() => {
     load()
@@ -50,6 +60,10 @@ export default function GroupsPage() {
 
   const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
   const rangeEnd = Math.min(page * PAGE_SIZE, total)
+
+  if (!canRead) {
+    return <PermissionDenied permission="device.read" title="Groups" />
+  }
 
   async function onCreate(e: FormEvent) {
     e.preventDefault()
@@ -109,47 +123,49 @@ export default function GroupsPage() {
         </button>
       </header>
 
-      <section className="panel" aria-labelledby="create-group-heading">
-        <h2 id="create-group-heading" className="panel-title">
-          Create group
-        </h2>
-        <form className="token-create-grid" onSubmit={onCreate}>
-          <div className="field">
-            <label className="label" htmlFor="group-name">
-              Name
-            </label>
-            <input
-              id="group-name"
-              className="input"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="IT"
-              required
-            />
-          </div>
-          <div className="field" style={{ gridColumn: 'span 2' }}>
-            <label className="label" htmlFor="group-desc">
-              Description (optional)
-            </label>
-            <input
-              id="group-desc"
-              className="input"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Endpoints for the IT department"
-            />
-          </div>
-          <div className="token-create-submit">
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={creating}
-            >
-              {creating ? 'Creating…' : 'Create group'}
-            </button>
-          </div>
-        </form>
-      </section>
+      {canWrite ? (
+        <section className="panel" aria-labelledby="create-group-heading">
+          <h2 id="create-group-heading" className="panel-title">
+            Create group
+          </h2>
+          <form className="token-create-grid" onSubmit={onCreate}>
+            <div className="field">
+              <label className="label" htmlFor="group-name">
+                Name
+              </label>
+              <input
+                id="group-name"
+                className="input"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="IT"
+                required
+              />
+            </div>
+            <div className="field" style={{ gridColumn: 'span 2' }}>
+              <label className="label" htmlFor="group-desc">
+                Description (optional)
+              </label>
+              <input
+                id="group-desc"
+                className="input"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Endpoints for the IT department"
+              />
+            </div>
+            <div className="token-create-submit">
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={creating}
+              >
+                {creating ? 'Creating…' : 'Create group'}
+              </button>
+            </div>
+          </form>
+        </section>
+      ) : null}
 
       {error ? (
         <p className="error" role="alert">

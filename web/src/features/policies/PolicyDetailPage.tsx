@@ -1,8 +1,11 @@
 import { FormEvent, useCallback, useEffect, useId, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { PermissionDenied } from '../../components/PermissionDenied'
 import { toast } from '../../components/toast'
+import type { AppOutletContext } from '../../layouts/AppLayout'
 import { formatRelativeTime } from '../../lib/format'
+import { hasPermission } from '../../lib/permissions'
 import { listDevices } from '../devices/api'
 import type { Device } from '../devices/types'
 import { listGroups } from '../groups/api'
@@ -25,6 +28,9 @@ import {
 import type { Policy, PolicyAssignment, PolicyRule } from './types'
 
 export default function PolicyDetailPage() {
+  const { me } = useOutletContext<AppOutletContext>()
+  const canRead = hasPermission(me, 'policy.read')
+  const canWrite = hasPermission(me, 'policy.write')
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
@@ -76,6 +82,10 @@ export default function PolicyDetailPage() {
   const [deletingPolicy, setDeletingPolicy] = useState(false)
 
   const load = useCallback(() => {
+    if (!canRead) {
+      setLoading(false)
+      return
+    }
     if (!id) {
       setError('missing policy id')
       setLoading(false)
@@ -112,7 +122,7 @@ export default function PolicyDetailPage() {
         setError(err instanceof Error ? err.message : 'failed to load policy')
       })
       .finally(() => setLoading(false))
-  }, [id])
+  }, [id, canRead])
 
   useEffect(() => {
     load()
@@ -412,6 +422,10 @@ export default function PolicyDetailPage() {
     return d ? `Device: ${d.hostname}` : `Device: ${a.device_id ?? '—'}`
   }
 
+  if (!canRead) {
+    return <PermissionDenied permission="policy.read" title="Policy" />
+  }
+
   return (
     <div className="stack">
       <header className="page-header">
@@ -438,7 +452,7 @@ export default function PolicyDetailPage() {
           </p>
         </div>
         <div className="page-header-actions">
-          {policy ? (
+          {policy && canWrite ? (
             <button
               type="button"
               className="btn btn-danger"
@@ -455,14 +469,16 @@ export default function PolicyDetailPage() {
           >
             Refresh
           </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={onPublish}
-            disabled={publishing || !policy}
-          >
-            {publishing ? 'Publishing…' : 'Publish'}
-          </button>
+          {canWrite ? (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={onPublish}
+              disabled={publishing || !policy}
+            >
+              {publishing ? 'Publishing…' : 'Publish'}
+            </button>
+          ) : null}
         </div>
       </header>
 
@@ -495,53 +511,55 @@ export default function PolicyDetailPage() {
             </div>
           </div>
 
-          <section className="panel" aria-labelledby="mode-heading">
-            <h2 id="mode-heading" className="panel-title">
-              Change mode
-            </h2>
-            <p className="muted" style={{ marginTop: 0 }}>
-              Audit reports matches only. Enforce will terminate when agent
-              Level&nbsp;1 kill is implemented — publish after switching so
-              operators see a new version.
-            </p>
-            <form
-              className="token-create-grid"
-              onSubmit={(e) => {
-                e.preventDefault()
-                void onSaveMode()
-              }}
-            >
-              <div className="field">
-                <label className="label" htmlFor="policy-mode-edit">
-                  Mode
-                </label>
-                <select
-                  id="policy-mode-edit"
-                  className="input"
-                  value={modeDraft}
-                  onChange={(e) => setModeDraft(e.target.value)}
-                >
-                  <option value="audit">audit</option>
-                  <option value="enforce">enforce</option>
-                </select>
-              </div>
-              <div className="token-create-submit">
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={
-                    savingMode || modeDraft === policy.mode || !modeDraft
-                  }
-                >
-                  {savingMode ? 'Saving…' : 'Save mode'}
-                </button>
-              </div>
-            </form>
-          </section>
+          {canWrite ? (
+            <section className="panel" aria-labelledby="mode-heading">
+              <h2 id="mode-heading" className="panel-title">
+                Change mode
+              </h2>
+              <p className="muted" style={{ marginTop: 0 }}>
+                Audit reports matches only. Enforce will terminate when agent
+                Level&nbsp;1 kill is implemented — publish after switching so
+                operators see a new version.
+              </p>
+              <form
+                className="token-create-grid"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  void onSaveMode()
+                }}
+              >
+                <div className="field">
+                  <label className="label" htmlFor="policy-mode-edit">
+                    Mode
+                  </label>
+                  <select
+                    id="policy-mode-edit"
+                    className="input"
+                    value={modeDraft}
+                    onChange={(e) => setModeDraft(e.target.value)}
+                  >
+                    <option value="audit">audit</option>
+                    <option value="enforce">enforce</option>
+                  </select>
+                </div>
+                <div className="token-create-submit">
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={
+                      savingMode || modeDraft === policy.mode || !modeDraft
+                    }
+                  >
+                    {savingMode ? 'Saving…' : 'Save mode'}
+                  </button>
+                </div>
+              </form>
+            </section>
+          ) : null}
         </>
       ) : null}
 
-      {policy ? (
+      {policy && canWrite ? (
         <section className="panel" aria-labelledby="add-rule-heading">
           <h2 id="add-rule-heading" className="panel-title">
             Add rule
@@ -659,7 +677,11 @@ export default function PolicyDetailPage() {
         {rules && rules.length === 0 ? (
           <div className="empty-state" role="status">
             <p className="empty-title">No rules yet</p>
-            <p className="muted">Add a process_name block rule above.</p>
+            <p className="muted">
+              {canWrite
+                ? 'Add a process_name block rule above.'
+                : 'No rules on this policy.'}
+            </p>
           </div>
         ) : null}
         {rules && rules.length > 0 ? (
@@ -671,7 +693,7 @@ export default function PolicyDetailPage() {
                   <th>Type</th>
                   <th>Operator</th>
                   <th>Value</th>
-                  <th />
+                  {canWrite ? <th /> : null}
                 </tr>
               </thead>
               <tbody>
@@ -692,24 +714,26 @@ export default function PolicyDetailPage() {
                         {ruleMatchLabel(r)}
                       </div>
                     </td>
-                    <td>
-                      <div className="table-row-actions">
-                        <button
-                          type="button"
-                          className="btn btn-ghost"
-                          onClick={() => beginEditRule(r)}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-ghost"
-                          onClick={() => setRemoveRule(r)}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
+                    {canWrite ? (
+                      <td>
+                        <div className="table-row-actions">
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            onClick={() => beginEditRule(r)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            onClick={() => setRemoveRule(r)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>
@@ -718,7 +742,7 @@ export default function PolicyDetailPage() {
         ) : null}
       </section>
 
-      {policy ? (
+      {policy && canWrite ? (
         <section className="panel" aria-labelledby="add-assign-heading">
           <h2 id="add-assign-heading" className="panel-title">
             Add assignment
@@ -804,7 +828,9 @@ export default function PolicyDetailPage() {
           <div className="empty-state" role="status">
             <p className="empty-title">No assignments</p>
             <p className="muted">
-              Assign to org, a group, or a device before publishing.
+              {canWrite
+                ? 'Assign to org, a group, or a device before publishing.'
+                : 'No assignments on this policy.'}
             </p>
           </div>
         ) : null}
@@ -815,7 +841,7 @@ export default function PolicyDetailPage() {
                 <tr>
                   <th>Scope</th>
                   <th>Target</th>
-                  <th />
+                  {canWrite ? <th /> : null}
                 </tr>
               </thead>
               <tbody>
@@ -823,15 +849,17 @@ export default function PolicyDetailPage() {
                   <tr key={a.id}>
                     <td className="mono">{a.scope}</td>
                     <td>{assignmentLabel(a)}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn btn-ghost"
-                        onClick={() => setRemoveAssign(a)}
-                      >
-                        Remove
-                      </button>
-                    </td>
+                    {canWrite ? (
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => setRemoveAssign(a)}
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>
@@ -840,7 +868,7 @@ export default function PolicyDetailPage() {
         ) : null}
       </section>
 
-      {editingRule ? (
+      {editingRule && canWrite ? (
         <div className="dialog-root" role="presentation">
           <button
             type="button"

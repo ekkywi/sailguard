@@ -9,6 +9,7 @@ import {
 } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { PermissionDenied } from '../../components/PermissionDenied'
 import { toast } from '../../components/toast'
 import type { AppOutletContext } from '../../layouts/AppLayout'
 import {
@@ -16,6 +17,7 @@ import {
   formatRelativeTime,
   statusBadgeClass,
 } from '../../lib/format'
+import { hasPermission } from '../../lib/permissions'
 import {
   createUser,
   listRoles,
@@ -68,8 +70,8 @@ function RolePicker({
 
 export default function UsersPage() {
   const { me } = useOutletContext<AppOutletContext>()
-  const canRead = me?.permissions.includes('user.read') ?? false
-  const canWrite = me?.permissions.includes('user.write') ?? false
+  const canRead = hasPermission(me, 'user.read')
+  const canWrite = hasPermission(me, 'user.write')
 
   const [users, setUsers] = useState<AdminUser[] | null>(null)
   const [rolesCatalog, setRolesCatalog] = useState<Role[]>([])
@@ -321,17 +323,7 @@ export default function UsersPage() {
   }
 
   if (!canRead) {
-    return (
-      <div className="stack">
-        <header>
-          <p className="section-label">Administration</p>
-          <h1 className="title">Users</h1>
-        </header>
-        <p className="error" role="alert">
-          Missing permission: user.read
-        </p>
-      </div>
-    )
+    return <PermissionDenied permission="user.read" title="Users" />
   }
 
   return (

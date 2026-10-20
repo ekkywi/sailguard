@@ -1,16 +1,22 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { PermissionDenied } from '../../components/PermissionDenied'
 import { toast } from '../../components/toast'
+import type { AppOutletContext } from '../../layouts/AppLayout'
 import {
   formatDateTime,
   formatRelativeTime,
   statusBadgeClass,
 } from '../../lib/format'
+import { hasPermission } from '../../lib/permissions'
 import { deleteDevice, getDevice, patchDevice } from './api'
 import type { Device } from './types'
 
 export default function DeviceDetailPage() {
+  const { me } = useOutletContext<AppOutletContext>()
+  const canRead = hasPermission(me, 'device.read')
+  const canWrite = hasPermission(me, 'device.write')
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [device, setDevice] = useState<Device | null>(null)
@@ -23,6 +29,10 @@ export default function DeviceDetailPage() {
   const [deleting, setDeleting] = useState(false)
 
   const load = useCallback(() => {
+    if (!canRead) {
+      setLoading(false)
+      return
+    }
     if (!id) {
       setError('missing device id')
       setLoading(false)
@@ -40,11 +50,15 @@ export default function DeviceDetailPage() {
         setError(err instanceof Error ? err.message : 'failed to load device')
       })
       .finally(() => setLoading(false))
-  }, [id])
+  }, [id, canRead])
 
   useEffect(() => {
     load()
   }, [load])
+
+  if (!canRead) {
+    return <PermissionDenied permission="device.read" title="Device" />
+  }
 
   async function onSaveDisplayName(e: FormEvent) {
     e.preventDefault()
@@ -121,7 +135,7 @@ export default function DeviceDetailPage() {
             Enrollment and agent metadata for this endpoint.
           </p>
         </div>
-        {device ? (
+        {device && canWrite ? (
           <div className="page-header-actions">
             <button
               type="button"
@@ -198,37 +212,45 @@ export default function DeviceDetailPage() {
             </DetailRow>
           </div>
 
-          <section className="panel" aria-labelledby="device-rename-heading">
-            <h2 id="device-rename-heading" className="panel-title">
-              Display name
-            </h2>
-            <form className="token-create-grid" onSubmit={onSaveDisplayName}>
-              <div className="field" style={{ gridColumn: '1 / -1' }}>
-                <label className="label" htmlFor="device-display-name">
-                  Label shown in the console
-                </label>
-                <input
-                  id="device-display-name"
-                  className="input"
-                  value={displayNameDraft}
-                  onChange={(e) => setDisplayNameDraft(e.target.value)}
-                  placeholder={device.hostname}
-                />
-              </div>
-              <div className="token-create-submit">
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={
-                    savingName ||
-                    displayNameDraft.trim() === (device.display_name || '')
-                  }
-                >
-                  {savingName ? 'Saving…' : 'Save'}
-                </button>
-              </div>
-            </form>
-          </section>
+          {canWrite ? (
+            <section className="panel" aria-labelledby="device-rename-heading">
+              <h2 id="device-rename-heading" className="panel-title">
+                Display name
+              </h2>
+              <form className="token-create-grid" onSubmit={onSaveDisplayName}>
+                <div className="field" style={{ gridColumn: '1 / -1' }}>
+                  <label className="label" htmlFor="device-display-name">
+                    Label shown in the console
+                  </label>
+                  <input
+                    id="device-display-name"
+                    className="input"
+                    value={displayNameDraft}
+                    onChange={(e) => setDisplayNameDraft(e.target.value)}
+                    placeholder={device.hostname}
+                  />
+                </div>
+                <div className="token-create-submit">
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={
+                      savingName ||
+                      displayNameDraft.trim() === (device.display_name || '')
+                    }
+                  >
+                    {savingName ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+              </form>
+            </section>
+          ) : (
+            <div className="info-list" aria-label="Display name">
+              <DetailRow label="Display name">
+                {device.display_name || '—'}
+              </DetailRow>
+            </div>
+          )}
         </>
       ) : null}
 

@@ -1,6 +1,9 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useOutletContext } from 'react-router-dom'
+import { PermissionDenied } from '../../components/PermissionDenied'
 import { toast } from '../../components/toast'
+import type { AppOutletContext } from '../../layouts/AppLayout'
+import { hasPermission } from '../../lib/permissions'
 import {
   downloadWindowsAgentPackage,
   getWindowsAgentPackageMeta,
@@ -45,6 +48,8 @@ function PlatformGlyph({ family }: { family: string }) {
 }
 
 export default function AgentDownloadPage() {
+  const { me } = useOutletContext<AppOutletContext>()
+  const canWrite = hasPermission(me, 'device.write')
   const [meta, setMeta] = useState<AgentPackageMeta | null>(null)
   const [channelID, setChannelID] = useState('windows-legacy')
   const [packageKind, setPackageKind] = useState<AgentPackageKind>('install')
@@ -59,6 +64,10 @@ export default function AgentDownloadPage() {
   const [downloading, setDownloading] = useState(false)
 
   const load = useCallback(() => {
+    if (!canWrite) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setError(null)
     getWindowsAgentPackageMeta()
@@ -79,7 +88,7 @@ export default function AgentDownloadPage() {
         )
       })
       .finally(() => setLoading(false))
-  }, [])
+  }, [canWrite])
 
   useEffect(() => {
     load()
@@ -179,6 +188,12 @@ export default function AgentDownloadPage() {
     } finally {
       setDownloading(false)
     }
+  }
+
+  if (!canWrite) {
+    return (
+      <PermissionDenied permission="device.write" title="Download agent" />
+    )
   }
 
   return (

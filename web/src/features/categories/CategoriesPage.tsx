@@ -1,13 +1,19 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useOutletContext } from 'react-router-dom'
+import { PermissionDenied } from '../../components/PermissionDenied'
 import { toast } from '../../components/toast'
+import type { AppOutletContext } from '../../layouts/AppLayout'
 import { formatRelativeTime } from '../../lib/format'
+import { hasPermission } from '../../lib/permissions'
 import { createCategory, listCategories } from './api'
 import type { Category, CreateCategoryInput } from './types'
 
 const PAGE_SIZE = 10
 
 export default function CategoriesPage() {
+  const { me } = useOutletContext<AppOutletContext>()
+  const canRead = hasPermission(me, 'policy.read')
+  const canWrite = hasPermission(me, 'policy.write')
   const navigate = useNavigate()
   const [categories, setCategories] = useState<Category[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -20,6 +26,10 @@ export default function CategoriesPage() {
   const [page, setPage] = useState(1)
 
   const load = useCallback(() => {
+    if (!canRead) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setError(null)
     listCategories()
@@ -31,7 +41,7 @@ export default function CategoriesPage() {
         )
       })
       .finally(() => setLoading(false))
-  }, [])
+  }, [canRead])
 
   useEffect(() => {
     load()
@@ -90,6 +100,10 @@ export default function CategoriesPage() {
     }
   }
 
+  if (!canRead) {
+    return <PermissionDenied permission="policy.read" title="Categories" />
+  }
+
   return (
     <div className="stack">
       <header className="page-header">
@@ -118,62 +132,64 @@ export default function CategoriesPage() {
         </button>
       </header>
 
-      <section className="panel" aria-labelledby="create-category-heading">
-        <h2 id="create-category-heading" className="panel-title">
-          Create category
-        </h2>
-        <form className="rule-form-grid" onSubmit={onCreate}>
-          <div className="field">
-            <label className="label" htmlFor="category-code">
-              Code
-            </label>
-            <input
-              id="category-code"
-              className="input mono"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="messaging"
-              pattern="[a-zA-Z0-9_]+"
-              title="Letters, digits, and underscore only"
-              required
-            />
-          </div>
-          <div className="field">
-            <label className="label" htmlFor="category-name">
-              Name
-            </label>
-            <input
-              id="category-name"
-              className="input"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Messaging"
-              required
-            />
-          </div>
-          <div className="field rule-form-value">
-            <label className="label" htmlFor="category-desc">
-              Description (optional)
-            </label>
-            <input
-              id="category-desc"
-              className="input"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Consumer chat / messaging apps"
-            />
-          </div>
-          <div className="rule-form-actions">
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={creating}
-            >
-              {creating ? 'Creating…' : 'Create category'}
-            </button>
-          </div>
-        </form>
-      </section>
+      {canWrite ? (
+        <section className="panel" aria-labelledby="create-category-heading">
+          <h2 id="create-category-heading" className="panel-title">
+            Create category
+          </h2>
+          <form className="rule-form-grid" onSubmit={onCreate}>
+            <div className="field">
+              <label className="label" htmlFor="category-code">
+                Code
+              </label>
+              <input
+                id="category-code"
+                className="input mono"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="messaging"
+                pattern="[a-zA-Z0-9_]+"
+                title="Letters, digits, and underscore only"
+                required
+              />
+            </div>
+            <div className="field">
+              <label className="label" htmlFor="category-name">
+                Name
+              </label>
+              <input
+                id="category-name"
+                className="input"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Messaging"
+                required
+              />
+            </div>
+            <div className="field rule-form-value">
+              <label className="label" htmlFor="category-desc">
+                Description (optional)
+              </label>
+              <input
+                id="category-desc"
+                className="input"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Consumer chat / messaging apps"
+              />
+            </div>
+            <div className="rule-form-actions">
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={creating}
+              >
+                {creating ? 'Creating…' : 'Create category'}
+              </button>
+            </div>
+          </form>
+        </section>
+      ) : null}
 
       {error ? (
         <p className="error" role="alert">
@@ -200,7 +216,11 @@ export default function CategoriesPage() {
         {!loading && categories && categories.length === 0 ? (
           <div className="empty-state" role="status">
             <p className="empty-title">No categories yet</p>
-            <p className="muted">Create a category above, then add signatures.</p>
+            <p className="muted">
+              {canWrite
+                ? 'Create a category above, then add signatures.'
+                : 'No categories in the catalog.'}
+            </p>
           </div>
         ) : null}
 

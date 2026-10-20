@@ -1,13 +1,19 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { formatRelativeTime } from '../../lib/format'
+import { useNavigate, useOutletContext } from 'react-router-dom'
+import { PermissionDenied } from '../../components/PermissionDenied'
 import { toast } from '../../components/toast'
+import type { AppOutletContext } from '../../layouts/AppLayout'
+import { formatRelativeTime } from '../../lib/format'
+import { hasPermission } from '../../lib/permissions'
 import { createPolicy, listPolicies } from './api'
 import type { CreatePolicyInput, Policy } from './types'
 
 const PAGE_SIZE = 10
 
 export default function PoliciesPage() {
+  const { me } = useOutletContext<AppOutletContext>()
+  const canRead = hasPermission(me, 'policy.read')
+  const canWrite = hasPermission(me, 'policy.write')
   const navigate = useNavigate()
   const [policies, setPolicies] = useState<Policy[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -20,6 +26,10 @@ export default function PoliciesPage() {
   const [page, setPage] = useState(1)
 
   const load = useCallback(() => {
+    if (!canRead) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setError(null)
     listPolicies()
@@ -29,7 +39,7 @@ export default function PoliciesPage() {
         setError(err instanceof Error ? err.message : 'failed to load policies')
       })
       .finally(() => setLoading(false))
-  }, [])
+  }, [canRead])
 
   useEffect(() => {
     load()
@@ -87,6 +97,10 @@ export default function PoliciesPage() {
     }
   }
 
+  if (!canRead) {
+    return <PermissionDenied permission="policy.read" title="Policies" />
+  }
+
   return (
     <div className="stack">
       <header className="page-header">
@@ -114,6 +128,7 @@ export default function PoliciesPage() {
         </button>
       </header>
 
+      {canWrite ? (
       <section className="panel" aria-labelledby="create-policy-heading">
         <h2 id="create-policy-heading" className="panel-title">
           Create policy
@@ -169,6 +184,7 @@ export default function PoliciesPage() {
           </div>
         </form>
       </section>
+      ) : null}
 
       {error ? (
         <p className="error" role="alert">

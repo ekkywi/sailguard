@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
+import { PermissionDenied } from '../components/PermissionDenied'
 import {
   getDashboardSummary,
   getViolationsTimeseries,
@@ -10,8 +11,9 @@ import type {
   ViolationsTimeseries,
   ViolationsTimeseriesRange,
 } from '../features/dashboard/types'
-import { formatDateTime, formatRelativeTime } from '../lib/format'
 import type { AppOutletContext } from '../layouts/AppLayout'
+import { formatDateTime, formatRelativeTime } from '../lib/format'
+import { hasPermission } from '../lib/permissions'
 
 function eventTypeLabel(t: string): string {
   if (t === 'violation_detected') return 'Detected'
@@ -21,6 +23,7 @@ function eventTypeLabel(t: string): string {
 
 export default function HomePage() {
   const { me, meLoading, meError } = useOutletContext<AppOutletContext>()
+  const canRead = hasPermission(me, 'event.read')
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [summaryError, setSummaryError] = useState<string | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(true)
@@ -30,6 +33,10 @@ export default function HomePage() {
   const [tsError, setTsError] = useState<string | null>(null)
 
   const loadSummary = useCallback(() => {
+    if (!canRead) {
+      setSummaryLoading(false)
+      return
+    }
     setSummaryLoading(true)
     setSummaryError(null)
     getDashboardSummary()
@@ -44,24 +51,31 @@ export default function HomePage() {
         )
       })
       .finally(() => setSummaryLoading(false))
-  }, [])
+  }, [canRead])
 
-  const loadTimeseries = useCallback((range: ViolationsTimeseriesRange) => {
-    setTsLoading(true)
-    setTsError(null)
-    getViolationsTimeseries(range)
-      .then((data) => {
-        setTimeseries(data)
-        setTsError(null)
-      })
-      .catch((err: unknown) => {
-        setTimeseries(null)
-        setTsError(
-          err instanceof Error ? err.message : 'failed to load timeseries',
-        )
-      })
-      .finally(() => setTsLoading(false))
-  }, [])
+  const loadTimeseries = useCallback(
+    (range: ViolationsTimeseriesRange) => {
+      if (!canRead) {
+        setTsLoading(false)
+        return
+      }
+      setTsLoading(true)
+      setTsError(null)
+      getViolationsTimeseries(range)
+        .then((data) => {
+          setTimeseries(data)
+          setTsError(null)
+        })
+        .catch((err: unknown) => {
+          setTimeseries(null)
+          setTsError(
+            err instanceof Error ? err.message : 'failed to load timeseries',
+          )
+        })
+        .finally(() => setTsLoading(false))
+    },
+    [canRead],
+  )
 
   useEffect(() => {
     loadSummary()
@@ -82,6 +96,10 @@ export default function HomePage() {
   const topProcesses = summary?.top_processes ?? []
   const topHosts = summary?.top_hosts ?? []
   const staleDevices = summary?.stale_devices ?? []
+
+  if (!meLoading && !meError && me && !canRead) {
+    return <PermissionDenied permission="event.read" title="Overview" />
+  }
 
   return (
     <div className="stack">

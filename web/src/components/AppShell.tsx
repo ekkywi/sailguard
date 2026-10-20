@@ -204,12 +204,25 @@ function IconPanelLeft() {
   )
 }
 
+function hasPerm(permissions: string[], code: string) {
+  return permissions.includes(code)
+}
+
 export function AppShell({
   children,
   userLabel,
   permissions = [],
 }: AppShellProps) {
-  const canReadUsers = permissions.includes('user.read')
+  const canDeviceRead = hasPerm(permissions, 'device.read')
+  const canDeviceWrite = hasPerm(permissions, 'device.write')
+  const canPolicyRead = hasPerm(permissions, 'policy.read')
+  const canEventRead = hasPerm(permissions, 'event.read')
+  const canUserRead = hasPerm(permissions, 'user.read')
+  const showInventory = canDeviceRead || canDeviceWrite
+  const showControl = canPolicyRead
+  const showTelemetry = canEventRead
+  const showAdmin = canUserRead
+
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return localStorage.getItem(SIDEBAR_KEY) === '1'
@@ -250,47 +263,71 @@ export function AppShell({
             </button>
           </div>
           <nav className="sidebar-nav" aria-label="Main">
-            <p className="sidebar-section">Workspace</p>
-            <NavLink to="/" end className={navClass} title="Overview">
-              <IconOverview />
-              <span className="nav-label">Overview</span>
-            </NavLink>
-            <p className="sidebar-section">Inventory</p>
-            <NavLink to="/devices" className={navClass} title="Devices">
-              <IconDevices />
-              <span className="nav-label">Devices</span>
-            </NavLink>
-            <NavLink to="/groups" className={navClass} title="Groups">
-              <IconGroups />
-              <span className="nav-label">Groups</span>
-            </NavLink>
-            <NavLink to="/tokens" className={navClass} title="Tokens">
-              <IconTokens />
-              <span className="nav-label">Tokens</span>
-            </NavLink>
-            <NavLink
-              to="/agent-download"
-              className={navClass}
-              title="Download agent"
-            >
-              <IconDownload />
-              <span className="nav-label">Download</span>
-            </NavLink>
-            <p className="sidebar-section">Control</p>
-            <NavLink to="/policies" className={navClass} title="Policies">
-              <IconPolicies />
-              <span className="nav-label">Policies</span>
-            </NavLink>
-            <NavLink to="/categories" className={navClass} title="Categories">
-              <IconCategories />
-              <span className="nav-label">Categories</span>
-            </NavLink>
-            <p className="sidebar-section">Telemetry</p>
-            <NavLink to="/events" className={navClass} title="Events">
-              <IconEvents />
-              <span className="nav-label">Events</span>
-            </NavLink>
-            {canReadUsers ? (
+            {canEventRead ? (
+              <>
+                <p className="sidebar-section">Workspace</p>
+                <NavLink to="/" end className={navClass} title="Overview">
+                  <IconOverview />
+                  <span className="nav-label">Overview</span>
+                </NavLink>
+              </>
+            ) : null}
+            {showInventory ? (
+              <>
+                <p className="sidebar-section">Inventory</p>
+                {canDeviceRead ? (
+                  <>
+                    <NavLink to="/devices" className={navClass} title="Devices">
+                      <IconDevices />
+                      <span className="nav-label">Devices</span>
+                    </NavLink>
+                    <NavLink to="/groups" className={navClass} title="Groups">
+                      <IconGroups />
+                      <span className="nav-label">Groups</span>
+                    </NavLink>
+                  </>
+                ) : null}
+                {canDeviceWrite ? (
+                  <>
+                    <NavLink to="/tokens" className={navClass} title="Tokens">
+                      <IconTokens />
+                      <span className="nav-label">Tokens</span>
+                    </NavLink>
+                    <NavLink
+                      to="/agent-download"
+                      className={navClass}
+                      title="Download agent"
+                    >
+                      <IconDownload />
+                      <span className="nav-label">Download</span>
+                    </NavLink>
+                  </>
+                ) : null}
+              </>
+            ) : null}
+            {showControl ? (
+              <>
+                <p className="sidebar-section">Control</p>
+                <NavLink to="/policies" className={navClass} title="Policies">
+                  <IconPolicies />
+                  <span className="nav-label">Policies</span>
+                </NavLink>
+                <NavLink to="/categories" className={navClass} title="Categories">
+                  <IconCategories />
+                  <span className="nav-label">Categories</span>
+                </NavLink>
+              </>
+            ) : null}
+            {showTelemetry ? (
+              <>
+                <p className="sidebar-section">Telemetry</p>
+                <NavLink to="/events" className={navClass} title="Events">
+                  <IconEvents />
+                  <span className="nav-label">Events</span>
+                </NavLink>
+              </>
+            ) : null}
+            {showAdmin ? (
               <>
                 <p className="sidebar-section">Administration</p>
                 <NavLink to="/users" className={navClass} title="Users">

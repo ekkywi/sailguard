@@ -1,16 +1,25 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useOutletContext } from 'react-router-dom'
+import { PermissionDenied } from '../../components/PermissionDenied'
+import type { AppOutletContext } from '../../layouts/AppLayout'
 import { formatRelativeTime, statusBadgeClass } from '../../lib/format'
+import { hasPermission } from '../../lib/permissions'
 import { listDevices } from './api'
 import type { Device } from './types'
 
 export default function DevicesPage() {
+  const { me } = useOutletContext<AppOutletContext>()
+  const canRead = hasPermission(me, 'device.read')
   const navigate = useNavigate()
   const [devices, setDevices] = useState<Device[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(() => {
+    if (!canRead) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setError(null)
     listDevices()
@@ -20,11 +29,15 @@ export default function DevicesPage() {
         setError(err instanceof Error ? err.message : 'failed to load devices')
       })
       .finally(() => setLoading(false))
-  }, [])
+  }, [canRead])
 
   useEffect(() => {
     load()
   }, [load])
+
+  if (!canRead) {
+    return <PermissionDenied permission="device.read" title="Devices" />
+  }
 
   return (
     <div className="stack">

@@ -30,7 +30,7 @@ Administrative APIs are further protected by role-based permissions as routes co
 
 ### Identity & access
 
-- **Available now:** login; current-user profile with roles and permission codes (`/auth/me`); **users admin** (`GET/POST /v1/users`, `GET/PATCH /v1/users/{id}`, `POST …/reset-password`, `GET /v1/roles`, `GET /v1/permissions`; web `/users` gated by `user.read` / `user.write`)
+- **Available now:** login; current-user profile with roles and permission codes (`/auth/me`); **users admin** (`GET/POST /v1/users`, `GET/PATCH /v1/users/{id}`, `POST …/reset-password`, `GET /v1/roles`, `GET /v1/permissions`; web `/users` gated by `user.read` / `user.write`). Admin console also hides nav links and write controls from `/auth/me` permission codes (API `requirePermission` remains authoritative).
 - **Planned:** password change, logout/session revoke (server-side), LDAP/AD, MFA
 
 ### Inventory
