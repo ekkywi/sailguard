@@ -10,7 +10,8 @@ import (
 
 func (s *Store) FindByEmail(ctx context.Context, email string) (*User, error) {
 	const q = `
-		SELECT id, email, name, password_hash, auth_provider, is_active, last_login_at
+		SELECT id, email, name, password_hash, auth_provider, is_active,
+		       last_login_at, created_at, updated_at
 		FROM users
 		WHERE email = $1
 	`
@@ -24,6 +25,8 @@ func (s *Store) FindByEmail(ctx context.Context, email string) (*User, error) {
 		&u.AuthProvider,
 		&u.IsActive,
 		&u.LastLoginAt,
+		&u.CreatedAt,
+		&u.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
@@ -36,7 +39,8 @@ func (s *Store) FindByEmail(ctx context.Context, email string) (*User, error) {
 
 func (s *Store) FindByID(ctx context.Context, id uuid.UUID) (*User, error) {
 	const q = `
-		SELECT id, email, name, password_hash, auth_provider, is_active, last_login_at
+		SELECT id, email, name, password_hash, auth_provider, is_active,
+		       last_login_at, created_at, updated_at
 		FROM users
 		WHERE id = $1
 	`
@@ -50,6 +54,8 @@ func (s *Store) FindByID(ctx context.Context, id uuid.UUID) (*User, error) {
 		&u.AuthProvider,
 		&u.IsActive,
 		&u.LastLoginAt,
+		&u.CreatedAt,
+		&u.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound

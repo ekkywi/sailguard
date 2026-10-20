@@ -25,6 +25,15 @@ func NewRouter(cfg config.Config, pool *pgxpool.Pool, rdb *redis.Client) http.Ha
 	mux.HandleFunc("GET /v1/auth/me", api.requireAuth(api.handleMe))
 	mux.HandleFunc("POST /v1/auth/login", api.handleLogin)
 
+	mux.HandleFunc("GET /v1/roles", api.requirePermission("user.read", api.handleListRoles))
+	mux.HandleFunc("GET /v1/permissions", api.requirePermission("user.read", api.handleListPermissions))
+
+	mux.HandleFunc("GET /v1/users", api.requirePermission("user.read", api.handleListUsers))
+	mux.HandleFunc("GET /v1/users/{id}", api.requirePermission("user.read", api.handleGetUser))
+	mux.HandleFunc("POST /v1/users", api.requirePermission("user.write", api.handleCreateUser))
+	mux.HandleFunc("PATCH /v1/users/{id}", api.requirePermission("user.write", api.handlePatchUser))
+	mux.HandleFunc("POST /v1/users/{id}/reset-password", api.requirePermission("user.write", api.handleResetUserPassword))
+
 	mux.HandleFunc("GET /v1/groups", api.requirePermission("device.read", api.handleListGroups))
 	mux.HandleFunc("POST /v1/groups", api.requirePermission("device.write", api.handleCreateGroup))
 	mux.HandleFunc("GET /v1/groups/{id}", api.requirePermission("device.read", api.handleGetGroup))

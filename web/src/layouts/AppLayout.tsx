@@ -47,7 +47,10 @@ export default function AppLayout() {
   }
 
   return (
-    <AppShell userLabel={me?.email ?? null}>
+    <AppShell
+      userLabel={me?.email ?? null}
+      permissions={me?.permissions ?? []}
+    >
       <Outlet context={ctx} />
     </AppShell>
   )

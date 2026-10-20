@@ -8,5 +8,5 @@
 - events/ — **done** (violation list)
 - categories/ — **done**
 - dashboard/ — **done** (`GET /v1/dashboard/summary` + violations-timeseries chart on Home)
+- users/ — **done** (list/create/edit roles/disable/reset password; nav gated by `user.read`)
 - alerts/ — planned
-- users/ — planned

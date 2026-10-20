@@ -9,6 +9,7 @@ const SIDEBAR_KEY = 'sg_sidebar_collapsed'
 type AppShellProps = {
   children: React.ReactNode
   userLabel?: string | null
+  permissions?: string[]
 }
 
 function navClass({ isActive }: { isActive: boolean }) {
@@ -165,6 +166,27 @@ function IconEvents() {
   )
 }
 
+function IconUsers() {
+  return (
+    <svg className="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="9" cy="8" r="3" stroke="currentColor" strokeWidth="1.75" />
+      <path
+        d="M3.5 18.5c.8-2.6 2.8-4 5.5-4s4.7 1.4 5.5 4"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+      <circle cx="17" cy="9" r="2.25" stroke="currentColor" strokeWidth="1.75" />
+      <path
+        d="M15.2 18.5c.4-1.6 1.5-2.7 3.3-2.7 1.1 0 2 .4 2.6 1.1"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
 function IconPanelLeft() {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -182,7 +204,12 @@ function IconPanelLeft() {
   )
 }
 
-export function AppShell({ children, userLabel }: AppShellProps) {
+export function AppShell({
+  children,
+  userLabel,
+  permissions = [],
+}: AppShellProps) {
+  const canReadUsers = permissions.includes('user.read')
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return localStorage.getItem(SIDEBAR_KEY) === '1'
@@ -263,6 +290,15 @@ export function AppShell({ children, userLabel }: AppShellProps) {
               <IconEvents />
               <span className="nav-label">Events</span>
             </NavLink>
+            {canReadUsers ? (
+              <>
+                <p className="sidebar-section">Administration</p>
+                <NavLink to="/users" className={navClass} title="Users">
+                  <IconUsers />
+                  <span className="nav-label">Users</span>
+                </NavLink>
+              </>
+            ) : null}
           </nav>
         </div>
       </aside>
