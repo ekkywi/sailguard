@@ -166,6 +166,25 @@ function IconEvents() {
   )
 }
 
+function IconAudit() {
+  return (
+    <svg className="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M8 4.5h8.5A1.5 1.5 0 0 1 18 6v13.2l-3.2-2.1H8A1.5 1.5 0 0 1 6.5 16V6A1.5 1.5 0 0 1 8 4.5Z"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9.5 9h5M9.5 12.5h3.5"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
 function IconUsers() {
   return (
     <svg className="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -218,10 +237,11 @@ export function AppShell({
   const canPolicyRead = hasPerm(permissions, 'policy.read')
   const canEventRead = hasPerm(permissions, 'event.read')
   const canUserRead = hasPerm(permissions, 'user.read')
+  const canAuditRead = hasPerm(permissions, 'audit.read')
   const showInventory = canDeviceRead || canDeviceWrite
   const showControl = canPolicyRead
   const showTelemetry = canEventRead
-  const showAdmin = canUserRead
+  const showAdmin = canUserRead || canAuditRead
 
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -330,10 +350,18 @@ export function AppShell({
             {showAdmin ? (
               <>
                 <p className="sidebar-section">Administration</p>
-                <NavLink to="/users" className={navClass} title="Users">
-                  <IconUsers />
-                  <span className="nav-label">Users</span>
-                </NavLink>
+                {canUserRead ? (
+                  <NavLink to="/users" className={navClass} title="Users">
+                    <IconUsers />
+                    <span className="nav-label">Users</span>
+                  </NavLink>
+                ) : null}
+                {canAuditRead ? (
+                  <NavLink to="/audit" className={navClass} title="Audit log">
+                    <IconAudit />
+                    <span className="nav-label">Audit</span>
+                  </NavLink>
+                ) : null}
               </>
             ) : null}
           </nav>

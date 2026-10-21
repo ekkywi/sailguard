@@ -252,6 +252,15 @@ func (a *API) handlePublishPolicy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	a.recordAudit(r, "policy.publish", "policy", p.ID.String(),
+		"published policy "+p.Name,
+		map[string]any{
+			"name": p.Name,
+			"version": p.Version,
+			"mode": p.Mode,
+		},
+	)
+
 	writeJSON(w, http.StatusOK, envelope{
 		OK:   true,
 		Data: policyJSON(*p),

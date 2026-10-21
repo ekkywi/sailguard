@@ -13,6 +13,7 @@ import CategoryDetailPage from './features/categories/CategoryDetailPage'
 import EventsPage from './features/events/EventsPage'
 import AgentDownloadPage from './features/agent-packages/AgentDownloadPage'
 import UsersPage from './features/users/UsersPage'
+import AuditLogsPage from './features/audit/AuditLogsPage'
 import AppLayout from './layouts/AppLayout'
 import HomePage from './pages/HomePage'
 
@@ -40,6 +41,7 @@ export default function App() {
         <Route path="/categories/:code" element={<CategoryDetailPage />} />
         <Route path="/events" element={<EventsPage />} />
         <Route path="/users" element={<UsersPage />} />
+        <Route path="/audit" element={<AuditLogsPage />} />
       </Route>
     </Routes>
   )

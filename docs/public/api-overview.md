@@ -42,7 +42,8 @@ Administrative APIs are further protected by role-based permissions as routes co
 ### Policy
 
 - **Available now:** list/create/get/**DELETE** policies; **PATCH** mode (`audit`/`enforce`); list/add/**PATCH**/delete rules (including `rule_type=category`); categories CRUD (`GET/POST /v1/categories`, `GET/PATCH/DELETE /v1/categories/{code}`) and signatures (`GET/POST …/signatures`, `DELETE …/signatures/{id}`); list/add/remove assignments; publish (bumps version); effective-policy preview `GET /v1/devices/{id}/policy`; **device overrides** (`GET/POST /v1/devices/{id}/overrides`, `DELETE …/overrides/{overrideId}`; `allow` requires future `expires_at`; list defaults to active only, `?include_expired=true` for history). Admin web: `/policies`, `/policies/:id`, `/categories`, `/categories/:code`, device detail tab `?tab=overrides`.
-- **Planned:** admin audit log for publish/override actions
+- **Available now (admin audit):** `GET /v1/audit-logs` (`audit.read`) lists recent administrative actions; Batch 1 records `policy.publish`, `override.create`, and `override.delete` into `admin_audit_logs`. Web console `/audit`.
+- **Planned:** broader audit coverage (users, devices, tokens, categories)
 
 ### Agent channel
 
@@ -52,7 +53,7 @@ Administrative APIs are further protected by role-based permissions as routes co
 ### Telemetry & operations
 
 - **Available now:** health/ready; agents submit `violation_detected` / `violation_blocked` (persisted, including optional process user); admin `GET /v1/events`; web console **Events** page (`/events`, User column); fleet **dashboard summary** `GET /v1/dashboard/summary` (`event.read` — device online/stale within online window, violations in last 24h, recent violation rows, top processes/hosts 24h, stale device list; Home overview); **violations timeseries** `GET /v1/dashboard/violations-timeseries?range=24h|7d` (filled hourly/daily buckets; Home chart)
-- **Planned:** event detail filters, alerts, administrative audit logs, alert-channel configuration, async stream pipeline
+- **Planned:** event detail filters, alerts, alert-channel configuration, async stream pipeline
 
 ## Health
 

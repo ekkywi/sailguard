@@ -25,7 +25,7 @@ SailGuard combines a privileged endpoint agent with a centralized policy control
 ### Authorization and change control
 
 - Policy publish and emergency overrides are privileged operations  
-- Sensitive configuration changes should be captured in an **administrative audit trail**  
+- Sensitive configuration changes are captured in an **administrative audit trail** (`GET /v1/audit-logs` / console **Audit**; initially policy publish and device overrides)  
 - Enforcement rollout is designed to support **audit-first**, then staged enforce by group or device set  
 
 ### Endpoint safeguards

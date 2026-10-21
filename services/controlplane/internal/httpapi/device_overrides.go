@@ -174,6 +174,19 @@ func (a *API) handleCreateDeviceOverride(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	a.recordAudit(r, "override.create", "device_override", o.ID.String(),
+		"Created "+o.Action+" override on device",
+		map[string]any{
+			"device_id": o.DeviceID.String(),
+			"action": o.Action,
+			"rule_type": o.RuleType,
+			"oeprator": o.Operator,
+			"value": o.Value,
+			"reason": o.Reason,
+			"expires_at": o.ExpiresAt,
+		},
+	)
+
 	writeJSON(w, http.StatusCreated, envelope{
 		OK:   true,
 		Data: deviceOverrideJSON(*o),
@@ -237,6 +250,12 @@ func (a *API) handleDeleteDeviceOverride(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	a.recordAudit(r, "override.delete", "device_override", overrideID.String(),
+		"Deleted device override",
+		map[string]any{
+			"device_id": deviceID.String(),
+		})
+	
 	writeJSON(w, http.StatusOK, envelope{
 		OK:   true,
 		Data: map[string]any{"deleted": true},
