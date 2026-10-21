@@ -14,5 +14,33 @@ export type Device = {
 }
 
 export type DeviceListData = {
-    items: Device[]
+  items: Device[]
+}
+
+export type DeviceOverride = {
+  id: string
+  device_id: string
+  action: string
+  rule_type: string
+  operator: string
+  value: string
+  reason: string
+  expires_at: string | null
+  expired: boolean
+  created_at: string
+  updated_at: string
+}
+
+export type DeviceOverrideListData = {
+  items: DeviceOverride[]
+  include_expired: boolean
+}
+
+export type CreateDeviceOverrideInput = {
+  action: string
+  rule_type: string
+  operator: string
+  value: string
+  reason: string
+  expires_at?: string
 }

@@ -1,5 +1,11 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
+import {
+  Link,
+  useNavigate,
+  useOutletContext,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { PermissionDenied } from '../../components/PermissionDenied'
 import { toast } from '../../components/toast'
@@ -11,14 +17,27 @@ import {
 } from '../../lib/format'
 import { hasPermission } from '../../lib/permissions'
 import { deleteDevice, getDevice, patchDevice } from './api'
+import DeviceOverridesPanel from './DeviceOverridesPanel'
 import type { Device } from './types'
+
+type DeviceTab = 'overview' | 'overrides'
+
+function parseTab(raw: string | null, canPolicyRead: boolean): DeviceTab {
+  if (raw === 'overrides' && canPolicyRead) return 'overrides'
+  return 'overview'
+}
 
 export default function DeviceDetailPage() {
   const { me } = useOutletContext<AppOutletContext>()
   const canRead = hasPermission(me, 'device.read')
   const canWrite = hasPermission(me, 'device.write')
+  const canPolicyRead = hasPermission(me, 'policy.read')
+  const canPolicyWrite = hasPermission(me, 'policy.write')
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tab = parseTab(searchParams.get('tab'), canPolicyRead)
+
   const [device, setDevice] = useState<Device | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -56,8 +75,22 @@ export default function DeviceDetailPage() {
     load()
   }, [load])
 
+  useEffect(() => {
+    if (searchParams.get('tab') === 'overrides' && !canPolicyRead) {
+      setSearchParams({}, { replace: true })
+    }
+  }, [canPolicyRead, searchParams, setSearchParams])
+
   if (!canRead) {
     return <PermissionDenied permission="device.read" title="Device" />
+  }
+
+  function setTab(next: DeviceTab) {
+    if (next === 'overview') {
+      setSearchParams({}, { replace: true })
+      return
+    }
+    setSearchParams({ tab: next }, { replace: true })
   }
 
   async function onSaveDisplayName(e: FormEvent) {
@@ -119,6 +152,11 @@ export default function DeviceDetailPage() {
     }
   }
 
+  const lede =
+    tab === 'overrides'
+      ? 'Emergency and time-bounded policy exceptions for this endpoint.'
+      : 'Enrollment and agent metadata for this endpoint.'
+
   return (
     <div className="stack">
       <header className="page-header">
@@ -131,9 +169,7 @@ export default function DeviceDetailPage() {
             Detail
           </p>
           <h1 className="title">{device?.hostname ?? 'Device'}</h1>
-          <p className="lede">
-            Enrollment and agent metadata for this endpoint.
-          </p>
+          <p className="lede">{lede}</p>
         </div>
         {device && canWrite ? (
           <div className="page-header-actions">
@@ -170,87 +206,133 @@ export default function DeviceDetailPage() {
 
       {device ? (
         <>
-          <div className="info-list" aria-label="Device details">
-            <DetailRow label="Status">
-              <span className={statusBadgeClass(device.status)}>
-                {device.status}
-              </span>
-            </DetailRow>
-            <DetailRow label="Hostname">{device.hostname}</DetailRow>
-            <DetailRow label="OS">
-              {device.os}
-              {device.os_version ? ` ${device.os_version}` : ''}
-            </DetailRow>
-            <DetailRow label="Agent">{device.agent_version || '—'}</DetailRow>
-            <DetailRow label="Machine GUID">
-              <span className="mono">{device.machine_guid ?? '—'}</span>
-            </DetailRow>
-            <DetailRow label="Last seen">
-              <span title={device.last_seen_at ?? undefined}>
-                {formatRelativeTime(device.last_seen_at)}
-                {device.last_seen_at ? (
-                  <span className="muted">
-                    {' '}
-                    · {formatDateTime(device.last_seen_at)}
-                  </span>
-                ) : null}
-              </span>
-            </DetailRow>
-            <DetailRow label="Enrolled">
-              <span title={device.enrolled_at ?? undefined}>
-                {formatRelativeTime(device.enrolled_at)}
-                {device.enrolled_at ? (
-                  <span className="muted">
-                    {' '}
-                    · {formatDateTime(device.enrolled_at)}
-                  </span>
-                ) : null}
-              </span>
-            </DetailRow>
-            <DetailRow label="ID">
-              <span className="mono">{device.id}</span>
-            </DetailRow>
-          </div>
+          <nav className="detail-tabs" aria-label="Device sections">
+            <button
+              type="button"
+              className={
+                tab === 'overview'
+                  ? 'detail-tab detail-tab-active'
+                  : 'detail-tab'
+              }
+              aria-current={tab === 'overview' ? 'page' : undefined}
+              onClick={() => setTab('overview')}
+            >
+              Overview
+            </button>
+            {canPolicyRead ? (
+              <button
+                type="button"
+                className={
+                  tab === 'overrides'
+                    ? 'detail-tab detail-tab-active'
+                    : 'detail-tab'
+                }
+                aria-current={tab === 'overrides' ? 'page' : undefined}
+                onClick={() => setTab('overrides')}
+              >
+                Overrides
+              </button>
+            ) : null}
+          </nav>
 
-          {canWrite ? (
-            <section className="panel" aria-labelledby="device-rename-heading">
-              <h2 id="device-rename-heading" className="panel-title">
-                Display name
-              </h2>
-              <form className="token-create-grid" onSubmit={onSaveDisplayName}>
-                <div className="field" style={{ gridColumn: '1 / -1' }}>
-                  <label className="label" htmlFor="device-display-name">
-                    Label shown in the console
-                  </label>
-                  <input
-                    id="device-display-name"
-                    className="input"
-                    value={displayNameDraft}
-                    onChange={(e) => setDisplayNameDraft(e.target.value)}
-                    placeholder={device.hostname}
-                  />
-                </div>
-                <div className="token-create-submit">
-                  <button
-                    type="submit"
-                    className="btn btn-primary"
-                    disabled={
-                      savingName ||
-                      displayNameDraft.trim() === (device.display_name || '')
-                    }
+          {tab === 'overview' ? (
+            <div className="stack device-module">
+              <div className="info-list" aria-label="Device details">
+                <DetailRow label="Status">
+                  <span className={statusBadgeClass(device.status)}>
+                    {device.status}
+                  </span>
+                </DetailRow>
+                <DetailRow label="Hostname">{device.hostname}</DetailRow>
+                <DetailRow label="OS">
+                  {device.os}
+                  {device.os_version ? ` ${device.os_version}` : ''}
+                </DetailRow>
+                <DetailRow label="Agent">
+                  {device.agent_version || '—'}
+                </DetailRow>
+                <DetailRow label="Machine GUID">
+                  <span className="mono">{device.machine_guid ?? '—'}</span>
+                </DetailRow>
+                <DetailRow label="Last seen">
+                  <span title={device.last_seen_at ?? undefined}>
+                    {formatRelativeTime(device.last_seen_at)}
+                    {device.last_seen_at ? (
+                      <span className="muted">
+                        {' '}
+                        · {formatDateTime(device.last_seen_at)}
+                      </span>
+                    ) : null}
+                  </span>
+                </DetailRow>
+                <DetailRow label="Enrolled">
+                  <span title={device.enrolled_at ?? undefined}>
+                    {formatRelativeTime(device.enrolled_at)}
+                    {device.enrolled_at ? (
+                      <span className="muted">
+                        {' '}
+                        · {formatDateTime(device.enrolled_at)}
+                      </span>
+                    ) : null}
+                  </span>
+                </DetailRow>
+                <DetailRow label="Display name">
+                  {device.display_name || '—'}
+                </DetailRow>
+                <DetailRow label="ID">
+                  <span className="mono">{device.id}</span>
+                </DetailRow>
+              </div>
+
+              {canWrite ? (
+                <section
+                  className="panel"
+                  aria-labelledby="device-rename-heading"
+                >
+                  <h2 id="device-rename-heading" className="panel-title">
+                    Display name
+                  </h2>
+                  <form
+                    className="token-create-grid"
+                    onSubmit={onSaveDisplayName}
                   >
-                    {savingName ? 'Saving…' : 'Save'}
-                  </button>
-                </div>
-              </form>
-            </section>
-          ) : (
-            <div className="info-list" aria-label="Display name">
-              <DetailRow label="Display name">
-                {device.display_name || '—'}
-              </DetailRow>
+                    <div className="field" style={{ gridColumn: '1 / -1' }}>
+                      <label className="label" htmlFor="device-display-name">
+                        Label shown in the console
+                      </label>
+                      <input
+                        id="device-display-name"
+                        className="input"
+                        value={displayNameDraft}
+                        onChange={(e) => setDisplayNameDraft(e.target.value)}
+                        placeholder={device.hostname}
+                      />
+                    </div>
+                    <div className="token-create-submit">
+                      <button
+                        type="submit"
+                        className="btn btn-primary"
+                        disabled={
+                          savingName ||
+                          displayNameDraft.trim() ===
+                            (device.display_name || '')
+                        }
+                      >
+                        {savingName ? 'Saving…' : 'Save'}
+                      </button>
+                    </div>
+                  </form>
+                </section>
+              ) : null}
             </div>
-          )}
+          ) : null}
+
+          {tab === 'overrides' && id && canPolicyRead ? (
+            <DeviceOverridesPanel
+              deviceId={id}
+              canWrite={canPolicyWrite}
+            />
+          ) : null}
         </>
       ) : null}
 

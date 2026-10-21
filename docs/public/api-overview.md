@@ -41,8 +41,8 @@ Administrative APIs are further protected by role-based permissions as routes co
 
 ### Policy
 
-- **Available now:** list/create/get/**DELETE** policies; **PATCH** mode (`audit`/`enforce`); list/add/**PATCH**/delete rules (including `rule_type=category`); categories CRUD (`GET/POST /v1/categories`, `GET/PATCH/DELETE /v1/categories/{code}`) and signatures (`GET/POST …/signatures`, `DELETE …/signatures/{id}`); list/add/remove assignments; publish (bumps version); effective-policy preview `GET /v1/devices/{id}/policy`. Admin web: `/policies`, `/policies/:id`, `/categories`, `/categories/:code`. Schema includes categories, category signatures, and overrides.
-- **Planned:** device override APIs
+- **Available now:** list/create/get/**DELETE** policies; **PATCH** mode (`audit`/`enforce`); list/add/**PATCH**/delete rules (including `rule_type=category`); categories CRUD (`GET/POST /v1/categories`, `GET/PATCH/DELETE /v1/categories/{code}`) and signatures (`GET/POST …/signatures`, `DELETE …/signatures/{id}`); list/add/remove assignments; publish (bumps version); effective-policy preview `GET /v1/devices/{id}/policy`; **device overrides** (`GET/POST /v1/devices/{id}/overrides`, `DELETE …/overrides/{overrideId}`; `allow` requires future `expires_at`; list defaults to active only, `?include_expired=true` for history). Admin web: `/policies`, `/policies/:id`, `/categories`, `/categories/:code`, device detail tab `?tab=overrides`.
+- **Planned:** admin audit log for publish/override actions
 
 ### Agent channel
 

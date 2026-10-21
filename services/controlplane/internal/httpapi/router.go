@@ -49,6 +49,9 @@ func NewRouter(cfg config.Config, pool *pgxpool.Pool, rdb *redis.Client) http.Ha
 	mux.HandleFunc("PATCH /v1/devices/{id}", api.requirePermission("device.write", api.handlePatchDevice))
 	mux.HandleFunc("DELETE /v1/devices/{id}", api.requirePermission("device.write", api.handleDeleteDevice))
 	mux.HandleFunc("GET /v1/devices/{id}/policy", api.requirePermission("policy.read", api.handleGetDevicePolicy))
+	mux.HandleFunc("GET /v1/devices/{id}/overrides", api.requirePermission("policy.read", api.handleListDeviceOverrides))
+	mux.HandleFunc("POST /v1/devices/{id}/overrides", api.requirePermission("policy.write", api.handleCreateDeviceOverride))
+	mux.HandleFunc("DELETE /v1/devices/{id}/overrides/{overrideId}", api.requirePermission("policy.write", api.handleDeleteDeviceOverride))
 
 	mux.HandleFunc("GET /v1/enrollment-tokens", api.requirePermission("device.write", api.handleListEnrollmentTokens))
 	mux.HandleFunc("POST /v1/enrollment-tokens", api.requirePermission("device.write", api.handleCreateEnrollmentToken))

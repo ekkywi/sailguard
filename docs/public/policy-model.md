@@ -52,6 +52,8 @@ For each observed process (Linux `/proc` list; Windows Toolhelp list, WMI creati
 
 Administrators can switch a policy between `audit` and `enforce` (PATCH + publish) and add, edit, or delete rules from the policy detail console. Rules may match technical fields (process name, path, hash, publisher, product) or a curated **category** (expanded server-side from category signatures before agents sync). The Categories console manages category metadata and the signature catalog used for that expansion.
 
+Device overrides are managed on the device detail page. They apply only to that endpoint, win over assigned policies, and drop out of the effective policy automatically when `expires_at` passes (rows are retained for history; the console lists active overrides by default). Allow overrides require a future expiry and a reason.
+
 ## Privacy posture
 
 SailGuard focuses on application identity attributes required for policy (name, path, hash, publisher, product, account context as configured). Collection of full command lines or screen contents is not part of the default product posture.
