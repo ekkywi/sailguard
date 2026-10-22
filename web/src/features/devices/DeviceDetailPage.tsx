@@ -16,6 +16,7 @@ import {
   statusBadgeClass,
 } from '../../lib/format'
 import { hasPermission } from '../../lib/permissions'
+import { useDocumentTitle } from '../../lib/useDocumentTitle'
 import { deleteDevice, getDevice, patchDevice } from './api'
 import DeviceOverridesPanel from './DeviceOverridesPanel'
 import type { Device } from './types'
@@ -39,6 +40,7 @@ export default function DeviceDetailPage() {
   const tab = parseTab(searchParams.get('tab'), canPolicyRead)
 
   const [device, setDevice] = useState<Device | null>(null)
+  useDocumentTitle(device?.hostname ?? 'Device')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [displayNameDraft, setDisplayNameDraft] = useState('')

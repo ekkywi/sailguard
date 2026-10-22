@@ -4,6 +4,7 @@ import { PermissionDenied } from '../../components/PermissionDenied'
 import { toast } from '../../components/toast'
 import type { AppOutletContext } from '../../layouts/AppLayout'
 import { hasPermission } from '../../lib/permissions'
+import { useDocumentTitle } from '../../lib/useDocumentTitle'
 import {
   downloadWindowsAgentPackage,
   getWindowsAgentPackageMeta,
@@ -48,6 +49,7 @@ function PlatformGlyph({ family }: { family: string }) {
 }
 
 export default function AgentDownloadPage() {
+  useDocumentTitle('Download agent')
   const { me } = useOutletContext<AppOutletContext>()
   const canWrite = hasPermission(me, 'device.write')
   const [meta, setMeta] = useState<AgentPackageMeta | null>(null)
@@ -179,7 +181,7 @@ export default function AgentDownloadPage() {
         'Download started',
         packageKind === 'update'
           ? 'Keep ProgramData device.json when installing the update.'
-          : 'Check your browser downloads folder.',
+          : 'ZIP saved to the browser download folder.',
       )
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'download failed'
@@ -203,8 +205,8 @@ export default function AgentDownloadPage() {
           <p className="section-label">Inventory</p>
           <h1 className="title">Download agent</h1>
           <p className="lede">
-            Package a Windows agent for first enrollment or a credential-safe
-            exe update.
+            Windows agent ZIP: install (with enrollment token) or update (no
+            token).
           </p>
         </div>
         <button

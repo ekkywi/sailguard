@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { SailGuardLogo } from '../../components/SailGuardLogo'
 import { ThemeToggle } from '../../components/ThemeToggle'
 import { getToken, setToken } from '../../lib/auth-storage'
+import { useDocumentTitle } from '../../lib/useDocumentTitle'
 import { login } from './api'
 
 function IconEye() {
@@ -46,6 +47,7 @@ function IconEyeOff() {
 }
 
 export default function LoginPage() {
+  useDocumentTitle('Sign in')
   const navigate = useNavigate()
   const emailId = useId()
   const passwordId = useId()
@@ -55,6 +57,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [emailError, setEmailError] = useState<string | null>(null)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   if (getToken()) {
@@ -64,13 +68,28 @@ export default function LoginPage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
+    setEmailError(null)
+    setPasswordError(null)
+
+    const trimmedEmail = email.trim()
+    if (!trimmedEmail) {
+      setEmailError('Email is required')
+      return
+    }
+    if (!password) {
+      setPasswordError('Password is required')
+      return
+    }
+
     setLoading(true)
     try {
-      const data = await login(email, password)
+      const data = await login(trimmedEmail, password)
       setToken(data.access_token)
       navigate('/', { replace: true })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'login failed')
+      const msg = err instanceof Error ? err.message : 'Sign-in failed'
+      setError(msg)
+      setPasswordError(msg)
     } finally {
       setLoading(false)
     }
@@ -83,11 +102,14 @@ export default function LoginPage() {
       </div>
 
       <div className="login-panel">
-        <div className="login-brand-row">
-          <SailGuardLogo className="sg-logo sg-logo-lg" />
-          <h1 className="login-brand">SailGuard</h1>
+        <div className="login-brand-block">
+          <div className="login-brand-row">
+            <SailGuardLogo className="sg-logo sg-logo-xl" />
+            <h1 className="login-brand">SailGuard</h1>
+          </div>
+          <hr className="login-brand-rule" />
+          <p className="lede lede-tight">Sign in</p>
         </div>
-        <p className="lede lede-tight">Sign in to the control plane</p>
 
         <form className="form" onSubmit={onSubmit} noValidate>
           <div className="field">
@@ -96,17 +118,26 @@ export default function LoginPage() {
             </label>
             <input
               id={emailId}
-              className="input"
+              className={emailError ? 'input input-invalid' : 'input'}
               type="email"
               name="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value)
+                setEmailError(null)
+                setError(null)
+              }}
               required
               autoComplete="username"
               placeholder="admin@example.com"
-              aria-invalid={error ? true : undefined}
-              aria-describedby={error ? errorId : undefined}
+              aria-invalid={emailError || error ? true : undefined}
+              aria-describedby={emailError ? `${emailId}-err` : undefined}
             />
+            {emailError ? (
+              <p id={`${emailId}-err`} className="field-error" role="alert">
+                {emailError}
+              </p>
+            ) : null}
           </div>
 
           <div className="field">
@@ -116,15 +147,19 @@ export default function LoginPage() {
             <div className="input-with-action">
               <input
                 id={passwordId}
-                className="input"
+                className={passwordError ? 'input input-invalid' : 'input'}
                 type={showPassword ? 'text' : 'password'}
                 name="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value)
+                  setPasswordError(null)
+                  setError(null)
+                }}
                 required
                 autoComplete="current-password"
-                aria-invalid={error ? true : undefined}
-                aria-describedby={error ? errorId : undefined}
+                aria-invalid={passwordError ? true : undefined}
+                aria-describedby={passwordError ? errorId : undefined}
               />
               <button
                 type="button"
@@ -136,13 +171,12 @@ export default function LoginPage() {
                 {showPassword ? <IconEyeOff /> : <IconEye />}
               </button>
             </div>
+            {passwordError ? (
+              <p id={errorId} className="field-error" role="alert">
+                {passwordError}
+              </p>
+            ) : null}
           </div>
-
-          {error ? (
-            <p id={errorId} className="error" role="alert">
-              {error}
-            </p>
-          ) : null}
 
           <button
             type="submit"
@@ -155,7 +189,7 @@ export default function LoginPage() {
         </form>
       </div>
 
-      <p className="login-footer">Endpoint application control · on-premises</p>
+      <p className="login-footer">On-premises endpoint application control</p>
     </div>
   )
 }

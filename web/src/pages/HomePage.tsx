@@ -14,6 +14,7 @@ import type {
 import type { AppOutletContext } from '../layouts/AppLayout'
 import { formatDateTime, formatRelativeTime } from '../lib/format'
 import { hasPermission } from '../lib/permissions'
+import { useDocumentTitle } from '../lib/useDocumentTitle'
 
 function eventTypeLabel(t: string): string {
   if (t === 'violation_detected') return 'Detected'
@@ -22,6 +23,7 @@ function eventTypeLabel(t: string): string {
 }
 
 export default function HomePage() {
+  useDocumentTitle('Overview')
   const { me, meLoading, meError } = useOutletContext<AppOutletContext>()
   const canRead = hasPermission(me, 'event.read')
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
@@ -108,11 +110,11 @@ export default function HomePage() {
           <p className="section-label">Overview</p>
           <h1 className="title">Control plane</h1>
           <p className="lede">
-            Fleet health and recent policy violations.
+            Device counts and recent violations
             {summary ? (
               <span className="page-meta">
                 {' '}
-                · online window {summary.online_window_sec}s
+                · online ≤{summary.online_window_sec}s
               </span>
             ) : null}
           </p>

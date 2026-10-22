@@ -1,16 +1,19 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { PermissionDenied } from '../../components/PermissionDenied'
+import { TableSkeleton } from '../../components/TableSkeleton'
 import { toast } from '../../components/toast'
 import type { AppOutletContext } from '../../layouts/AppLayout'
 import { formatRelativeTime } from '../../lib/format'
 import { hasPermission } from '../../lib/permissions'
+import { useDocumentTitle } from '../../lib/useDocumentTitle'
 import { createPolicy, listPolicies } from './api'
 import type { CreatePolicyInput, Policy } from './types'
 
 const PAGE_SIZE = 10
 
 export default function PoliciesPage() {
+  useDocumentTitle('Policies')
   const { me } = useOutletContext<AppOutletContext>()
   const canRead = hasPermission(me, 'policy.read')
   const canWrite = hasPermission(me, 'policy.write')
@@ -23,6 +26,7 @@ export default function PoliciesPage() {
   const [description, setDescription] = useState('')
   const [mode, setMode] = useState('audit')
   const [creating, setCreating] = useState(false)
+  const [nameError, setNameError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
 
   const load = useCallback(() => {
@@ -65,12 +69,13 @@ export default function PoliciesPage() {
     e.preventDefault()
     const trimmed = name.trim()
     if (!trimmed) {
-      setError('name is required')
+      setNameError('Name is required')
       return
     }
 
     setCreating(true)
     setError(null)
+    setNameError(null)
 
     const body: CreatePolicyInput = {
       name: trimmed,
@@ -108,7 +113,7 @@ export default function PoliciesPage() {
           <p className="section-label">Policy</p>
           <h1 className="title">Policies</h1>
           <p className="lede">
-            Application control policies (audit first, then enforce).
+            Application control policies
             {policies ? (
               <span className="page-meta">
                 {' '}
@@ -140,12 +145,21 @@ export default function PoliciesPage() {
             </label>
             <input
               id="policy-name"
-              className="input"
+              className={nameError ? 'input input-invalid' : 'input'}
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value)
+                setNameError(null)
+              }}
               placeholder="Lab block notepad"
               required
+              aria-invalid={nameError ? true : undefined}
             />
+            {nameError ? (
+              <p className="field-error" role="alert">
+                {nameError}
+              </p>
+            ) : null}
           </div>
           <div className="field">
             <label className="label" htmlFor="policy-mode">
@@ -205,14 +219,16 @@ export default function PoliciesPage() {
         </div>
 
         {loading && !policies ? (
-          <p className="loading">Loading policies…</p>
+          <TableSkeleton label="Loading policies…" />
         ) : null}
 
         {!loading && policies && policies.length === 0 ? (
           <div className="empty-state" role="status">
             <p className="empty-title">No policies yet</p>
             <p className="muted">
-              Create an audit policy above, then open it to add rules.
+              {canWrite
+                ? 'Create an audit policy above, then open it to add rules.'
+                : 'Ask an admin with policy.write to create a policy.'}
             </p>
           </div>
         ) : null}
@@ -248,7 +264,15 @@ export default function PoliciesPage() {
                         <div className="muted">{p.description || '—'}</div>
                       </td>
                       <td>
-                        <span className="mono">{p.mode}</span>
+                        <span
+                          className={
+                            p.mode === 'enforce'
+                              ? 'badge-mode badge-mode-enforce'
+                              : 'badge-mode'
+                          }
+                        >
+                          {p.mode}
+                        </span>
                       </td>
                       <td className="muted">{p.version}</td>
                       <td

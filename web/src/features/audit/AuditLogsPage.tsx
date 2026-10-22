@@ -3,7 +3,9 @@ import { Link, useOutletContext } from 'react-router-dom'
 import { PermissionDenied } from '../../components/PermissionDenied'
 import type { AppOutletContext } from '../../layouts/AppLayout'
 import { formatDateTime, formatRelativeTime } from '../../lib/format'
+import { TableSkeleton } from '../../components/TableSkeleton'
 import { hasPermission } from '../../lib/permissions'
+import { useDocumentTitle } from '../../lib/useDocumentTitle'
 import { exportAuditLogsCSV, listAuditLogs } from './api'
 import type { AuditFamily, AuditLog, AuditLogQuery } from './types'
 
@@ -24,20 +26,13 @@ const FAMILIES: { id: AuditFamily; label: string }[] = [
 
 function actionFamilyClass(action: string): string {
   const a = action.toLowerCase()
-  if (a.startsWith('auth.')) return 'audit-action audit-action--auth'
-  if (a.includes('.fail') || a.endsWith('.delete') || a.includes('.revoke')) {
+  if (
+    a.includes('.fail') ||
+    a.endsWith('.delete') ||
+    a.includes('.revoke') ||
+    a.includes('.remove')
+  ) {
     return 'audit-action audit-action--warn'
-  }
-  if (a.startsWith('policy.')) return 'audit-action audit-action--policy'
-  if (a.startsWith('category.')) return 'audit-action audit-action--category'
-  if (a.startsWith('user.')) return 'audit-action audit-action--user'
-  if (a.startsWith('device.') || a.startsWith('override.')) {
-    return 'audit-action audit-action--device'
-  }
-  if (a.startsWith('group.')) return 'audit-action audit-action--group'
-  if (a.startsWith('agent_package.')) return 'audit-action audit-action--package'
-  if (a.startsWith('enrollment_token.')) {
-    return 'audit-action audit-action--enrollment'
   }
   return 'audit-action'
 }
@@ -98,6 +93,7 @@ function shortId(id: string): string {
 }
 
 export default function AuditLogsPage() {
+  useDocumentTitle('Audit log')
   const { me } = useOutletContext<AppOutletContext>()
   const canRead = hasPermission(me, 'audit.read')
 
@@ -225,13 +221,11 @@ export default function AuditLogsPage() {
           <p className="section-label">Security</p>
           <h1 className="title">Audit log</h1>
           <p className="lede">
-            Administrative actions across the control plane.
-            {typeof total === 'number' ? (
-              <span className="page-meta">
-                {' '}
-                · {total.toLocaleString()} matching
-              </span>
-            ) : null}
+            Administrative actions
+            <span className="page-meta">
+              {' '}
+              · {total.toLocaleString()} matching
+            </span>
           </p>
         </div>
         <div className="btn-row">
@@ -365,7 +359,9 @@ export default function AuditLogsPage() {
           ) : null}
         </div>
 
-        {loading && !logs ? <p className="loading">Loading audit log…</p> : null}
+        {loading && !logs ? (
+          <TableSkeleton label="Loading audit log…" rows={4} />
+        ) : null}
 
         {!loading && logs && logs.length === 0 ? (
           <div className="empty-state" role="status">
@@ -377,6 +373,23 @@ export default function AuditLogsPage() {
                 ? 'Try another family, date range, or clear filters.'
                 : 'Publish a policy or sign in to record the first entry.'}
             </p>
+            {hasFilters ? (
+              <div className="empty-actions">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={clearFilters}
+                >
+                  Clear filters
+                </button>
+              </div>
+            ) : (
+              <div className="empty-actions">
+                <Link className="btn btn-ghost" to="/policies">
+                  Policies
+                </Link>
+              </div>
+            )}
           </div>
         ) : null}
 
@@ -403,7 +416,11 @@ export default function AuditLogsPage() {
                     return (
                       <tr
                         key={e.id}
-                        className="audit-row"
+                        className={
+                          selected?.id === e.id
+                            ? 'audit-row audit-row-selected'
+                            : 'audit-row'
+                        }
                         tabIndex={0}
                         onClick={() => setSelected(e)}
                         onKeyDown={(ev) => {

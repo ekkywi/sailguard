@@ -9,6 +9,7 @@ import {
   statusBadgeClass,
 } from '../../lib/format'
 import { hasPermission } from '../../lib/permissions'
+import { useDocumentTitle } from '../../lib/useDocumentTitle'
 import { listDevices } from '../devices/api'
 import type { Device } from '../devices/types'
 import {
@@ -29,6 +30,7 @@ export default function GroupDetailPage() {
   const navigate = useNavigate()
 
   const [group, setGroup] = useState<DeviceGroup | null>(null)
+  useDocumentTitle(group?.name ?? 'Group')
   const [members, setMembers] = useState<Device[] | null>(null)
   const [allDevices, setAllDevices] = useState<Device[] | null>(null)
 

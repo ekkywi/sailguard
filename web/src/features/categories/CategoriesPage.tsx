@@ -1,16 +1,19 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { PermissionDenied } from '../../components/PermissionDenied'
+import { TableSkeleton } from '../../components/TableSkeleton'
 import { toast } from '../../components/toast'
 import type { AppOutletContext } from '../../layouts/AppLayout'
 import { formatRelativeTime } from '../../lib/format'
 import { hasPermission } from '../../lib/permissions'
+import { useDocumentTitle } from '../../lib/useDocumentTitle'
 import { createCategory, listCategories } from './api'
 import type { Category, CreateCategoryInput } from './types'
 
 const PAGE_SIZE = 10
 
 export default function CategoriesPage() {
+  useDocumentTitle('Categories')
   const { me } = useOutletContext<AppOutletContext>()
   const canRead = hasPermission(me, 'policy.read')
   const canWrite = hasPermission(me, 'policy.write')
@@ -111,8 +114,7 @@ export default function CategoriesPage() {
           <p className="section-label">Control</p>
           <h1 className="title">Categories</h1>
           <p className="lede">
-            Curated business labels expanded into technical signatures for
-            policy rules.
+            Category catalog for policy rules
             {categories ? (
               <span className="page-meta">
                 {' '}
@@ -210,7 +212,7 @@ export default function CategoriesPage() {
         </div>
 
         {loading && !categories ? (
-          <p className="loading">Loading categories…</p>
+          <TableSkeleton label="Loading categories…" />
         ) : null}
 
         {!loading && categories && categories.length === 0 ? (

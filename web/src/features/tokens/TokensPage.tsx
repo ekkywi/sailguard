@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { TableSkeleton } from '../../components/TableSkeleton'
 import { PermissionDenied } from '../../components/PermissionDenied'
 import { toast } from '../../components/toast'
 import type { AppOutletContext } from '../../layouts/AppLayout'
@@ -10,6 +11,7 @@ import {
   statusBadgeClass,
 } from '../../lib/format'
 import { hasPermission } from '../../lib/permissions'
+import { useDocumentTitle } from '../../lib/useDocumentTitle'
 import {
   createEnrollmentToken,
   listEnrollmentTokens,
@@ -28,6 +30,7 @@ function tokenStatus(t: EnrollmentToken): 'active' | 'expired' | 'revoked' {
 }
 
 export default function TokensPage() {
+  useDocumentTitle('Enrollment tokens')
   const { me } = useOutletContext<AppOutletContext>()
   const canWrite = hasPermission(me, 'device.write')
   const [tokens, setTokens] = useState<EnrollmentToken[] | null>(null)
@@ -170,12 +173,7 @@ export default function TokensPage() {
           <p className="section-label">Inventory</p>
           <h1 className="title">Enrollment tokens</h1>
           <p className="lede">
-            One-time or limited-use secrets for agent enrollment. After create,
-            paste the secret into{' '}
-            <Link className="crumb" to="/agent-download">
-              Download agent
-            </Link>{' '}
-            to build a Windows ZIP with config.json.
+            Enrollment tokens
             {tokens ? (
               <span className="page-meta">
                 {' '}
@@ -300,13 +298,18 @@ export default function TokensPage() {
         </div>
 
         {loading && !tokens ? (
-          <p className="loading">Loading tokens…</p>
+          <TableSkeleton label="Loading tokens…" />
         ) : null}
 
         {!loading && tokens && tokens.length === 0 ? (
           <div className="empty-state" role="status">
             <p className="empty-title">No enrollment tokens yet</p>
-            <p className="muted">Create one above to enroll agents.</p>
+            <p className="muted">Create one above, then open Download agent.</p>
+            <div className="empty-actions">
+              <Link className="btn btn-ghost" to="/agent-download">
+                Download agent
+              </Link>
+            </div>
           </div>
         ) : null}
 

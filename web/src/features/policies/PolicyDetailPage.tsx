@@ -6,6 +6,7 @@ import { toast } from '../../components/toast'
 import type { AppOutletContext } from '../../layouts/AppLayout'
 import { formatRelativeTime } from '../../lib/format'
 import { hasPermission } from '../../lib/permissions'
+import { useDocumentTitle } from '../../lib/useDocumentTitle'
 import { listDevices } from '../devices/api'
 import type { Device } from '../devices/types'
 import { listGroups } from '../groups/api'
@@ -35,6 +36,7 @@ export default function PolicyDetailPage() {
   const navigate = useNavigate()
 
   const [policy, setPolicy] = useState<Policy | null>(null)
+  useDocumentTitle(policy?.name ?? 'Policy')
   const [rules, setRules] = useState<PolicyRule[] | null>(null)
   const [assignments, setAssignments] = useState<PolicyAssignment[] | null>(
     null,
@@ -495,7 +497,17 @@ export default function PolicyDetailPage() {
           <div className="info-list" aria-label="Policy details">
             <div className="info-row">
               <span className="info-key">Mode</span>
-              <span className="info-val mono">{policy.mode}</span>
+              <span className="info-val">
+                <span
+                  className={
+                    policy.mode === 'enforce'
+                      ? 'badge-mode badge-mode-enforce'
+                      : 'badge-mode'
+                  }
+                >
+                  {policy.mode}
+                </span>
+              </span>
             </div>
             <div className="info-row">
               <span className="info-key">Priority</span>

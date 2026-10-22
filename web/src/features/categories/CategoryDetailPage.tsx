@@ -6,6 +6,7 @@ import { toast } from '../../components/toast'
 import type { AppOutletContext } from '../../layouts/AppLayout'
 import { formatRelativeTime } from '../../lib/format'
 import { hasPermission } from '../../lib/permissions'
+import { useDocumentTitle } from '../../lib/useDocumentTitle'
 import {
   addCategorySignature,
   deleteCategory,
@@ -24,6 +25,7 @@ export default function CategoryDetailPage() {
   const navigate = useNavigate()
 
   const [category, setCategory] = useState<Category | null>(null)
+  useDocumentTitle(category?.name ?? 'Category')
   const [signatures, setSignatures] = useState<CategorySignature[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -192,8 +194,8 @@ export default function CategoryDetailPage() {
           </p>
           <h1 className="title">{category?.name || 'Category'}</h1>
           <p className="lede">
-            Manage display name and technical signatures. Policy rules that
-            reference this category expand to these signatures on publish/sync.
+            Name, description, and signatures used when policy rules reference
+            this category.
           </p>
         </div>
         <div className="page-header-actions">

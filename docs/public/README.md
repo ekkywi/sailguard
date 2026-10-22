@@ -1,6 +1,6 @@
 # SailGuard public documentation
 
-Professional product documentation for on-prem endpoint application control.
+Product documentation for on-premises endpoint application control.
 
 | Document | Description |
 |----------|-------------|

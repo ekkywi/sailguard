@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
 import { PermissionDenied } from '../../components/PermissionDenied'
+import { TableSkeleton } from '../../components/TableSkeleton'
 import type { AppOutletContext } from '../../layouts/AppLayout'
 import { formatDateTime, formatRelativeTime } from '../../lib/format'
 import { hasPermission } from '../../lib/permissions'
+import { useDocumentTitle } from '../../lib/useDocumentTitle'
 import { listEvents } from './api'
 import type { DeviceEvent } from './types'
 
@@ -16,6 +18,7 @@ function eventTypeLabel(t: string): string {
 }
 
 export default function EventsPage() {
+  useDocumentTitle('Events')
   const { me } = useOutletContext<AppOutletContext>()
   const canRead = hasPermission(me, 'event.read')
   const [events, setEvents] = useState<DeviceEvent[] | null>(null)
@@ -70,7 +73,7 @@ export default function EventsPage() {
           <p className="section-label">Telemetry</p>
           <h1 className="title">Events</h1>
           <p className="lede">
-            Policy violations reported by agents (audit and enforce).
+            Agent policy violations
             {events ? (
               <span className="page-meta">
                 {' '}
@@ -107,15 +110,21 @@ export default function EventsPage() {
           ) : null}
         </div>
 
-        {loading && !events ? <p className="loading">Loading events…</p> : null}
+        {loading && !events ? (
+          <TableSkeleton label="Loading events…" />
+        ) : null}
 
         {!loading && events && events.length === 0 ? (
           <div className="empty-state" role="status">
             <p className="empty-title">No events yet</p>
             <p className="muted">
-              Publish an audit policy, then run an agent that matches a block
-              rule. Violations will appear here.
+              Publish an audit policy, then run an agent that matches a rule.
             </p>
+            <div className="empty-actions">
+              <Link className="btn btn-ghost" to="/policies">
+                Policies
+              </Link>
+            </div>
           </div>
         ) : null}
 

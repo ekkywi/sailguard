@@ -10,6 +10,7 @@ import {
 import { useOutletContext } from 'react-router-dom'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { PermissionDenied } from '../../components/PermissionDenied'
+import { TableSkeleton } from '../../components/TableSkeleton'
 import { toast } from '../../components/toast'
 import type { AppOutletContext } from '../../layouts/AppLayout'
 import {
@@ -18,6 +19,7 @@ import {
   statusBadgeClass,
 } from '../../lib/format'
 import { hasPermission } from '../../lib/permissions'
+import { useDocumentTitle } from '../../lib/useDocumentTitle'
 import {
   createUser,
   listRoles,
@@ -69,6 +71,7 @@ function RolePicker({
 }
 
 export default function UsersPage() {
+  useDocumentTitle('Users')
   const { me } = useOutletContext<AppOutletContext>()
   const canRead = hasPermission(me, 'user.read')
   const canWrite = hasPermission(me, 'user.write')
@@ -88,6 +91,12 @@ export default function UsersPage() {
   const [password, setPassword] = useState('')
   const [createRoles, setCreateRoles] = useState<string[]>(['viewer'])
   const [creating, setCreating] = useState(false)
+  const [createFieldErrors, setCreateFieldErrors] = useState<{
+    email?: string
+    name?: string
+    password?: string
+    roles?: string
+  }>({})
   const createTitleId = useId()
   const createFirstRef = useRef<HTMLInputElement>(null)
 
@@ -202,6 +211,7 @@ export default function UsersPage() {
     setName('')
     setPassword('')
     setCreateRoles(['viewer'])
+    setCreateFieldErrors({})
     setError(null)
     setCreateOpen(true)
   }
@@ -216,12 +226,16 @@ export default function UsersPage() {
     if (!canWrite) return
     const trimmedEmail = email.trim().toLowerCase()
     const trimmedName = name.trim()
-    if (!trimmedEmail || !trimmedName || password.length < 10) {
-      toast.error('email, name, and password (min 10 chars) are required')
-      return
+    const nextErrors: typeof createFieldErrors = {}
+    if (!trimmedEmail) nextErrors.email = 'Email is required'
+    if (!trimmedName) nextErrors.name = 'Name is required'
+    if (password.length < 10) {
+      nextErrors.password = 'Password must be at least 10 characters'
     }
-    if (createRoles.length === 0) {
-      toast.error('select at least one role')
+    if (createRoles.length === 0) nextErrors.roles = 'Select at least one role'
+    setCreateFieldErrors(nextErrors)
+    if (Object.keys(nextErrors).length > 0) {
+      toast.error('Fix the highlighted fields')
       return
     }
 
@@ -235,12 +249,14 @@ export default function UsersPage() {
         roles: createRoles,
       })
       setCreateOpen(false)
+      setCreateFieldErrors({})
       setPage(1)
       toast.success('User created')
       load()
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'failed to create user'
       setError(msg)
+      setCreateFieldErrors({ email: msg })
       toast.error(msg)
     } finally {
       setCreating(false)
@@ -332,9 +348,7 @@ export default function UsersPage() {
         <div className="page-header-text">
           <p className="section-label">Administration</p>
           <h1 className="title">Users</h1>
-          <p className="lede">
-            Local admin accounts and role assignments for the control plane.
-          </p>
+          <p className="lede">Local admin accounts and role assignments</p>
         </div>
         <div className="btn-row">
           <button
@@ -428,7 +442,9 @@ export default function UsersPage() {
           ) : null}
         </div>
 
-        {loading && !users ? <p className="loading">Loading users…</p> : null}
+        {loading && !users ? (
+          <TableSkeleton label="Loading users…" />
+        ) : null}
 
         {!loading && users && filtered.length === 0 ? (
           <div className="empty-state" role="status">
@@ -440,6 +456,17 @@ export default function UsersPage() {
                 ? 'Create an admin account to share access beyond the seed user.'
                 : 'Try another search or clear the status filter.'}
             </p>
+            {users.length === 0 && canWrite ? (
+              <div className="empty-actions">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={openCreate}
+                >
+                  Add user
+                </button>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -597,14 +624,25 @@ export default function UsersPage() {
                 <input
                   ref={createFirstRef}
                   id="user-email"
-                  className="input"
+                  className={
+                    createFieldErrors.email ? 'input input-invalid' : 'input'
+                  }
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value)
+                    setCreateFieldErrors((prev) => ({ ...prev, email: undefined }))
+                  }}
                   placeholder="ops@sailguard.local"
                   required
                   disabled={creating}
+                  aria-invalid={createFieldErrors.email ? true : undefined}
                 />
+                {createFieldErrors.email ? (
+                  <p className="field-error" role="alert">
+                    {createFieldErrors.email}
+                  </p>
+                ) : null}
               </div>
               <div className="field">
                 <label className="label" htmlFor="user-name">
@@ -612,13 +650,24 @@ export default function UsersPage() {
                 </label>
                 <input
                   id="user-name"
-                  className="input"
+                  className={
+                    createFieldErrors.name ? 'input input-invalid' : 'input'
+                  }
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    setName(e.target.value)
+                    setCreateFieldErrors((prev) => ({ ...prev, name: undefined }))
+                  }}
                   placeholder="Ops"
                   required
                   disabled={creating}
+                  aria-invalid={createFieldErrors.name ? true : undefined}
                 />
+                {createFieldErrors.name ? (
+                  <p className="field-error" role="alert">
+                    {createFieldErrors.name}
+                  </p>
+                ) : null}
               </div>
               <div className="field">
                 <label className="label" htmlFor="user-password">
@@ -626,24 +675,49 @@ export default function UsersPage() {
                 </label>
                 <input
                   id="user-password"
-                  className="input"
+                  className={
+                    createFieldErrors.password ? 'input input-invalid' : 'input'
+                  }
                   type="password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value)
+                    setCreateFieldErrors((prev) => ({
+                      ...prev,
+                      password: undefined,
+                    }))
+                  }}
                   placeholder="min 10 characters"
                   minLength={10}
                   required
                   disabled={creating}
+                  aria-invalid={createFieldErrors.password ? true : undefined}
                 />
+                {createFieldErrors.password ? (
+                  <p className="field-error" role="alert">
+                    {createFieldErrors.password}
+                  </p>
+                ) : null}
               </div>
               <div className="field">
                 <span className="label">Roles</span>
                 <RolePicker
                   roles={rolesCatalog}
                   selected={createRoles}
-                  onToggle={toggleCreateRole}
+                  onToggle={(code) => {
+                    toggleCreateRole(code)
+                    setCreateFieldErrors((prev) => ({
+                      ...prev,
+                      roles: undefined,
+                    }))
+                  }}
                   disabled={creating}
                 />
+                {createFieldErrors.roles ? (
+                  <p className="field-error" role="alert">
+                    {createFieldErrors.roles}
+                  </p>
+                ) : null}
               </div>
               <div className="dialog-actions">
                 <button

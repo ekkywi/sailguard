@@ -1,16 +1,19 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { PermissionDenied } from '../../components/PermissionDenied'
+import { TableSkeleton } from '../../components/TableSkeleton'
 import { toast } from '../../components/toast'
 import type { AppOutletContext } from '../../layouts/AppLayout'
 import { formatRelativeTime } from '../../lib/format'
 import { hasPermission } from '../../lib/permissions'
+import { useDocumentTitle } from '../../lib/useDocumentTitle'
 import { createGroup, listGroups } from './api'
 import type { CreateGroupInput, DeviceGroup } from './types'
 
 const PAGE_SIZE = 10
 
 export default function GroupsPage() {
+  useDocumentTitle('Groups')
   const { me } = useOutletContext<AppOutletContext>()
   const canRead = hasPermission(me, 'device.read')
   const canWrite = hasPermission(me, 'device.write')
@@ -104,7 +107,7 @@ export default function GroupsPage() {
           <p className="section-label">Inventory</p>
           <h1 className="title">Groups</h1>
           <p className="lede">
-            Device groups for inventory and later policy assignment.
+            Device groups
             {groups ? (
               <span className="page-meta">
                 {' '}
@@ -186,13 +189,17 @@ export default function GroupsPage() {
         </div>
 
         {loading && !groups ? (
-          <p className="loading">Loading groups…</p>
+          <TableSkeleton label="Loading groups…" />
         ) : null}
 
         {!loading && groups && groups.length === 0 ? (
           <div className="empty-state" role="status">
             <p className="empty-title">No groups yet</p>
-            <p className="muted">Create groups such as IT or Finance above.</p>
+            <p className="muted">
+              {canWrite
+                ? 'Create a group such as IT or Finance above.'
+                : 'Ask an admin with device.write to create groups.'}
+            </p>
           </div>
         ) : null}
 

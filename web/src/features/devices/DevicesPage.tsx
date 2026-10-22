@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import { PermissionDenied } from '../../components/PermissionDenied'
+import { TableSkeleton } from '../../components/TableSkeleton'
 import type { AppOutletContext } from '../../layouts/AppLayout'
 import { formatRelativeTime, statusBadgeClass } from '../../lib/format'
 import { hasPermission } from '../../lib/permissions'
+import { useDocumentTitle } from '../../lib/useDocumentTitle'
 import { listDevices } from './api'
 import type { Device } from './types'
 
 export default function DevicesPage() {
+  useDocumentTitle('Devices')
   const { me } = useOutletContext<AppOutletContext>()
   const canRead = hasPermission(me, 'device.read')
   const navigate = useNavigate()
@@ -46,7 +49,7 @@ export default function DevicesPage() {
           <p className="section-label">Inventory</p>
           <h1 className="title">Devices</h1>
           <p className="lede">
-            Endpoints enrolled with the control plane.
+            Enrolled endpoints
             {devices ? (
               <span className="page-meta">
                 {' '}
@@ -71,16 +74,24 @@ export default function DevicesPage() {
         </p>
       ) : null}
 
-      {loading && !devices ? <TableSkeleton /> : null}
+      {loading && !devices ? (
+        <TableSkeleton label="Loading devices…" rows={4} />
+      ) : null}
 
       {!loading && devices && devices.length === 0 ? (
         <div className="empty-state" role="status">
           <p className="empty-title">No devices enrolled yet</p>
           <p className="muted">
-            Create an enrollment token via the API, then enroll an agent with{' '}
-            <span className="mono">POST /v1/agent/enroll</span>. Enrolled hosts
-            will appear here.
+            Create a token, download an agent package, then enroll a host.
           </p>
+          <div className="empty-actions">
+            <Link className="btn btn-ghost" to="/tokens">
+              Enrollment tokens
+            </Link>
+            <Link className="btn btn-ghost" to="/agent-download">
+              Download agent
+            </Link>
+          </div>
         </div>
       ) : null}
 
@@ -146,20 +157,6 @@ export default function DevicesPage() {
           <Link to="/">Back to overview</Link>
         </p>
       ) : null}
-    </div>
-  )
-}
-
-function TableSkeleton() {
-  return (
-    <div className="table-wrap" aria-hidden="true">
-      <div className="skeleton-table">
-        <div className="skeleton-row skeleton-head" />
-        <div className="skeleton-row" />
-        <div className="skeleton-row" />
-        <div className="skeleton-row" />
-      </div>
-      <p className="loading skeleton-label">Loading devices…</p>
     </div>
   )
 }
