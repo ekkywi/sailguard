@@ -10,7 +10,7 @@ This document describes the agent ↔ control plane contract at a product level.
 
 2. Receive a unique **device credential** and recommended sync intervals; persist locally on the agent (`device.json` under the configured data directory)  
 3. Authenticate subsequent calls with `Authorization: Bearer <device_token>` *(whoami / events / policy)*. If an operator has set the device to **disabled**, these calls return **403** with `device_disabled`; the agent should log and wait for admin re-enable (it must **not** treat this as a cue to re-enroll). If the device token is **invalid/revoked** (**401** `unauthorized`), and a valid `enrollment_token` remains in local config, the agent may **re-enroll / reclaim** (same machine ID) to obtain a new device credential, then retry. A bad enrollment token returns **401** `enrollment_invalid` (distinct from device unauthorized) and does not rotate credentials.  
-4. **Submit event batches** via `POST /v1/agent/events` — **heartbeat** refreshes `last_seen_at` and soft-updates hostname/OS/agent version; **`violation_detected`** / **`violation_blocked`** are persisted (including process owner when available) and listed for admins (`GET /v1/events` / console Events)  
+4. **Submit event batches** via `POST /v1/agent/events` — **heartbeat** refreshes `last_seen_at` and soft-updates hostname/OS/agent version; **`violation_detected`** / **`violation_blocked`** are accepted into the control-plane stream and persisted asynchronously by the worker (including process owner when available), then listed for admins (`GET /v1/events` / console Events)  
 5. **Poll / pull effective policy** via `GET /v1/agent/policy` (optional `?hash=` → `unchanged`); replace local cache atomically when content changes  
 6. **Observe processes** and evaluate against cached policy:  
    - **Enumerate** via Linux `/proc` or Windows Toolhelp (process owner attached when the OS allows)  
@@ -48,7 +48,7 @@ Supported event classes include:
 | `violation_blocked` | Match under enforce, including enforcement outcome (`terminated` / `terminate_failed`); may include process `user_name` |
 | `agent_error` | Agent-side failures worth surfacing to operators (planned persistence) |
 
-Batches include per-event client IDs to support idempotent ingestion. Servers may hint that policy reload is recommended in the batch response.
+Batches include per-event client IDs to support idempotent ingestion (safe under agent retry and worker replay). A successful HTTP accept means the control plane enqueued the violation; durable listing in Events requires the worker to be running. Servers may hint that policy reload is recommended in the batch response.
 
 ## Offline behavior
 

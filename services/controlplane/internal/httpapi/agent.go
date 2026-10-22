@@ -9,7 +9,7 @@ import (
 
 	"github.com/ekkywi/sailguard/pkgs/agentcontract"
 	"github.com/ekkywi/sailguard/services/controlplane/internal/domain/inventory"
-	"github.com/ekkywi/sailguard/services/controlplane/internal/domain/telemetry"
+	"github.com/ekkywi/sailguard/services/controlplane/internal/queue"
 )
 
 func (a *API) handleAgentEnroll(w http.ResponseWriter, r *http.Request) {
@@ -179,7 +179,7 @@ func (a *API) handleAgentEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	store := inventory.NewStore(a.pool)
-	events := telemetry.NewStore(a.pool)
+	q := queue.New(a.rdb)
 	accepted := 0
 	rejected := make([]map[string]any, 0)
 	sawHeartbeat := false
@@ -226,11 +226,11 @@ func (a *API) handleAgentEvents(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			in := telemetry.InsertViolationInput{
-				DeviceID:           deviceID,
+			msg := queue.ViolationMessage{
+				DeviceID:           deviceID.String(),
 				ClientEventID:      clientID,
 				EventType:          ev.EventType,
-				OccurredAt:         occurredAt,
+				OccurredAt:         occurredAt.Format(time.RFC3339),
 				DedupeKey:          ev.DedupeKey,
 				ProcessPID:         ev.Process.PID,
 				ProcessName:        ev.Process.Name,
@@ -241,22 +241,31 @@ func (a *API) handleAgentEvents(w http.ResponseWriter, r *http.Request) {
 				ProcessUserName:    ev.Process.UserName,
 			}
 			if ev.Match != nil {
-				in.MatchRuleID = ev.Match.RuleID
-				in.MatchAction = ev.Match.Action
-				in.MatchRuleType = ev.Match.RuleType
-				in.MatchValue = ev.Match.Value
-				in.MatchCategoryCode = ev.Match.CategoryCode
+				msg.MatchRuleID = ev.Match.RuleID
+				msg.MatchAction = ev.Match.Action
+				msg.MatchRuleType = ev.Match.RuleType
+				msg.MatchValue = ev.Match.Value
+				msg.MatchCategoryCode = ev.Match.CategoryCode
 			}
 			if ev.Policy != nil {
-				in.PolicyVersion = ev.Policy.Version
-				in.PolicyMode = ev.Policy.Mode
+				msg.PolicyVersion = ev.Policy.Version
+				msg.PolicyMode = ev.Policy.Mode
 			}
 
-			if _, _, err := events.InsertViolation(r.Context(), in); err != nil {
+			values, err := queue.EncodeViolationValues(msg)
+			if err != nil {
 				rejected = append(rejected, map[string]any{
 					"client_event_id": clientID,
-					"code":            "persist_error",
-					"message":         "failed to store violation",
+					"code":            "enqueue_error",
+					"message":         "failed to encode violation for stream",
+				})
+				continue
+			}
+			if _, err := q.Produce(r.Context(), queue.StreamEvents, values); err != nil {
+				rejected = append(rejected, map[string]any{
+					"client_event_id": clientID,
+					"code":            "enqueue_error",
+					"message":         "failed to enqueue violation",
 				})
 				continue
 			}

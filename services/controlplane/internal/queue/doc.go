@@ -1,5 +1,7 @@
 package queue
 
 // Package queue wraps Redis Streams produce/consume for events and alerts.
-// M1 skeleton: Produce / EnsureGroup / ReadGroup / Ack on sg:events (group sg-workers).
-// Persist-to-Postgres and alert pipelines land in later milestones (M4+).
+//
+// Violation ingest (Phase A): API Produce on sg:events (group sg-workers);
+// worker DecodeViolationMessage → telemetry.InsertViolation → Ack.
+// Alerts / retention jobs remain later milestones.

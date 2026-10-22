@@ -41,8 +41,8 @@ Dev Docker / host ports (SailGuard-specific, loopback): see [docs/public/deploym
 cp .env.example .env
 make dev-up
 make test-pkgs
-make build-api && ./bin/sailguard-api   # or: go run ./services/controlplane/cmd/api
-make build-worker                        # separate terminal
+make build-api && ./bin/sailguard-api   # or: make run-api
+make run-worker                          # required for violation persist (Redis → Postgres)
 cd web && npm install && npm run dev
 ```
 

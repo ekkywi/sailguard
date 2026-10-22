@@ -42,7 +42,8 @@ description: >-
 ```bash
 make dev-up
 make migrate-up
-go run ./services/controlplane/cmd/api
+make run-api       # terminal 1
+make run-worker    # terminal 2 — required for violation → Postgres
 cd web && npm run dev
 curl http://127.0.0.1:18080/v1/health
 curl -s http://127.0.0.1:18080/v1/ready   # db + redis true
@@ -51,8 +52,8 @@ curl -s http://127.0.0.1:18080/v1/ready   # db + redis true
 ## Milestone orientation
 
 - M0–M3 magang core **done** (policy UI, audit match, Events persist/UI; mode PATCH + add/edit/delete rules).
-- M4 **partial**: Linux `/proc` List+Terminate **done**; Windows Toolhelp List+Terminate+WMI Watch+scan **done**; Win7 Go 1.20 build **done**; installer ZIP + setup **done**; install vs update download packages **done**; Windows Service `SailGuardAgent` auto-start **done** (Task Scheduler + detached fallback if SCM Access denied); MachineGuid/os-release **done**; process user on events **done**; enroll reclaim **done**; device/group/policy DELETE (and device/group PATCH) **done**; disabled-device auth gate (403 `device_disabled` + enroll refuse) **done**; offline violation queue + flush **done**; edit-rule in place (**PATCH** rules + UI) **done**; category rules in builder (`GET /v1/categories` + type-driven form) + lab signature seeds + **Categories admin UI** **done**; re-enroll on 401 **done** (lab smoke deferred); **dashboard summary** (`GET /v1/dashboard/summary` + Home; top processes/hosts + stale devices) **done**; **violations timeseries** (`GET /v1/dashboard/violations-timeseries?range=24h|7d` + Home chart) **done**. Remaining: Redis stream/worker; optional ETW/Linux Watch; credential ACL; signed fleet auto-update.
-- Later: alerts, LDAP, Redis stream/worker, credential ACL, etc. (users admin + RBAC UI gates + device overrides + audit Batch 1–4 done).
+- M4 **partial**: Linux `/proc` List+Terminate **done**; Windows Toolhelp List+Terminate+WMI Watch+scan **done**; Win7 Go 1.20 build **done**; installer ZIP + setup **done**; install vs update download packages **done**; Windows Service `SailGuardAgent` auto-start **done** (Task Scheduler + detached fallback if SCM Access denied); MachineGuid/os-release **done**; process user on events **done**; enroll reclaim **done**; device/group/policy DELETE (and device/group PATCH) **done**; disabled-device auth gate (403 `device_disabled` + enroll refuse) **done**; offline violation queue + flush **done**; edit-rule in place (**PATCH** rules + UI) **done**; category rules in builder (`GET /v1/categories` + type-driven form) + lab signature seeds + **Categories admin UI** **done**; re-enroll on 401 **done** (lab smoke deferred); **dashboard summary** (`GET /v1/dashboard/summary` + Home; top processes/hosts + stale devices) **done**; **violations timeseries** (`GET /v1/dashboard/violations-timeseries?range=24h|7d` + Home chart) **done**; **Redis stream/worker Phase A** (`sg:events` enqueue + worker `InsertViolation`; heartbeat sync) **done**. Remaining: optional ETW/Linux Watch; credential ACL; rotate-credential; signed fleet auto-update; stream XAUTOCLAIM/alerts.
+- Later: alerts, LDAP, credential ACL, etc. (users admin + RBAC UI gates + device overrides + audit Batch 1–4 done).
 - Admin console visual rules: `docs/internal/ui-console.md` (limited `--sg-gold`, operational copy, no marketing/AI-slop chrome).
 
 ## Agent timers / dual-path
@@ -66,7 +67,7 @@ curl -s http://127.0.0.1:18080/v1/ready   # db + redis true
 
 ## When resuming
 
-State the next concrete step from `handoff.md` (currently: Redis stream/worker, credential ACL, or rotate-credential). Prefer one complete method per guidance step. If handoff conflicts with the repo, trust the repo + checklist and update handoff.
+State the next concrete step from `handoff.md` (currently: credential ACL, rotate-credential, or stream hardening/alerts). Prefer one complete method per guidance step. If handoff conflicts with the repo, trust the repo + checklist and update handoff.
 
 ## Lab smoke
 

@@ -10,7 +10,7 @@ import (
 
 const (
 	StreamEvents = "sg:events"
-	GroupEvents = "sg-workers"
+	GroupEvents  = "sg-workers"
 )
 
 type Client struct {
@@ -42,11 +42,11 @@ func (c *Client) EnsureGroup(ctx context.Context, stream, group string) error {
 
 func (c *Client) ReadGroup(ctx context.Context, stream, group, consumer string, count int64) ([]redis.XMessage, error) {
 	streams, err := c.rdb.XReadGroup(ctx, &redis.XReadGroupArgs{
-		Group: group,
+		Group:    group,
 		Consumer: consumer,
-		Streams: []string{stream, ">"},
-		Count: count,
-		Block: 2 * time.Second,
+		Streams:  []string{stream, ">"},
+		Count:    count,
+		Block:    2 * time.Second,
 	}).Result()
 	if err == redis.Nil {
 		return nil, nil

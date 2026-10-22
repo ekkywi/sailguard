@@ -71,6 +71,6 @@ The architecture targets mid-scale estates (on the order of **hundreds to low th
 
 ## Development vs production runtimes
 
-For engineering workstations, dependencies may be started alone (database and Redis) while API, worker, and UI processes run directly on the host for fast iteration. Production deployments should run the full control-plane service set under the organization’s process supervisor or container platform.
+For engineering workstations, dependencies may be started alone (database and Redis) while API, worker, and UI processes run directly on the host for fast iteration. **Both the API and the worker must run** for violation events to reach PostgreSQL (API enqueues to Redis; worker persists). Production deployments should run the full control-plane service set under the organization’s process supervisor or container platform.
 
 See internal developer workflow notes for day-to-day commands.

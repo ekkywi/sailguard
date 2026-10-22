@@ -40,7 +40,7 @@ help:
 	@echo "  make run-api         go run API (host)"
 	@echo "  make run-web         Vite dev server (same as web-dev)"
 	@echo "  make run-agent       go run agent (lab data dir)"
-	@echo "  make run-worker      go run worker (optional)"
+	@echo "  make run-worker      go run worker (required for violation persist)"
 	@echo ""
 	@echo "  Other:"
 	@echo "  make test-pkgs       Test shared Go packages"
