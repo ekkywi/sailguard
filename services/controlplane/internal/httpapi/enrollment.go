@@ -102,6 +102,15 @@ func (a *API) handleCreateEnrollmentToken(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	a.recordAudit(r, "enrollment_token.create", "enrollment_token", tok.ID.String(),
+		"Created enrollment token",
+		map[string]any{
+			"label":      tok.Label,
+			"max_uses":   tok.MaxUses,
+			"expires_at": tok.ExpiresAt,
+		},
+	)
+
 	data := enrollmentTokenJSON(*tok)
 	data["token"] = secret
 
@@ -135,8 +144,15 @@ func (a *API) handleRevokeEnrollmentToken(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	a.recordAudit(r, "enrollment_token.revoke", "enrollment_token", tok.ID.String(),
+		"Revoked enrollment token",
+		map[string]any{
+			"label": tok.Label,
+		},
+	)
+
 	writeJSON(w, http.StatusOK, envelope{
-		OK: true,
+		OK:   true,
 		Data: enrollmentTokenJSON(*tok),
 	})
 }

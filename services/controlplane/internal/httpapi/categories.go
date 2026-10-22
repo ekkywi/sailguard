@@ -122,6 +122,11 @@ func (a *API) handleCreateCategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	a.recordAudit(r, "category.create", "category", c.Code,
+		"Created category "+c.Name,
+		map[string]any{"code": c.Code, "name": c.Name},
+	)
+
 	writeJSON(w, http.StatusCreated, envelope{
 		OK:   true,
 		Data: categoryJSON(*c),
@@ -219,6 +224,11 @@ func (a *API) handlePatchCategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	a.recordAudit(r, "category.update", "category", c.Code,
+		"Updated category "+c.Name,
+		map[string]any{"code": c.Code, "name": c.Name},
+	)
+
 	writeJSON(w, http.StatusOK, envelope{
 		OK:   true,
 		Data: categoryJSON(*c),
@@ -270,9 +280,15 @@ func (a *API) handleDeleteCategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	norm := strings.TrimSpace(strings.ToLower(code))
+	a.recordAudit(r, "category.delete", "category", norm,
+		"Deleted category",
+		map[string]any{"code": norm},
+	)
+
 	writeJSON(w, http.StatusOK, envelope{
 		OK:   true,
-		Data: map[string]any{"deleted": true, "code": strings.TrimSpace(strings.ToLower(code))},
+		Data: map[string]any{"deleted": true, "code": norm},
 	})
 }
 
@@ -372,6 +388,16 @@ func (a *API) handleAddCategorySignature(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	a.recordAudit(r, "category.signature.create", "category_signature", sig.ID.String(),
+		"Added category signature",
+		map[string]any{
+			"category_code": sig.CategoryCode,
+			"rule_type":     sig.RuleType,
+			"operator":      sig.Operator,
+			"value":         sig.Value,
+		},
+	)
+
 	writeJSON(w, http.StatusCreated, envelope{
 		OK:   true,
 		Data: categorySignatureJSON(*sig),
@@ -425,11 +451,20 @@ func (a *API) handleDeleteCategorySignature(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	norm := strings.TrimSpace(strings.ToLower(code))
+	a.recordAudit(r, "category.signature.delete", "category_signature", sigID.String(),
+		"Deleted category signature",
+		map[string]any{
+			"category_code": norm,
+			"signature_id":  sigID.String(),
+		},
+	)
+
 	writeJSON(w, http.StatusOK, envelope{
 		OK: true,
 		Data: map[string]any{
 			"deleted":       true,
-			"category_code": strings.TrimSpace(strings.ToLower(code)),
+			"category_code": norm,
 			"signature_id":  sigID.String(),
 		},
 	})

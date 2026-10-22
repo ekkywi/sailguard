@@ -101,6 +101,11 @@ func (a *API) handleCreateGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	a.recordAudit(r, "group.create", "group", group.ID.String(),
+		"Created group "+group.Name,
+		map[string]any{"name": group.Name},
+	)
+
 	writeJSON(w, http.StatusCreated, envelope{
 		OK:   true,
 		Data: groupJSON(*group),
@@ -190,6 +195,11 @@ func (a *API) handlePatchGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	a.recordAudit(r, "group.update", "group", group.ID.String(),
+		"Updated group "+group.Name,
+		map[string]any{"name": group.Name},
+	)
+
 	writeJSON(w, http.StatusOK, envelope{
 		OK:   true,
 		Data: groupJSON(*group),
@@ -222,6 +232,11 @@ func (a *API) handleDeleteGroup(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+
+	a.recordAudit(r, "group.delete", "group", id.String(),
+		"Deleted group",
+		map[string]any{"group_id": id.String()},
+	)
 
 	writeJSON(w, http.StatusOK, envelope{
 		OK:   true,
@@ -333,6 +348,15 @@ func (a *API) handlePatchDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	a.recordAudit(r, "device.update", "device", device.ID.String(),
+		"Updated device "+device.Hostname,
+		map[string]any{
+			"hostname":     device.Hostname,
+			"display_name": device.DisplayName,
+			"status":       device.Status,
+		},
+	)
+
 	writeJSON(w, http.StatusOK, envelope{
 		OK:   true,
 		Data: deviceJSON(*device),
@@ -365,6 +389,13 @@ func (a *API) handleDeleteDevice(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+
+	a.recordAudit(r, "device.delete", "device", id.String(),
+		"Deleted device",
+		map[string]any{
+			"device_id": id.String(),
+		},
+	)
 
 	writeJSON(w, http.StatusOK, envelope{
 		OK:   true,

@@ -154,6 +154,21 @@ func (a *API) handleAddPolicyAssignment(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	meta := map[string]any{
+		"policy_id": asg.PolicyID.String(),
+		"scope":     asg.Scope,
+	}
+	if asg.GroupID != nil {
+		meta["group_id"] = asg.GroupID.String()
+	}
+	if asg.DeviceID != nil {
+		meta["device_id"] = asg.DeviceID.String()
+	}
+	a.recordAudit(r, "policy.assignment.create", "policy_assignment", asg.ID.String(),
+		"Added policy assignment",
+		meta,
+	)
+
 	writeJSON(w, http.StatusCreated, envelope{
 		OK:   true,
 		Data: assignmentJSON(*asg),
@@ -206,6 +221,14 @@ func (a *API) handleRemovePolicyAssignment(w http.ResponseWriter, r *http.Reques
 		})
 		return
 	}
+
+	a.recordAudit(r, "policy.assignment.delete", "policy_assignment", assignmentID.String(),
+		"Removed policy assignment",
+		map[string]any{
+			"policy_id":     policyID.String(),
+			"assignment_id": assignmentID.String(),
+		},
+	)
 
 	writeJSON(w, http.StatusOK, envelope{
 		OK: true,

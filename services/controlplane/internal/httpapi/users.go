@@ -294,6 +294,16 @@ func (a *API) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		roles = req.Roles
 	}
 
+	a.recordAudit(r, "user.create", "user", user.ID.String(),
+		"Created user "+user.Email,
+		map[string]any{
+			"email":  user.Email,
+			"name":   user.Name,
+			"roles":  roles,
+			"active": user.IsActive,
+		},
+	)
+
 	writeJSON(w, http.StatusCreated, envelope{
 		OK:   true,
 		Data: userJSON(*user, roles),
@@ -486,6 +496,16 @@ func (a *API) handlePatchUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	a.recordAudit(r, "user.update", "user", updated.ID.String(),
+		"Updated user "+updated.Email,
+		map[string]any{
+			"email":  updated.Email,
+			"name":   updated.Name,
+			"roles":  roles,
+			"active": updated.IsActive,
+		},
+	)
+
 	writeJSON(w, http.StatusOK, envelope{
 		OK:   true,
 		Data: userJSON(*updated, roles),
@@ -562,6 +582,13 @@ func (a *API) handleResetUserPassword(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+
+	a.recordAudit(r, "user.reset_password", "user", id.String(),
+		"Reset user password",
+		map[string]any{
+			"user_id": id.String(),
+		},
+	)
 
 	writeJSON(w, http.StatusOK, envelope{
 		OK: true,

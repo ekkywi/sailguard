@@ -118,6 +118,15 @@ func (a *API) handleCreatePolicy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	a.recordAudit(r, "policy.create", "policy", p.ID.String(),
+		"Created policy "+p.Name,
+		map[string]any{
+			"name":     p.Name,
+			"mode":     p.Mode,
+			"priority": p.Priority,
+		},
+	)
+
 	writeJSON(w, http.StatusCreated, envelope{
 		OK:   true,
 		Data: policyJSON(*p),
@@ -286,6 +295,17 @@ func (a *API) handleAddPolicyRule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	a.recordAudit(r, "policy.rule.create", "policy_rule", rule.ID.String(),
+		"Added policy rule",
+		map[string]any{
+			"policy_id": rule.PolicyID.String(),
+			"action":    rule.Action,
+			"rule_type": rule.RuleType,
+			"operator":  rule.Operator,
+			"value":     rule.Value,
+		},
+	)
+
 	writeJSON(w, http.StatusCreated, envelope{
 		OK:   true,
 		Data: policyRuleJSON(*rule),
@@ -367,6 +387,17 @@ func (a *API) handlePatchPolicyRule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	a.recordAudit(r, "policy.rule.update", "policy_rule", rule.ID.String(),
+		"Updated policy rule",
+		map[string]any{
+			"policy_id": rule.PolicyID.String(),
+			"action":    rule.Action,
+			"rule_type": rule.RuleType,
+			"operator":  rule.Operator,
+			"value":     rule.Value,
+		},
+	)
+
 	writeJSON(w, http.StatusOK, envelope{
 		OK:   true,
 		Data: policyRuleJSON(*rule),
@@ -431,6 +462,14 @@ func (a *API) handlePatchPolicy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	a.recordAudit(r, "policy.update", "policy", p.ID.String(),
+		"Updated policy "+p.Name,
+		map[string]any{
+			"name": p.Name,
+			"mode": p.Mode,
+		},
+	)
+
 	writeJSON(w, http.StatusOK, envelope{
 		OK:   true,
 		Data: policyJSON(*p),
@@ -472,6 +511,13 @@ func (a *API) handleDeletePolicy(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+
+	a.recordAudit(r, "policy.delete", "policy", id.String(),
+		"Deleted policy",
+		map[string]any{
+			"policy_id": id.String(),
+		},
+	)
 
 	writeJSON(w, http.StatusOK, envelope{
 		OK: true,
@@ -527,6 +573,14 @@ func (a *API) handleDeletePolicyRule(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+
+	a.recordAudit(r, "policy.rule.delete", "policy_rule", ruleID.String(),
+		"Deleted policy rule",
+		map[string]any{
+			"policy_id": policyID.String(),
+			"rule_id":   ruleID.String(),
+		},
+	)
 
 	writeJSON(w, http.StatusOK, envelope{
 		OK: true,

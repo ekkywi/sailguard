@@ -42,8 +42,7 @@ Administrative APIs are further protected by role-based permissions as routes co
 ### Policy
 
 - **Available now:** list/create/get/**DELETE** policies; **PATCH** mode (`audit`/`enforce`); list/add/**PATCH**/delete rules (including `rule_type=category`); categories CRUD (`GET/POST /v1/categories`, `GET/PATCH/DELETE /v1/categories/{code}`) and signatures (`GET/POST …/signatures`, `DELETE …/signatures/{id}`); list/add/remove assignments; publish (bumps version); effective-policy preview `GET /v1/devices/{id}/policy`; **device overrides** (`GET/POST /v1/devices/{id}/overrides`, `DELETE …/overrides/{overrideId}`; `allow` requires future `expires_at`; list defaults to active only, `?include_expired=true` for history). Admin web: `/policies`, `/policies/:id`, `/categories`, `/categories/:code`, device detail tab `?tab=overrides`.
-- **Available now (admin audit):** `GET /v1/audit-logs` (`audit.read`) lists recent administrative actions; Batch 1 records `policy.publish`, `override.create`, and `override.delete` into `admin_audit_logs`. Web console `/audit`.
-- **Planned:** broader audit coverage (users, devices, tokens, categories)
+- **Available now (admin audit):** `GET /v1/audit-logs` (`audit.read`) lists `admin_audit_logs` with filters (`family`, `from`/`to` RFC3339, `actor`, `q`, `resource_type`, `limit`/`offset`) and `total`. `GET /v1/audit-logs/export` downloads CSV (same filters, max 10k rows). Coverage: policy CRUD/rules/assignments/publish; categories + signatures; overrides; users; devices; enrollment tokens; groups + membership; agent package download (channel/kind only — no enrollment token); login success/failure. Secrets never logged. Web console `/audit` (family chips, date range, search, row detail, CSV export).
 
 ### Agent channel
 

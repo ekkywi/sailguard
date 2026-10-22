@@ -2451,3 +2451,235 @@ input {
     width: auto;
   }
 }
+
+/* —— Audit log —— */
+.audit-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.audit-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.audit-chip {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--text-xs);
+  line-height: 1.2;
+  padding: 0.35rem 0.65rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.audit-chip:hover {
+  background: var(--ghost-hover);
+}
+
+.audit-chip-on {
+  border-color: var(--border-strong);
+  background: var(--ghost-active);
+  font-weight: 600;
+}
+
+.audit-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: flex-end;
+}
+
+.audit-filter-grow {
+  flex: 1 1 12rem;
+  min-width: 10rem;
+}
+
+.audit-filter-clear {
+  flex: 0 0 auto;
+}
+
+.audit-table .audit-row {
+  cursor: pointer;
+}
+
+.audit-table .audit-row:hover td {
+  background: var(--ghost-hover);
+}
+
+.audit-table .audit-row:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+
+.audit-action {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--text-xs);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--ghost-hover);
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.audit-action--policy {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+
+.audit-action--category {
+  border-color: #c4b5fd;
+  background: #f5f3ff;
+  color: #4c1d95;
+}
+
+.audit-action--user {
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.audit-action--device {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.audit-action--group {
+  border-color: #a5f3fc;
+  background: #ecfeff;
+  color: #155e75;
+}
+
+.audit-action--auth {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.audit-action--warn {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.audit-action--package {
+  border-color: #d4d4d4;
+  background: #f5f5f5;
+  color: #404040;
+}
+
+.audit-action--enrollment {
+  border-color: #fbcfe8;
+  background: #fdf2f8;
+  color: #9d174d;
+}
+
+[data-theme='dark'] .audit-action--policy {
+  border-color: #1e3a8a;
+  background: #172554;
+  color: #bfdbfe;
+}
+
+[data-theme='dark'] .audit-action--category {
+  border-color: #4c1d95;
+  background: #2e1065;
+  color: #ddd6fe;
+}
+
+[data-theme='dark'] .audit-action--user {
+  border-color: #065f46;
+  background: #052e16;
+  color: #a7f3d0;
+}
+
+[data-theme='dark'] .audit-action--device {
+  border-color: #92400e;
+  background: #451a03;
+  color: #fde68a;
+}
+
+[data-theme='dark'] .audit-action--group {
+  border-color: #155e75;
+  background: #083344;
+  color: #a5f3fc;
+}
+
+[data-theme='dark'] .audit-action--auth,
+[data-theme='dark'] .audit-action--warn {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+[data-theme='dark'] .audit-action--package {
+  border-color: #404040;
+  background: #1f1f1f;
+  color: #d4d4d4;
+}
+
+[data-theme='dark'] .audit-action--enrollment {
+  border-color: #9d174d;
+  background: #500724;
+  color: #fbcfe8;
+}
+
+.audit-resource-link {
+  color: var(--fg);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.audit-resource-link:hover {
+  color: var(--muted);
+}
+
+.audit-detail-panel {
+  max-width: 32rem;
+}
+
+.audit-detail-grid {
+  display: grid;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+}
+
+.audit-detail-grid dt {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  margin-bottom: 0.15rem;
+}
+
+.audit-detail-grid dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+.audit-meta-block {
+  margin-bottom: var(--space-4);
+}
+
+.audit-meta-pre {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  overflow: auto;
+  max-height: 14rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

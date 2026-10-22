@@ -325,7 +325,7 @@ func (a *API) handleDownloadWindowsAgentPackage(w http.ResponseWriter, r *http.R
 			"Server URL in config.json: %s\n"+
 			"Service name: SailGuardAgent (Automatic)\n",
 			ch.Label, ch.ID, ch.Description, ch.Toolchain,
-			setupBinaryName, dataDir, serverURL))
+			dataDir, setupBinaryName, dataDir, serverURL))
 	} else {
 		readme = []byte(fmt.Sprintf(""+
 			"SailGuard agent installer package (%s)\n"+
@@ -348,6 +348,14 @@ func (a *API) handleDownloadWindowsAgentPackage(w http.ResponseWriter, r *http.R
 	}
 
 	zipName := fmt.Sprintf("sailguard-agent-%s-%s.zip", channelID, packageKind)
+	a.recordAudit(r, "agent_package.download", "agent_package", channelID,
+		"Downloaded Windows agent package",
+		map[string]any{
+			"channel":      channelID,
+			"package_kind": packageKind,
+			"server_url":   serverURL,
+		},
+	)
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, zipName))
 	w.WriteHeader(http.StatusOK)

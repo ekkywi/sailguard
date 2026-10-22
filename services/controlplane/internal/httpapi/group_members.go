@@ -144,6 +144,14 @@ func (a *API) handleAddGroupMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	a.recordAudit(r, "group.member.add", "group", groupID.String(),
+		"Added device to group",
+		map[string]any{
+			"group_id":  groupID.String(),
+			"device_id": deviceID.String(),
+		},
+	)
+
 	writeJSON(w, http.StatusCreated, envelope{
 		OK: true,
 		Data: map[string]any{
@@ -200,6 +208,14 @@ func (a *API) handleRemoveGroupMember(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+
+	a.recordAudit(r, "group.member.remove", "group", groupID.String(),
+		"Removed device from group",
+		map[string]any{
+			"group_id":  groupID.String(),
+			"device_id": deviceID.String(),
+		},
+	)
 
 	writeJSON(w, http.StatusOK, envelope{
 		OK: true,
