@@ -85,6 +85,7 @@ func NewRouter(cfg config.Config, pool *pgxpool.Pool, rdb *redis.Client) http.Ha
 	mux.HandleFunc("POST /v1/policies/{id}/publish", api.requirePermission("policy.write", api.handlePublishPolicy))
 
 	mux.HandleFunc("GET /v1/events", api.requirePermission("event.read", api.handleListEvents))
+	mux.HandleFunc("GET /v1/events/export", api.requirePermission("event.read", api.handleExportEventsCSV))
 	mux.HandleFunc("GET /v1/dashboard/summary", api.requirePermission("event.read", api.handleDashboardSummary))
 	mux.HandleFunc("GET /v1/dashboard/violations-timeseries", api.requirePermission("event.read", api.handleDashboardViolationsTimeseries))
 

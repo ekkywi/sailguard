@@ -26,6 +26,21 @@ export type DeviceEvent = {
   policy_mode: string | null
 }
 
+export type EventTypeFilter = '' | 'violation_detected' | 'violation_blocked'
+
+export type EventListQuery = {
+  from?: string
+  to?: string
+  event_type?: EventTypeFilter
+  device_id?: string
+  q?: string
+  limit?: number
+  offset?: number
+}
+
 export type EventListData = {
   items: DeviceEvent[]
+  total: number
+  limit: number
+  offset: number
 }

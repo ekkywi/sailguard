@@ -55,7 +55,8 @@ Administrative APIs are further protected by role-based permissions as routes co
 ### Telemetry & operations
 
 - **Available now:** health/ready; agents submit `violation_detected` / `violation_blocked` (async via Redis Streams + worker persist, including optional process user); admin `GET /v1/events`; web console **Events** page (`/events`, User column); fleet **dashboard summary** `GET /v1/dashboard/summary` (`event.read` — device online/stale within online window, violations in last 24h, recent violation rows, top processes/hosts 24h, stale device list; Home overview); **violations timeseries** `GET /v1/dashboard/violations-timeseries?range=24h|7d` (filled hourly/daily buckets; Home chart)
-- **Planned:** event detail filters, alerts, alert-channel configuration
+- **Available now (events):** `GET /v1/events` supports filters (`event_type`, `device_id`, `from`/`to` RFC3339, `q`, `limit`/`offset`) and returns `total`; `GET /v1/events/export` downloads CSV (same filters, max 10k rows). Admin console Events page mirrors Audit-style chips, date range, search, and CSV export.
+- **Planned:** alerts, alert-channel configuration
 
 ## Health
 

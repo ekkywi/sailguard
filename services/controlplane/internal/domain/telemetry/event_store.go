@@ -11,27 +11,177 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// ListEvents return newest devices events.
-func (s *Store) ListEvents(ctx context.Context, limit int) ([]DeviceEvent, error) {
-	if limit <= 0 || limit > 200 {
-		limit = 50
+// EventListFilter selects device_events rows. Empty fields are ignored.
+type EventListFilter struct {
+	From      *time.Time
+	To        *time.Time
+	EventType string // violation_detected | violation_blocked
+	DeviceID  *uuid.UUID
+	Q         string // substring: hostname, process, user, match value
+	Limit     int
+	Offset    int
+}
+
+type EventListResult struct {
+	Items []DeviceEvent
+	Total int
+}
+
+func clampEventListLimit(limit int) int {
+	if limit <= 0 {
+		return 50
+	}
+	if limit > 200 {
+		return 200
+	}
+	return limit
+}
+
+func (f EventListFilter) buildWhere() (string, []any) {
+	conds := make([]string, 0, 6)
+	args := make([]any, 0, 6)
+
+	if f.From != nil {
+		args = append(args, *f.From)
+		conds = append(conds, fmt.Sprintf("e.occurred_at >= $%d", len(args)))
+	}
+	if f.To != nil {
+		args = append(args, *f.To)
+		conds = append(conds, fmt.Sprintf("e.occurred_at <= $%d", len(args)))
+	}
+	if et := strings.TrimSpace(f.EventType); et != "" {
+		args = append(args, et)
+		conds = append(conds, fmt.Sprintf("e.event_type = $%d", len(args)))
+	}
+	if f.DeviceID != nil {
+		args = append(args, *f.DeviceID)
+		conds = append(conds, fmt.Sprintf("e.device_id = $%d", len(args)))
+	}
+	if q := strings.TrimSpace(f.Q); q != "" {
+		pat := "%" + strings.ToLower(q) + "%"
+		args = append(args, pat)
+		n := len(args)
+		conds = append(conds, fmt.Sprintf(
+			`(lower(COALESCE(d.hostname, '')) LIKE $%d
+			 OR lower(COALESCE(e.process_name, '')) LIKE $%d
+			 OR lower(COALESCE(e.process_path, '')) LIKE $%d
+			 OR lower(COALESCE(e.process_user_name, '')) LIKE $%d
+			 OR lower(COALESCE(e.match_value, '')) LIKE $%d
+			 OR lower(COALESCE(e.match_category_code, '')) LIKE $%d)`,
+			n, n, n, n, n, n,
+		))
 	}
 
-	const q = `
-		SELECT
-			e.id, e.device_id, COALESCE(d.hostname, ''),
-			e.client_event_id, e.event_type, e.occurred_at, e.received_at, e.dedupe_key,
-			e.process_pid, e.process_name, e.process_path, e.process_hash_sha256,
-			e.process_publisher, e.process_product_name, e.process_user_name,
-			e.match_rule_id, e.match_action, e.match_rule_type, e.match_value, e.match_category_code,
-			e.policy_version, e.policy_mode
+	if len(conds) == 0 {
+		return "", args
+	}
+	return "WHERE " + strings.Join(conds, " AND "), args
+}
+
+const eventSelectCols = `
+	e.id, e.device_id, COALESCE(d.hostname, ''),
+	e.client_event_id, e.event_type, e.occurred_at, e.received_at, e.dedupe_key,
+	e.process_pid, e.process_name, e.process_path, e.process_hash_sha256,
+	e.process_publisher, e.process_product_name, e.process_user_name,
+	e.match_rule_id, e.match_action, e.match_rule_type, e.match_value, e.match_category_code,
+	e.policy_version, e.policy_mode
+`
+
+func scanDeviceEvent(rows pgx.Rows) (DeviceEvent, error) {
+	var e DeviceEvent
+	err := rows.Scan(
+		&e.ID,
+		&e.DeviceID,
+		&e.Hostname,
+		&e.ClientEventID,
+		&e.EventType,
+		&e.OccurredAt,
+		&e.ReceivedAt,
+		&e.DedupeKey,
+		&e.ProcessPID,
+		&e.ProcessName,
+		&e.ProcessPath,
+		&e.ProcessHashSHA256,
+		&e.ProcessPublisher,
+		&e.ProcessProductName,
+		&e.ProcessUserName,
+		&e.MatchRuleID,
+		&e.MatchAction,
+		&e.MatchRuleType,
+		&e.MatchValue,
+		&e.MatchCategoryCode,
+		&e.PolicyVersion,
+		&e.PolicyMode,
+	)
+	return e, err
+}
+
+// ListEvents returns newest matching device events with total count.
+func (s *Store) ListEvents(ctx context.Context, f EventListFilter) (EventListResult, error) {
+	where, args := f.buildWhere()
+	limit := clampEventListLimit(f.Limit)
+	offset := f.Offset
+	if offset < 0 {
+		offset = 0
+	}
+
+	var total int
+	countSQL := `
+		SELECT count(*)
 		FROM device_events e
 		LEFT JOIN devices d ON d.id = e.device_id
-		ORDER BY e.occurred_at DESC, e.received_at DESC
-		LIMIT $1
-	`
+	` + where
+	if err := s.pool.QueryRow(ctx, countSQL, args...).Scan(&total); err != nil {
+		return EventListResult{}, err
+	}
 
-	rows, err := s.pool.Query(ctx, q, limit)
+	listArgs := append(append([]any{}, args...), limit, offset)
+	listSQL := fmt.Sprintf(`
+		SELECT %s
+		FROM device_events e
+		LEFT JOIN devices d ON d.id = e.device_id
+		%s
+		ORDER BY e.occurred_at DESC, e.received_at DESC
+		LIMIT $%d OFFSET $%d
+	`, eventSelectCols, where, len(args)+1, len(args)+2)
+
+	rows, err := s.pool.Query(ctx, listSQL, listArgs...)
+	if err != nil {
+		return EventListResult{}, err
+	}
+	defer rows.Close()
+
+	out := make([]DeviceEvent, 0)
+	for rows.Next() {
+		e, err := scanDeviceEvent(rows)
+		if err != nil {
+			return EventListResult{}, err
+		}
+		out = append(out, e)
+	}
+	if err := rows.Err(); err != nil {
+		return EventListResult{}, err
+	}
+	return EventListResult{Items: out, Total: total}, nil
+}
+
+// ListEventsForExport returns up to maxRows matching the filter (newest first).
+func (s *Store) ListEventsForExport(ctx context.Context, f EventListFilter, maxRows int) ([]DeviceEvent, error) {
+	if maxRows <= 0 || maxRows > 10000 {
+		maxRows = 10000
+	}
+	where, args := f.buildWhere()
+	listArgs := append(append([]any{}, args...), maxRows)
+	listSQL := fmt.Sprintf(`
+		SELECT %s
+		FROM device_events e
+		LEFT JOIN devices d ON d.id = e.device_id
+		%s
+		ORDER BY e.occurred_at DESC, e.received_at DESC
+		LIMIT $%d
+	`, eventSelectCols, where, len(args)+1)
+
+	rows, err := s.pool.Query(ctx, listSQL, listArgs...)
 	if err != nil {
 		return nil, err
 	}
@@ -39,39 +189,13 @@ func (s *Store) ListEvents(ctx context.Context, limit int) ([]DeviceEvent, error
 
 	out := make([]DeviceEvent, 0)
 	for rows.Next() {
-		var e DeviceEvent
-		if err := rows.Scan(
-			&e.ID,
-			&e.DeviceID,
-			&e.Hostname,
-			&e.ClientEventID,
-			&e.EventType,
-			&e.OccurredAt,
-			&e.ReceivedAt,
-			&e.DedupeKey,
-			&e.ProcessPID,
-			&e.ProcessName,
-			&e.ProcessPath,
-			&e.ProcessHashSHA256,
-			&e.ProcessPublisher,
-			&e.ProcessProductName,
-			&e.ProcessUserName,
-			&e.MatchRuleID,
-			&e.MatchAction,
-			&e.MatchRuleType,
-			&e.MatchValue,
-			&e.MatchCategoryCode,
-			&e.PolicyVersion,
-			&e.PolicyMode,
-		); err != nil {
+		e, err := scanDeviceEvent(rows)
+		if err != nil {
 			return nil, err
 		}
 		out = append(out, e)
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return out, nil
+	return out, rows.Err()
 }
 
 // InsertViolation inserts a violation row.
