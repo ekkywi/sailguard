@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	StreamEvents = "sg:events"
-	GroupEvents  = "sg-workers"
+	StreamEvents        = "sg:events"
+	GroupEvents         = "sg-workers"
+	DefaultClaimMinIdle = 60 * time.Second
 )
 
 type Client struct {
@@ -65,4 +66,34 @@ func (c *Client) Ack(ctx context.Context, stream, group string, ids ...string) e
 		return nil
 	}
 	return c.rdb.XAck(ctx, stream, group, ids...).Err()
+}
+
+func (c *Client) AutoClaim(
+	ctx context.Context,
+	stream, group, consumer string,
+	minIdle time.Duration,
+	start string,
+	count int64,
+) (messages []redis.XMessage, nextStart string, err error) {
+	if start == "" {
+		start = "0-0"
+	}
+	if minIdle <= 0 {
+		minIdle = DefaultClaimMinIdle
+	}
+	if count <= 0 {
+		count = 10
+	}
+	msgs, next, err := c.rdb.XAutoClaim(ctx, &redis.XAutoClaimArgs{
+		Stream:   stream,
+		Group:    group,
+		Consumer: consumer,
+		MinIdle:  minIdle,
+		Start:    start,
+		Count:    count,
+	}).Result()
+	if err != nil {
+		return nil, start, fmt.Errorf("xautoclaim %s: %w", stream, err)
+	}
+	return msgs, next, nil
 }
