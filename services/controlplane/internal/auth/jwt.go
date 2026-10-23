@@ -14,18 +14,24 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-func IssueAccessToken(secret string, userID uuid.UUID, email string, ttl time.Duration) (string, error) {
+func IssueAccessToken(secret string, userID uuid.UUID, email string, ttl time.Duration) (token string, jti string, err error) {
+	jti = uuid.NewString()
 	claims := Claims{
 		UserID: userID,
-		Email:  email,
+		Email: email,
 		RegisteredClaims: jwt.RegisteredClaims{
+			ID: jti,
 			ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(ttl)),
-			IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
-			Issuer:    "sailguard",
+			IssuedAt: jwt.NewNumericDate(time.Now().UTC()),
+			Issuer: "sailguard",
 		},
 	}
 	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return t.SignedString([]byte(secret))
+	signed, err := t.SignedString([]byte(secret))
+	if err != nil {
+		return "", "", err
+	}
+	return signed, jti, nil
 }
 
 func ParseAccessToken(secret, token string) (*Claims, error) {

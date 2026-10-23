@@ -1,6 +1,9 @@
 package config
 
-import "os"
+import (
+	"os"
+	"time"
+)
 
 type Config struct {
 	HTTPAddr         string
@@ -8,10 +11,11 @@ type Config struct {
 	RedisURL         string
 	JWTSecret        string
 	Env              string
-	AgentWin7Path    string // legacy Win7 SP1+ / 8.1 (Go 1.20 artefact)
-	AgentWindowsPath string // current Win10/11+ (modern Go artefact)
-	AgentSetupPath   string // Windows setup exe (Go 1.20; installs to Program Files)
-	PublicAgentURL   string // optional hint shown in download UI (LAN API base)
+	AgentWin7Path    string
+	AgentWindowsPath string
+	AgentSetupPath   string
+	PublicAgentURL   string
+	AdminTokenTTL    time.Duration
 }
 
 func Load() Config {
@@ -25,6 +29,7 @@ func Load() Config {
 		AgentWindowsPath: getEnv("SG_AGENT_WINDOWS_PATH", "bin/sailguard-agent-windows.exe"),
 		AgentSetupPath:   getEnv("SG_AGENT_SETUP_PATH", "bin/sailguard-agent-setup.exe"),
 		PublicAgentURL:   getEnv("SG_PUBLIC_AGENT_URL", ""),
+		AdminTokenTTL:    getEnvDuration("SG_ADMIN_TOKEN_TTL", 8*time.Hour),
 	}
 }
 
@@ -33,4 +38,16 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func getEnvDuration(key string, fallback time.Duration) time.Duration {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil || d <= 0 {
+		return fallback
+	}
+	return d
 }

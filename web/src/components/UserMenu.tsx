@@ -1,13 +1,11 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { clearToken } from '../lib/auth-storage'
+import { endSession } from '../lib/session'
 
 type UserMenuProps = {
   userLabel?: string | null
 }
 
 export function UserMenu({ userLabel }: UserMenuProps) {
-  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const menuId = useId()
@@ -38,8 +36,7 @@ export function UserMenu({ userLabel }: UserMenuProps) {
 
   function logout() {
     setOpen(false)
-    clearToken()
-    navigate('/login', { replace: true })
+    void endSession()
   }
 
   return (

@@ -5,9 +5,9 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/ekkywi/sailguard/services/controlplane/internal/auth"
+	"github.com/ekkywi/sailguard/services/controlplane/internal/authsession"
 	"github.com/ekkywi/sailguard/services/controlplane/internal/domain/audit"
 	"github.com/ekkywi/sailguard/services/controlplane/internal/domain/identity"
 	"golang.org/x/crypto/bcrypt"
@@ -31,7 +31,7 @@ func (a *API) handleMe(w http.ResponseWriter, r *http.Request) {
 	userID, ok := userIDFromCtx(r.Context())
 	if !ok {
 		writeJSON(w, http.StatusUnauthorized, envelope{
-			OK: false,
+			OK:    false,
 			Error: map[string]any{"code": "unauthorized", "message": "missing auth context"},
 		})
 		return
@@ -41,14 +41,14 @@ func (a *API) handleMe(w http.ResponseWriter, r *http.Request) {
 	user, err := store.FindByID(r.Context(), userID)
 	if errors.Is(err, identity.ErrNotFound) || (user != nil && !user.IsActive) {
 		writeJSON(w, http.StatusUnauthorized, envelope{
-			OK: false,
+			OK:    false,
 			Error: map[string]any{"code": "unauthorized", "message": "user not found or inactive"},
 		})
 		return
 	}
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, envelope{
-			OK: false,
+			OK:    false,
 			Error: map[string]any{"code": "internal_error", "message": "failed to load user"},
 		})
 		return
@@ -57,7 +57,7 @@ func (a *API) handleMe(w http.ResponseWriter, r *http.Request) {
 	roles, err := store.ListRoleCodes(r.Context(), user.ID)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, envelope{
-			OK: false, 
+			OK:    false,
 			Error: map[string]any{"code": "internal_error", "message": "failed to load roles"},
 		})
 		return
@@ -74,10 +74,10 @@ func (a *API) handleMe(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, envelope{
 		OK: true,
 		Data: map[string]any{
-			"id": user.ID.String(),
-			"email": user.Email,
-			"name": user.Name,
-			"roles": roles,
+			"id":          user.ID.String(),
+			"email":       user.Email,
+			"name":        user.Name,
+			"roles":       roles,
 			"permissions": perms,
 		},
 	})
@@ -152,11 +152,20 @@ func (a *API) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := auth.IssueAccessToken(a.cfg.JWTSecret, user.ID, user.Email, 8*time.Hour)
+	ttl := a.cfg.AdminTokenTTL
+	token, jti, err := auth.IssueAccessToken(a.cfg.JWTSecret, user.ID, user.Email, ttl)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, envelope{
 			OK:    false,
 			Error: map[string]any{"code": "internal_error", "message": "could not issue token"},
+		})
+		return
+	}
+
+	if err := authsession.New(a.rdb).Create(r.Context(), user.ID, jti, ttl); err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{
+			OK:    false,
+			Error: map[string]any{"code": "internal_error", "message": "could not create session"},
 		})
 		return
 	}
@@ -176,12 +185,58 @@ func (a *API) handleLogin(w http.ResponseWriter, r *http.Request) {
 		Data: map[string]any{
 			"access_token": token,
 			"token_type":   "Bearer",
-			"expires_in":   int((8 * time.Hour).Seconds()),
+			"expires_in":   int(ttl.Seconds()),
 			"user": map[string]any{
 				"id":    user.ID.String(),
 				"email": user.Email,
 				"name":  user.Name,
 			},
 		},
+	})
+}
+
+func (a *API) handleLogout(w http.ResponseWriter, r *http.Request) {
+	userID, ok := userIDFromCtx(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, envelope{
+			OK:    false,
+			Error: map[string]any{"code": "unauthorized", "message": "missing auth context"},
+		})
+		return
+	}
+	jti, ok := sessionIDFromCtx(r.Context())
+	if !ok || jti == "" {
+		writeJSON(w, http.StatusUnauthorized, envelope{
+			OK:    false,
+			Error: map[string]any{"code": "unauthorized", "message": "missing session"},
+		})
+		return
+	}
+
+	if err := authsession.New(a.rdb).Revoke(r.Context(), userID, jti); err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{
+			OK:    false,
+			Error: map[string]any{"code": "internal_error", "message": "could not revoke session"},
+		})
+		return
+	}
+
+	email := ""
+	if u, err := identity.NewStore(a.pool).FindByID(r.Context(), userID); err == nil && u != nil {
+		email = u.Email
+	}
+	a.writeAudit(r.Context(), audit.RecordInput{
+		ActorUserID:  &userID,
+		ActorEmail:   email,
+		Action:       "auth.logout",
+		ResourceType: "user",
+		ResourceID:   userID.String(),
+		Summary:      "Logout",
+		Metadata:     map[string]any{},
+	})
+
+	writeJSON(w, http.StatusOK, envelope{
+		OK:   true,
+		Data: map[string]any{},
 	})
 }

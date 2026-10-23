@@ -24,6 +24,7 @@ func NewRouter(cfg config.Config, pool *pgxpool.Pool, rdb *redis.Client) http.Ha
 
 	mux.HandleFunc("GET /v1/auth/me", api.requireAuth(api.handleMe))
 	mux.HandleFunc("POST /v1/auth/login", api.handleLogin)
+	mux.HandleFunc("POST /v1/auth/logout", api.requireAuth(api.handleLogout))
 
 	mux.HandleFunc("GET /v1/roles", api.requirePermission("user.read", api.handleListRoles))
 	mux.HandleFunc("GET /v1/permissions", api.requirePermission("user.read", api.handleListPermissions))

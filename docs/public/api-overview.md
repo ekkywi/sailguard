@@ -14,10 +14,11 @@ SailGuard exposes a versioned HTTP API under `/v1`. Responses use a consistent e
 
 | Step | Endpoint | Notes |
 |------|----------|--------|
-| Login | `POST /v1/auth/login` | JSON body: `email`, `password` → `access_token` (Bearer), `expires_in`, basic `user` |
-| Current user | `GET /v1/auth/me` | Header: `Authorization: Bearer <access_token>` |
+| Login | `POST /v1/auth/login` | JSON body: `email`, `password` → `access_token` (Bearer), `expires_in`, basic `user`. Issues a server session (`jti`) in Redis (TTL = `SG_ADMIN_TOKEN_TTL`, default 8h). |
+| Current user | `GET /v1/auth/me` | Header: `Authorization: Bearer <access_token>`; token must have a live Redis session |
+| Logout | `POST /v1/auth/logout` | Revokes the current session (`jti`); subsequent calls with that token return 401 |
 
-Tokens are signed access tokens (HMAC). Directory federation (for example LDAP/AD) may be added later without changing the Bearer pattern for API clients.
+Tokens are signed access tokens (HMAC) bound to a revocable server session. The admin console also applies a **10-minute idle** logout in the browser. Directory federation (for example LDAP/AD) may be added later without changing the Bearer pattern for API clients.
 
 | Client | Mechanism |
 |--------|-----------|
@@ -31,7 +32,8 @@ Administrative APIs are further protected by role-based permissions as routes co
 ### Identity & access
 
 - **Available now:** login; current-user profile with roles and permission codes (`/auth/me`); **users admin** (`GET/POST /v1/users`, `GET/PATCH /v1/users/{id}`, `POST …/reset-password`, `GET /v1/roles`, `GET /v1/permissions`; web `/users` gated by `user.read` / `user.write`). Admin console also hides nav links and write controls from `/auth/me` permission codes (API `requirePermission` remains authoritative).
-- **Planned:** password change, logout/session revoke (server-side), LDAP/AD, MFA
+- **Available now (sessions):** configurable admin token TTL (`SG_ADMIN_TOKEN_TTL`); Redis-backed session revoke on logout; console idle timeout (10m) and 401 → re-login.
+- **Planned:** password change, session list / revoke-all UI, LDAP/AD, MFA
 
 ### Inventory
 

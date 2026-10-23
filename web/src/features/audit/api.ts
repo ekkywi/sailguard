@@ -1,5 +1,6 @@
 import { apiFetch } from '../../lib/api'
 import { getToken } from '../../lib/auth-storage'
+import { endSession } from '../../lib/session'
 import type { AuditLogListData, AuditLogQuery } from './types'
 
 function toSearchParams(query: AuditLogQuery = {}): URLSearchParams {
@@ -38,6 +39,10 @@ export async function exportAuditLogsCSV(query: AuditLogQuery = {}) {
   if (token) headers.set('Authorization', `Bearer ${token}`)
 
   const res = await fetch(path, { headers })
+  if (res.status === 401 && token) {
+    await endSession({ reason: 'expired' })
+    throw new Error('session expired')
+  }
   if (!res.ok) {
     let message = `export failed (${res.status})`
     try {

@@ -2,10 +2,11 @@ package httpapi
 
 import (
 	"context"
-	"net/http"
 	"errors"
+	"net/http"
 
 	"github.com/ekkywi/sailguard/services/controlplane/internal/auth"
+	"github.com/ekkywi/sailguard/services/controlplane/internal/authsession"
 	"github.com/ekkywi/sailguard/services/controlplane/internal/domain/identity"
 	"github.com/ekkywi/sailguard/services/controlplane/internal/domain/inventory"
 	"github.com/google/uuid"
@@ -15,6 +16,7 @@ type ctxKey string
 
 const (
 	ctxUserID      ctxKey = "userID"
+	ctxSessionID   ctxKey = "sessionID"
 	ctxPermissions ctxKey = "permissions"
 	ctxDeviceID    ctxKey = "deviceID"
 )
@@ -24,16 +26,57 @@ func (a *API) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 		raw, ok := bearerToken(r)
 		if !ok || raw == "" {
 			writeJSON(w, http.StatusUnauthorized, envelope{
-				OK:    false,
-				Error: map[string]any{"code": "unauthorized", "message": "missing bearer token"},
+				OK: false,
+				Error: map[string]any{
+					"code":    "unauthorized",
+					"message": "missing bearer token",
+				},
 			})
 			return
 		}
+
 		claims, err := auth.ParseAccessToken(a.cfg.JWTSecret, raw)
 		if err != nil {
 			writeJSON(w, http.StatusUnauthorized, envelope{
-				OK:    false,
-				Error: map[string]any{"code": "unauthorized", "message": "invalid or expired token"},
+				OK: false,
+				Error: map[string]any{
+					"code":    "unauthorized",
+					"message": "invalid or expired token",
+				},
+			})
+			return
+		}
+
+		jti := claims.ID
+		if jti == "" {
+			writeJSON(w, http.StatusUnauthorized, envelope{
+				OK: false,
+				Error: map[string]any{
+					"code":    "unauthorized",
+					"message": "invalid or expired token",
+				},
+			})
+			return
+		}
+
+		okSession, err := authsession.New(a.rdb).Exists(r.Context(), jti)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, envelope{
+				OK: false,
+				Error: map[string]any{
+					"code":    "internal_error",
+					"message": "failed to check session",
+				},
+			})
+			return
+		}
+		if !okSession {
+			writeJSON(w, http.StatusUnauthorized, envelope{
+				OK: false,
+				Error: map[string]any{
+					"code":    "unauthorized",
+					"message": "session revoked or expired",
+				},
 			})
 			return
 		}
@@ -42,13 +85,17 @@ func (a *API) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 		perms, err := store.ListPermissionCodes(r.Context(), claims.UserID)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, envelope{
-				OK:    false,
-				Error: map[string]any{"code": "internal_error", "message": "failed to load permissions"},
+				OK: false,
+				Error: map[string]any{
+					"code":    "internal_error",
+					"message": "failed to load permissions",
+				},
 			})
 			return
 		}
 
 		ctx := context.WithValue(r.Context(), ctxUserID, claims.UserID)
+		ctx = context.WithValue(ctx, ctxSessionID, jti)
 		ctx = context.WithValue(ctx, ctxPermissions, perms)
 		next(w, r.WithContext(ctx))
 	}
@@ -77,7 +124,7 @@ func (a *API) requireDeviceAuth(next http.HandlerFunc) http.HandlerFunc {
 			writeJSON(w, http.StatusUnauthorized, envelope{
 				OK: false,
 				Error: map[string]any{
-					"code": "unauthorized",
+					"code":    "unauthorized",
 					"message": "missing bearer token",
 				},
 			})
@@ -93,7 +140,7 @@ func (a *API) requireDeviceAuth(next http.HandlerFunc) http.HandlerFunc {
 			writeJSON(w, http.StatusUnauthorized, envelope{
 				OK: false,
 				Error: map[string]any{
-					"code": "unauthorized",
+					"code":    "unauthorized",
 					"message": "invalid device token",
 				},
 			})
@@ -103,7 +150,7 @@ func (a *API) requireDeviceAuth(next http.HandlerFunc) http.HandlerFunc {
 			writeJSON(w, http.StatusForbidden, envelope{
 				OK: false,
 				Error: map[string]any{
-					"code": "device_disabled",
+					"code":    "device_disabled",
 					"message": "device is disabled",
 				},
 			})
@@ -113,7 +160,7 @@ func (a *API) requireDeviceAuth(next http.HandlerFunc) http.HandlerFunc {
 			writeJSON(w, http.StatusInternalServerError, envelope{
 				OK: false,
 				Error: map[string]any{
-					"code": "internal_error",
+					"code":    "internal_error",
 					"message": "failed to authenticate device",
 				},
 			})
@@ -127,6 +174,11 @@ func (a *API) requireDeviceAuth(next http.HandlerFunc) http.HandlerFunc {
 
 func userIDFromCtx(ctx context.Context) (uuid.UUID, bool) {
 	id, ok := ctx.Value(ctxUserID).(uuid.UUID)
+	return id, ok
+}
+
+func sessionIDFromCtx(ctx context.Context) (string, bool) {
+	id, ok := ctx.Value(ctxSessionID).(string)
 	return id, ok
 }
 

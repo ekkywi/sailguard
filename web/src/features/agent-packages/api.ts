@@ -1,5 +1,6 @@
 import { getToken } from '../../lib/auth-storage'
 import { apiFetch } from '../../lib/api'
+import { endSession } from '../../lib/session'
 import type { AgentPackageMeta, DownloadWindowsPackageInput } from './types'
 
 export function getWindowsAgentPackageMeta() {
@@ -23,6 +24,11 @@ export async function downloadWindowsAgentPackage(
     headers,
     body: JSON.stringify(body),
   })
+
+  if (res.status === 401 && token) {
+    await endSession({ reason: 'expired' })
+    throw new Error('session expired')
+  }
 
   if (!res.ok) {
     let message = `download failed (${res.status})`
