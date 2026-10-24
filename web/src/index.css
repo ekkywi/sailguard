@@ -2790,3 +2790,68 @@ input {
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* Settings hub */
+.settings-layout {
+  display: grid;
+  grid-template-columns: 12rem minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.settings-nav-link {
+  display: block;
+  padding: 0.45rem 0.65rem;
+  border-radius: calc(var(--radius) - 2px);
+  color: var(--muted);
+  text-decoration: none;
+  font-size: var(--text-sm);
+}
+
+.settings-nav-link:hover {
+  color: var(--fg);
+  background: var(--ghost-hover);
+}
+
+.settings-nav-link-on {
+  color: var(--fg);
+  background: var(--ghost-active);
+  font-weight: 550;
+}
+
+.settings-panel .list-panel {
+  margin: 0;
+}
+
+.settings-form {
+  max-width: 36rem;
+}
+
+.settings-lede {
+  margin-top: 0;
+}
+
+.settings-check {
+  max-width: fit-content;
+}
+
+@media (max-width: 720px) {
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}

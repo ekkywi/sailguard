@@ -11,9 +11,11 @@ import (
 
 	"github.com/ekkywi/sailguard/services/controlplane/internal/config"
 	"github.com/ekkywi/sailguard/services/controlplane/internal/db"
+	"github.com/ekkywi/sailguard/services/controlplane/internal/domain/alerting"
 	"github.com/ekkywi/sailguard/services/controlplane/internal/domain/telemetry"
 	"github.com/ekkywi/sailguard/services/controlplane/internal/queue"
 	"github.com/ekkywi/sailguard/services/controlplane/internal/redisx"
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -40,6 +42,7 @@ func main() {
 
 	q := queue.New(rdb)
 	events := telemetry.NewStore(pool)
+	alerts := alerting.NewStore(pool)
 
 	if err := q.EnsureGroup(ctx, queue.StreamEvents, queue.GroupEvents); err != nil {
 		log.Fatalf("ensure group: %v", err)
@@ -79,7 +82,7 @@ func main() {
 			}
 			for _, m := range claimed {
 				log.Printf("reclaimed id=%s", m.ID)
-				processStreamMessage(ctx, q, events, m)
+				processStreamMessage(ctx, q, events, alerts, m)
 			}
 		}
 
@@ -98,12 +101,18 @@ func main() {
 		}
 
 		for _, m := range msgs {
-			processStreamMessage(ctx, q, events, m)
+			processStreamMessage(ctx, q, events, alerts, m)
 		}
 	}
 }
 
-func processStreamMessage(ctx context.Context, q *queue.Client, events *telemetry.Store, m redis.XMessage) {
+func processStreamMessage(
+	ctx context.Context,
+	q *queue.Client,
+	events *telemetry.Store,
+	alerts *alerting.Store,
+	m redis.XMessage,
+) {
 	ack := func() {
 		if err := q.Ack(ctx, queue.StreamEvents, queue.GroupEvents, m.ID); err != nil {
 			log.Printf("ack %s: %v", m.ID, err)
@@ -174,7 +183,49 @@ func processStreamMessage(ctx context.Context, q *queue.Client, events *telemetr
 			"persisted id=%s client_event_id=%s inserted=%v row=%s",
 			m.ID, msg.ClientEventID, inserted, id,
 		)
+		if inserted {
+			notifyViolation(ctx, alerts, msg, deviceID, id.String())
+		}
 		ack()
 		return
+	}
+}
+
+func notifyViolation(
+	ctx context.Context,
+	alerts *alerting.Store,
+	msg queue.ViolationMessage,
+	deviceID uuid.UUID,
+	eventID string,
+) {
+	channels, err := alerts.ListEnabledWebhooks(ctx)
+	if err != nil {
+		log.Printf("alert list channels: %v", err)
+		return
+	}
+	if len(channels) == 0 {
+		return
+	}
+	payload := map[string]any{
+		"type":            "sailguard.violation",
+		"event_id":        eventID,
+		"device_id":       deviceID.String(),
+		"client_event_id": msg.ClientEventID,
+		"event_type":      msg.EventType,
+		"occurred_at":     msg.OccurredAt,
+		"process_name":    msg.ProcessName,
+		"process_path":    msg.ProcessPath,
+		"process_user":    msg.ProcessUserName,
+		"match_action":    msg.MatchAction,
+		"match_value":     msg.MatchValue,
+		"policy_mode":     msg.PolicyMode,
+	}
+	for _, ch := range channels {
+		url := ch.WebhookURL()
+		if err := alerting.DeliverWebhook(ctx, url, payload); err != nil {
+			log.Printf("alert webhook channel=%s: %v", ch.ID, err)
+			continue
+		}
+		log.Printf("alert webhook ok channel=%s", ch.ID)
 	}
 }

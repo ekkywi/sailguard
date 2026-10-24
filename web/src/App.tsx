@@ -14,6 +14,10 @@ import EventsPage from './features/events/EventsPage'
 import AgentDownloadPage from './features/agent-packages/AgentDownloadPage'
 import UsersPage from './features/users/UsersPage'
 import AuditLogsPage from './features/audit/AuditLogsPage'
+import SettingsLayout, {
+  SettingsIndexRedirect,
+} from './features/settings/SettingsLayout'
+import NotificationsPage from './features/settings/NotificationsPage'
 import AppLayout from './layouts/AppLayout'
 import HomePage from './pages/HomePage'
 
@@ -42,6 +46,10 @@ export default function App() {
         <Route path="/events" element={<EventsPage />} />
         <Route path="/users" element={<UsersPage />} />
         <Route path="/audit" element={<AuditLogsPage />} />
+        <Route path="/settings" element={<SettingsLayout />}>
+          <Route index element={<SettingsIndexRedirect />} />
+          <Route path="notifications" element={<NotificationsPage />} />
+        </Route>
       </Route>
     </Routes>
   )

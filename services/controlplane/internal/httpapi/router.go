@@ -97,6 +97,10 @@ func NewRouter(cfg config.Config, pool *pgxpool.Pool, rdb *redis.Client) http.Ha
 	mux.HandleFunc("POST /v1/agent/events", api.requireDeviceAuth(api.handleAgentEvents))
 	mux.HandleFunc("GET /v1/agent/policy", api.requireDeviceAuth(api.handleAgentPolicy))
 
+	mux.HandleFunc("GET /v1/alert-channels", api.requirePermission("alert.read", api.handleListAlertChannels))
+	mux.HandleFunc("PATCH /v1/alert-channels/{id}", api.requirePermission("alert.manage", api.handlePatchAlertChannel))
+	mux.HandleFunc("POST /v1/alert-channels/{id}/test", api.requirePermission("alert.manage", api.handleTestAlertChannel))
+
 	return mux
 }
 

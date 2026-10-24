@@ -223,6 +223,20 @@ function IconPanelLeft() {
   )
 }
 
+function IconSettings() {
+  return (
+    <svg className="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.75" />
+      <path
+        d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M6.1 6.1l1.6 1.6M16.3 16.3l1.6 1.6M17.9 6.1l-1.6 1.6M7.7 16.3l-1.6 1.6"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
 function hasPerm(permissions: string[], code: string) {
   return permissions.includes(code)
 }
@@ -238,10 +252,13 @@ export function AppShell({
   const canEventRead = hasPerm(permissions, 'event.read')
   const canUserRead = hasPerm(permissions, 'user.read')
   const canAuditRead = hasPerm(permissions, 'audit.read')
+  const canAlertRead = hasPerm(permissions, 'alert.read')
+  const canAlertManage = hasPerm(permissions, 'alert.manage')
   const showInventory = canDeviceRead || canDeviceWrite
   const showControl = canPolicyRead
   const showTelemetry = canEventRead
-  const showAdmin = canUserRead || canAuditRead
+  const showSettings = canAlertRead || canAlertManage
+  const showAdmin = canUserRead || canAuditRead || showSettings
 
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -360,6 +377,12 @@ export function AppShell({
                   <NavLink to="/audit" className={navClass} title="Audit log">
                     <IconAudit />
                     <span className="nav-label">Audit</span>
+                  </NavLink>
+                ) : null}
+                {showSettings ? (
+                  <NavLink to="/settings" className={navClass} title="Settings">
+                    <IconSettings />
+                    <span className="nav-label">Settings</span>
                   </NavLink>
                 ) : null}
               </>
