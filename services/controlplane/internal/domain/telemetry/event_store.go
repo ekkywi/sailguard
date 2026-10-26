@@ -27,6 +27,20 @@ type EventListResult struct {
 	Total int
 }
 
+type ViolationRow struct {
+	ID              uuid.UUID
+	DeviceID        uuid.UUID
+	ClientEventID   string
+	EventType       string
+	OccurredAt      time.Time
+	ProcessName     string
+	ProcessPath     string
+	ProcessUserName string
+	MatchAction     string
+	MatchValue      string
+	PolicyMode      string
+}
+
 func clampEventListLimit(limit int) int {
 	if limit <= 0 {
 		return 50
@@ -275,4 +289,29 @@ func (s *Store) InsertViolation(
 		return false, uuid.Nil, err
 	}
 	return true, id, nil
+}
+
+func (s *Store) GetViolationByID(ctx context.Context, id uuid.UUID) (*ViolationRow, error) {
+	const q = `
+		SELECT id, device_id, client_event_id, event_type, occurred_at,
+				COALESCE(process_name, ''), COALESCE(process_path, ''),
+				COALESCE(process_user_name, ''),
+				COALESCE(match_action, ''), COALESCE(match_value, ''),
+				COALESCE(policy_mode, '')
+		FROM device_events
+		WHERE id = $1
+	`
+	var r ViolationRow
+	err := s.pool.QueryRow(ctx, q, id).Scan(
+		&r.ID, &r.DeviceID, &r.ClientEventID, &r.EventType, &r.OccurredAt,
+		&r.ProcessName, &r.ProcessPath, &r.ProcessUserName,
+		&r.MatchAction, &r.MatchValue, &r.PolicyMode,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("event not found")
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &r, nil
 }

@@ -16,6 +16,27 @@ type Channel struct {
 	UpdatedAt time.Time
 }
 
+const (
+	DeliveryPending   = "pending"
+	DeliveryDelivered = "delivered"
+	DeliveryFailed    = "failed"
+	DeliveryDead      = "dead"
+)
+
+type Delivery struct {
+	ID          uuid.UUID
+	ChannelID   uuid.UUID
+	EventID     uuid.UUID
+	Status      string
+	Attempts    int
+	MaxAttempts int
+	LastError   *string
+	NextRetryAt *time.Time
+	DeliveredAt *time.Time
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
 func (c Channel) WebhookURL() string {
 	if c.Config == nil {
 		return ""

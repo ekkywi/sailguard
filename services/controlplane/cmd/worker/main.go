@@ -19,6 +19,19 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+func alertBackoff(attemptsAfterFail int) time.Duration {
+	switch {
+	case attemptsAfterFail <= 1:
+		return 30 * time.Second
+	case attemptsAfterFail == 2:
+		return 2 * time.Minute
+	case attemptsAfterFail == 3:
+		return 10 * time.Minute
+	default:
+		return 30 * time.Minute
+	}
+}
+
 func main() {
 	cfg := config.Load()
 	log.Printf("sailguard-worker starting (env=%s redis=%s)", cfg.Env, cfg.RedisURL)
@@ -49,8 +62,15 @@ func main() {
 	}
 	log.Printf("consumer group ready: %s / %s", queue.StreamEvents, queue.GroupEvents)
 
+	if err := q.EnsureGroup(ctx, queue.StreamAlerts, queue.GroupAlerts); err != nil {
+		log.Fatalf("ensure group: %v", err)
+	}
+	log.Printf("consumer group ready: %s / %s", queue.StreamAlerts, queue.GroupAlerts)
+
 	consumer := "worker-1"
+	alertConsumer := "worker-1-alerts"
 	claimStart := "0-0"
+	alertClaimStart := "0-0"
 
 	for {
 		if ctx.Err() != nil {
@@ -86,6 +106,34 @@ func main() {
 			}
 		}
 
+		alertClaimed, alertNext, err := q.AutoClaim(
+			ctx,
+			queue.StreamAlerts,
+			queue.GroupAlerts,
+			alertConsumer,
+			queue.DefaultClaimMinIdle,
+			alertClaimStart,
+			10,
+		)
+		if err != nil {
+			if ctx.Err() != nil {
+				log.Println("sailguard-worker stopped")
+				os.Exit(0)
+			}
+			log.Printf("alert autoclaim: %v", err)
+		} else {
+			if alertNext != "" {
+				alertClaimStart = alertNext
+			}
+			if alertClaimStart == "0-0" || len(alertClaimed) == 0 {
+				alertClaimStart = "0-0"
+			}
+			for _, m := range alertClaimed {
+				log.Printf("alert reclaimed id=%s", m.ID)
+				processAlertMessage(ctx, q, alerts, events, m)
+			}
+		}
+
 		msgs, err := q.ReadGroup(ctx, queue.StreamEvents, queue.GroupEvents, consumer, 10)
 		if err != nil {
 			if ctx.Err() != nil {
@@ -96,12 +144,28 @@ func main() {
 			time.Sleep(time.Second)
 			continue
 		}
-		if len(msgs) == 0 {
-			continue
-		}
-
 		for _, m := range msgs {
 			processStreamMessage(ctx, q, events, alerts, m)
+		}
+
+		alertMsgs, err := q.ReadGroup(ctx, queue.StreamAlerts, queue.GroupAlerts, alertConsumer, 10)
+		if err != nil {
+			if ctx.Err() != nil {
+				log.Println("sailguard-worker stopped")
+				os.Exit(0)
+			}
+			log.Printf("alert read group: %v", err)
+		} else {
+			for _, m := range alertMsgs {
+				processAlertMessage(ctx, q, alerts, events, m)
+			}
+		}
+
+		requeueDueAlerts(ctx, q, alerts)
+
+		if len(msgs) == 0 && len(alertMsgs) == 0 {
+			// ReadGroup already blocked ~2s; avoid busy spin when idle.
+			continue
 		}
 	}
 }
@@ -184,19 +248,18 @@ func processStreamMessage(
 			m.ID, msg.ClientEventID, inserted, id,
 		)
 		if inserted {
-			notifyViolation(ctx, alerts, msg, deviceID, id.String())
+			enqueueAlerts(ctx, q, alerts, id)
 		}
 		ack()
 		return
 	}
 }
 
-func notifyViolation(
+func enqueueAlerts(
 	ctx context.Context,
+	q *queue.Client,
 	alerts *alerting.Store,
-	msg queue.ViolationMessage,
-	deviceID uuid.UUID,
-	eventID string,
+	eventID uuid.UUID,
 ) {
 	channels, err := alerts.ListEnabledWebhooks(ctx)
 	if err != nil {
@@ -206,26 +269,145 @@ func notifyViolation(
 	if len(channels) == 0 {
 		return
 	}
-	payload := map[string]any{
-		"type":            "sailguard.violation",
-		"event_id":        eventID,
-		"device_id":       deviceID.String(),
-		"client_event_id": msg.ClientEventID,
-		"event_type":      msg.EventType,
-		"occurred_at":     msg.OccurredAt,
-		"process_name":    msg.ProcessName,
-		"process_path":    msg.ProcessPath,
-		"process_user":    msg.ProcessUserName,
-		"match_action":    msg.MatchAction,
-		"match_value":     msg.MatchValue,
-		"policy_mode":     msg.PolicyMode,
-	}
 	for _, ch := range channels {
-		url := ch.WebhookURL()
-		if err := alerting.DeliverWebhook(ctx, url, payload); err != nil {
-			log.Printf("alert webhook channel=%s: %v", ch.ID, err)
+		d, err := alerts.EnqueueDelivery(ctx, ch.ID, eventID)
+		if err != nil {
+			log.Printf("alert enqueue db channel=%s event=%s: %v", ch.ID, eventID, err)
 			continue
 		}
-		log.Printf("alert webhook ok channel=%s", ch.ID)
+		if err := produceAlertJob(ctx, q, d); err != nil {
+			log.Printf("alert produce delivery=%s: %v", d.ID, err)
+			continue
+		}
+		log.Printf(
+			"alert enqueued delivery=%s channel=%s event=%s",
+			d.ID, ch.ID, eventID,
+		)
 	}
+}
+
+func produceAlertJob(ctx context.Context, q *queue.Client, d *alerting.Delivery) error {
+	values, err := queue.EncodeAlertValues(queue.AlertMessage{
+		DeliveryID: d.ID.String(),
+		ChannelID:  d.ChannelID.String(),
+		EventID:    d.EventID.String(),
+	})
+	if err != nil {
+		return err
+	}
+	_, err = q.Produce(ctx, queue.StreamAlerts, values)
+	return err
+}
+
+func requeueDueAlerts(ctx context.Context, q *queue.Client, alerts *alerting.Store) {
+	due, err := alerts.ClaimDueRetries(ctx, 20)
+	if err != nil {
+		log.Printf("alert claim due: %v", err)
+		return
+	}
+	for i := range due {
+		d := &due[i]
+		if err := produceAlertJob(ctx, q, d); err != nil {
+			log.Printf("alert requeue delivery=%s: %v", d.ID, err)
+			continue
+		}
+		log.Printf("alert requeued delivery=%s attempts=%d", d.ID, d.Attempts)
+	}
+}
+
+func processAlertMessage(
+	ctx context.Context,
+	q *queue.Client,
+	alerts *alerting.Store,
+	events *telemetry.Store,
+	m redis.XMessage,
+) {
+	ack := func() {
+		if err := q.Ack(ctx, queue.StreamAlerts, queue.GroupAlerts, m.ID); err != nil {
+			log.Printf("alert ack %s: %v", m.ID, err)
+		}
+	}
+
+	msg, err := queue.DecodeAlertMessage(m.Values)
+	if err != nil {
+		log.Printf("alert skip poison id=%s: %v", m.ID, err)
+		ack()
+		return
+	}
+	deliveryID, err := msg.DeliveryUUID()
+	if err != nil {
+		log.Printf("alert skip bad delivery_id id=%s: %v", m.ID, err)
+		ack()
+		return
+	}
+
+	d, err := alerts.GetDelivery(ctx, deliveryID)
+	if err != nil {
+		log.Printf("alert get delivery=%s: %v", deliveryID, err)
+		ack()
+		return
+	}
+	if d.Status == alerting.DeliveryDelivered || d.Status == alerting.DeliveryDead {
+		ack()
+		return
+	}
+	if d.NextRetryAt != nil && d.NextRetryAt.After(time.Now()) {
+		// Too early — ack; ListDueRetries will re-produce when due.
+		ack()
+		return
+	}
+
+	ch, err := alerts.GetChannel(ctx, d.ChannelID)
+	if err != nil {
+		log.Printf("alert get channel delivery=%s: %v", deliveryID, err)
+		_, _ = alerts.MarkAttemptFailed(ctx, deliveryID, err.Error(), alertBackoff(d.Attempts+1))
+		ack()
+		return
+	}
+	url := strings.TrimSpace(ch.WebhookURL())
+	if url == "" || !ch.Enabled {
+		_, _ = alerts.MarkAttemptFailed(ctx, deliveryID, "channel disabled or empty url", alertBackoff(d.Attempts+1))
+		ack()
+		return
+	}
+
+	ev, err := events.GetViolationByID(ctx, d.EventID)
+	if err != nil {
+		log.Printf("alert load event delivery=%s: %v", deliveryID, err)
+		_, _ = alerts.MarkAttemptFailed(ctx, deliveryID, err.Error(), alertBackoff(d.Attempts+1))
+		ack()
+		return
+	}
+
+	payload := map[string]any{
+		"type":            "sailguard.violation",
+		"event_id":        ev.ID.String(),
+		"device_id":       ev.DeviceID.String(),
+		"client_event_id": ev.ClientEventID,
+		"event_type":      ev.EventType,
+		"occurred_at":     ev.OccurredAt.UTC().Format(time.RFC3339),
+		"process_name":    ev.ProcessName,
+		"process_path":    ev.ProcessPath,
+		"process_user":    ev.ProcessUserName,
+		"match_action":    ev.MatchAction,
+		"match_value":     ev.MatchValue,
+		"policy_mode":     ev.PolicyMode,
+	}
+
+	if err := alerting.DeliverWebhook(ctx, url, payload); err != nil {
+		log.Printf("alert webhook fail delivery=%s: %v", deliveryID, err)
+		if _, markErr := alerts.MarkAttemptFailed(ctx, deliveryID, err.Error(), alertBackoff(d.Attempts+1)); markErr != nil {
+			log.Printf("alert mark failed delivery=%s: %v", deliveryID, markErr)
+		}
+		ack()
+		return
+	}
+
+	if _, err := alerts.MarkDelivered(ctx, deliveryID); err != nil {
+		log.Printf("alert mark delivered delivery=%s: %v", deliveryID, err)
+		ack()
+		return
+	}
+	log.Printf("alert webhook ok delivery=%s", deliveryID)
+	ack()
 }

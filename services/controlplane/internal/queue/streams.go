@@ -11,6 +11,8 @@ import (
 const (
 	StreamEvents        = "sg:events"
 	GroupEvents         = "sg-workers"
+	StreamAlerts        = "sg:alerts"
+	GroupAlerts         = "sg-alert-workers"
 	DefaultClaimMinIdle = 60 * time.Second
 )
 

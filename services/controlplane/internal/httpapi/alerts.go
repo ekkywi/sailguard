@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/ekkywi/sailguard/services/controlplane/internal/domain/alerting"
+	"github.com/ekkywi/sailguard/services/controlplane/internal/queue"
 	"github.com/google/uuid"
 )
 
@@ -210,5 +212,131 @@ func (a *API) handleTestAlertChannel(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, envelope{
 		OK:   true,
 		Data: map[string]any{"sent": true},
+	})
+}
+
+func alertDeliveryJSON(d alerting.Delivery) map[string]any {
+	out := map[string]any{
+		"id":           d.ID.String(),
+		"channel_id":   d.ChannelID.String(),
+		"event_id":     d.EventID.String(),
+		"status":       d.Status,
+		"attempts":     d.Attempts,
+		"max_attempts": d.MaxAttempts,
+		"created_at":   d.CreatedAt,
+		"updated_at":   d.UpdatedAt,
+	}
+	if d.LastError != nil {
+		out["last_error"] = *d.LastError
+	}
+	if d.NextRetryAt != nil {
+		out["next_retry_at"] = *d.NextRetryAt
+	}
+	if d.DeliveredAt != nil {
+		out["delivered_at"] = *d.DeliveredAt
+	}
+	return out
+}
+
+func (a *API) handleListAlertDeliveries(w http.ResponseWriter, r *http.Request) {
+	status := strings.TrimSpace(r.URL.Query().Get("status"))
+	limit := 50
+	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil {
+			limit = n
+		}
+	}
+
+	items, err := alerting.NewStore(a.pool).ListDeliveries(r.Context(), status, limit)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "internal_error",
+				"message": "failed to list alert deliveries",
+			},
+		})
+		return
+	}
+	out := make([]map[string]any, 0, len(items))
+	for _, d := range items {
+		out = append(out, alertDeliveryJSON(d))
+	}
+	writeJSON(w, http.StatusOK, envelope{
+		OK:   true,
+		Data: map[string]any{"items": out},
+	})
+}
+
+func (a *API) handleRetryAlertDelivery(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "validation_error",
+				"message": "invalid id",
+			},
+		})
+		return
+	}
+
+	store := alerting.NewStore(a.pool)
+	d, err := store.RequestRetry(r.Context(), id)
+	if errors.Is(err, alerting.ErrDeliveryNotFound) {
+		writeJSON(w, http.StatusNotFound, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "not_found",
+				"message": "alert delivery not found or not retryable",
+			},
+		})
+		return
+	}
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "internal_error",
+				"message": "failed to request retry",
+			},
+		})
+		return
+	}
+
+	values, err := queue.EncodeAlertValues(queue.AlertMessage{
+		DeliveryID: d.ID.String(),
+		ChannelID:  d.ChannelID.String(),
+		EventID:    d.EventID.String(),
+	})
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "internal_error",
+				"message": "failed to encode alert job",
+			},
+		})
+		return
+	}
+	if _, err := queue.New(a.rdb).Produce(r.Context(), queue.StreamAlerts, values); err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "internal_error",
+				"message": "failed to enqueue alert job",
+			},
+		})
+		return
+	}
+
+	a.recordAudit(r, "alert.delivery.retry", "alert_delivery", d.ID.String(),
+		"Requested alert delivery retry",
+		map[string]any{"status": d.Status, "attempts": d.Attempts},
+	)
+
+	writeJSON(w, http.StatusOK, envelope{
+		OK:   true,
+		Data: alertDeliveryJSON(*d),
 	})
 }
