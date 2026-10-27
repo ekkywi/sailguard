@@ -39,6 +39,7 @@ SailGuard combines a privileged endpoint agent with a centralized policy control
 - PostgreSQL and Redis are intended to run on **private networks** with authentication enabled  
 - Application secrets (signing keys, database URLs, SMTP credentials) must be supplied via environment or secret stores—not committed to source control  
 - Alert webhooks should be configured carefully to reduce SSRF risk (HTTPS targets, timeouts, least data in payloads)  
+- Agent **enrollment** and **event ingest** are rate-limited (per IP / per device) with request body and batch size caps to reduce flood and oversized-payload abuse  
 
 ### Privacy-minded telemetry
 

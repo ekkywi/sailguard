@@ -3,12 +3,15 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http"
+	"strings"
 
 	"github.com/ekkywi/sailguard/services/controlplane/internal/auth"
 	"github.com/ekkywi/sailguard/services/controlplane/internal/authsession"
 	"github.com/ekkywi/sailguard/services/controlplane/internal/domain/identity"
 	"github.com/ekkywi/sailguard/services/controlplane/internal/domain/inventory"
+	"github.com/ekkywi/sailguard/services/controlplane/internal/ratelimit"
 	"github.com/google/uuid"
 )
 
@@ -190,4 +193,72 @@ func permissionsFromCtx(ctx context.Context) ([]string, bool) {
 func deviceIDFromCtx(ctx context.Context) (uuid.UUID, bool) {
 	id, ok := ctx.Value(ctxDeviceID).(uuid.UUID)
 	return id, ok
+}
+
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return strings.TrimSpace(r.RemoteAddr)
+	}
+	return host
+}
+
+func (a *API) rateLimit(
+	keyFn func(*http.Request) (string, bool),
+	limit int,
+	next http.HandlerFunc,
+) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		key, ok := keyFn(r)
+		if !ok || key == "" {
+			writeJSON(w, http.StatusUnauthorized, envelope{
+				OK: false,
+				Error: map[string]any{
+					"code":    "unauthorized",
+					"message": "missing rate limit key",
+				},
+			})
+			return
+		}
+
+		allowed, err := ratelimit.New(a.rdb).Allow(r.Context(), key, limit)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, envelope{
+				OK: false,
+				Error: map[string]any{
+					"code":    "internal_error",
+					"message": "rate limit check failed",
+				},
+			})
+			return
+		}
+		if !allowed {
+			w.Header().Set("Retry-After", "60")
+			writeJSON(w, http.StatusTooManyRequests, envelope{
+				OK: false,
+				Error: map[string]any{
+					"code":    "rate_limited",
+					"message": "too many requests, try again later",
+				},
+			})
+			return
+		}
+		next(w, r)
+	}
+}
+
+func enrollRateKey(r *http.Request) (string, bool) {
+	ip := clientIP(r)
+	if ip == "" {
+		return "", false
+	}
+	return "rl:enroll:ip:" + ip, true
+}
+
+func eventsRateKey(r *http.Request) (string, bool) {
+	id, ok := deviceIDFromCtx(r.Context())
+	if !ok {
+		return "", false
+	}
+	return "rl:events:dev:" + id.String(), true
 }

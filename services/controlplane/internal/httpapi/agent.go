@@ -13,8 +13,21 @@ import (
 )
 
 func (a *API) handleAgentEnroll(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, a.cfg.EnrollMaxBody)
+
 	var req agentcontract.EnrollRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			writeJSON(w, http.StatusBadRequest, envelope{
+				OK: false,
+				Error: map[string]any{
+					"code":    "validation_error",
+					"message": "request body too large",
+				},
+			})
+			return
+		}
 		writeJSON(w, http.StatusBadRequest, envelope{
 			OK: false,
 			Error: map[string]any{
@@ -141,8 +154,21 @@ func (a *API) handleAgentEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, a.cfg.EventsMaxBody)
+
 	var req agentcontract.EventBatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			writeJSON(w, http.StatusBadRequest, envelope{
+				OK: false,
+				Error: map[string]any{
+					"code":    "validation_error",
+					"message": "request body too large",
+				},
+			})
+			return
+		}
 		writeJSON(w, http.StatusBadRequest, envelope{
 			OK: false,
 			Error: map[string]any{
@@ -162,6 +188,17 @@ func (a *API) handleAgentEvents(w http.ResponseWriter, r *http.Request) {
 			Error: map[string]any{
 				"code":    "validation_error",
 				"message": "events must not be empty",
+			},
+		})
+		return
+	}
+
+	if len(req.Events) > a.cfg.EventsMaxBatch {
+		writeJSON(w, http.StatusBadRequest, envelope{
+			OK: false,
+			Error: map[string]any{
+				"code":    "validation_error",
+				"message": "too many events in batch",
 			},
 		})
 		return

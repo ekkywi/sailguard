@@ -67,8 +67,9 @@ curl -s http://127.0.0.1:18080/v1/ready   # db + redis true
 
 ## When resuming
 
-State the next concrete step from `handoff.md` (currently: event retention, rate limits, or email alerts). Prefer one complete method per guidance step. If handoff conflicts with the repo, trust the repo + checklist and update handoff.
+State the next concrete step from `handoff.md` (currently: event retention or email alerts). Prefer one complete method per guidance step. If handoff conflicts with the repo, trust the repo + checklist and update handoff.
 Lab RBAC smoke: `python3 scripts/smoke-rbac-roles.py` (seed `002_lab_roles.sql`; password `ChangeMe!SailGuard1`).
+Agent ingest limits: `SG_RATE_ENROLL_PER_MIN` / `SG_RATE_EVENTS_PER_MIN` / `SG_ENROLL_MAX_BODY` / `SG_EVENTS_MAX_BODY` / `SG_EVENTS_MAX_BATCH`.
 
 ## Lab smoke
 

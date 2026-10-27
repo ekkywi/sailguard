@@ -25,6 +25,8 @@ This document describes the agent ↔ control plane contract at a product level.
 - HTTPS/TLS in production  
 - Device authentication on all post-enroll calls  
 - JSON request/response bodies with an explicit `schema_version` for evolution  
+- Enroll and event ingest may return **429** `rate_limited` (per IP / per device); agents should back off and rely on the offline violation queue when uploads are throttled  
+- Oversized request bodies or event batches are rejected with **400** (server-side size and batch caps)  
 
 ## Policy document (effective)
 
