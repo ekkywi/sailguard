@@ -81,7 +81,14 @@ export default function AgentDownloadPage() {
           m.channels.find((c) => c.id === 'windows-legacy' && c.binary_available) ??
           m.channels.find((c) => c.downloadable && c.binary_available) ??
           m.channels.find((c) => c.downloadable)
-        if (preferred) setChannelID(preferred.id)
+        if (preferred) {
+          setChannelID(preferred.id)
+          if (preferred.os_family === 'linux' && m.default_data_dir_linux) {
+            setDataDir(m.default_data_dir_linux)
+          } else if (m.default_data_dir_windows || m.default_data_dir) {
+            setDataDir(m.default_data_dir_windows ?? m.default_data_dir)
+          }
+        }
       })
       .catch((err: unknown) => {
         setMeta(null)
@@ -101,10 +108,13 @@ export default function AgentDownloadPage() {
     return meta.channels.find((c) => c.id === channelID) ?? null
   }, [meta, channelID])
 
+  const isLinux = selected?.os_family === 'linux'
+  const needsWindowsSetup = Boolean(selected && selected.os_family !== 'linux')
+
   const canDownload = Boolean(
     selected?.downloadable &&
       selected.binary_available &&
-      meta?.setup_binary_available !== false,
+      (!needsWindowsSetup || meta?.setup_binary_available !== false),
   )
 
   const blockingReason = useMemo(() => {
@@ -115,7 +125,7 @@ export default function AgentDownloadPage() {
     if (!selected.binary_available) {
       return selected.build_hint || 'Build the agent binary for this channel first.'
     }
-    if (meta.setup_binary_available === false) {
+    if (selected.os_family !== 'linux' && meta.setup_binary_available === false) {
       return meta.setup_build_hint ?? 'Run ./scripts/build-agent-setup.sh'
     }
     return null
@@ -127,7 +137,27 @@ export default function AgentDownloadPage() {
 
   const contents = useMemo(() => {
     if (!selected) return []
-    const rows = [
+    if (selected.os_family === 'linux') {
+      return [
+        {
+          name: selected.binary_name,
+          detail: selected.binary_available
+            ? formatBytes(selected.binary_size_bytes)
+            : 'missing',
+        },
+        { name: 'install.sh', detail: 'root installer + systemd enable' },
+        { name: 'sailguard-agent.service', detail: 'systemd unit' },
+        {
+          name: 'config.json',
+          detail:
+            packageKind === 'install'
+              ? 'includes enrollment token'
+              : 'server URL only',
+        },
+        { name: 'README.txt', detail: 'install steps' },
+      ]
+    }
+    return [
       {
         name: selected.binary_name,
         detail: selected.binary_available
@@ -147,7 +177,6 @@ export default function AgentDownloadPage() {
       },
       { name: 'README.txt', detail: 'install steps' },
     ]
-    return rows
   }, [selected, meta, packageKind])
 
   async function onDownload(e: FormEvent) {
@@ -180,7 +209,9 @@ export default function AgentDownloadPage() {
       toast.success(
         'Download started',
         packageKind === 'update'
-          ? 'Keep ProgramData device.json when installing the update.'
+          ? isLinux
+            ? 'Keep the data directory device.json when installing the update.'
+            : 'Keep ProgramData device.json when installing the update.'
           : 'ZIP saved to the browser download folder.',
       )
     } catch (err: unknown) {
@@ -205,8 +236,8 @@ export default function AgentDownloadPage() {
           <p className="section-label">Inventory</p>
           <h1 className="title">Download agent</h1>
           <p className="lede">
-            Windows agent ZIP: install (with enrollment token) or update (no
-            token).
+            Agent ZIP for Windows or Linux: install (with enrollment token) or
+            update (no token).
           </p>
         </div>
         <button
@@ -286,7 +317,8 @@ export default function AgentDownloadPage() {
                     <span className="dl-choice-title">Update</span>
                     <span className="dl-choice-desc">
                       Replace the binary only. Keeps{' '}
-                      <span className="mono">device.json</span> in ProgramData.
+                      <span className="mono">device.json</span> in the data
+                      directory.
                     </span>
                   </span>
                 </button>
@@ -313,7 +345,22 @@ export default function AgentDownloadPage() {
                         active ? 'dl-platform dl-platform-active' : 'dl-platform'
                       }
                       disabled={disabled}
-                      onClick={() => setChannelID(ch.id)}
+                      onClick={() => {
+                        setChannelID(ch.id)
+                        if (!meta) return
+                        if (ch.os_family === 'linux') {
+                          setDataDir(
+                            meta.default_data_dir_linux ??
+                              '/var/lib/sailguard/agent',
+                          )
+                        } else {
+                          setDataDir(
+                            meta.default_data_dir_windows ??
+                              meta.default_data_dir ??
+                              'C:\\ProgramData\\SailGuard\\agent',
+                          )
+                        }
+                      }}
                     >
                       <span className="dl-platform-icon">
                         <PlatformGlyph family={ch.os_family} />
@@ -355,7 +402,9 @@ export default function AgentDownloadPage() {
                 {selected?.binary_path && !selected.binary_available ? (
                   <p className="callout-meta mono">{selected.binary_path}</p>
                 ) : null}
-                {meta.setup_binary_available === false && meta.setup_binary_path ? (
+                {needsWindowsSetup &&
+                meta.setup_binary_available === false &&
+                meta.setup_binary_path ? (
                   <p className="callout-meta mono">{meta.setup_binary_path}</p>
                 ) : null}
               </div>
@@ -364,11 +413,36 @@ export default function AgentDownloadPage() {
             {packageKind === 'update' && canDownload ? (
               <div className="callout callout-info" role="note">
                 <p className="callout-title">Update checklist</p>
-                <ol className="callout-steps">
-                  <li>Run setup as Administrator (it stops/replaces/starts the service).</li>
-                  <li>Leave ProgramData in place — do not delete device.json.</li>
-                  <li>Confirm with <span className="mono">sc query SailGuardAgent</span>.</li>
-                </ol>
+                {isLinux ? (
+                  <ol className="callout-steps">
+                    <li>
+                      Run <span className="mono">sudo ./install.sh</span> (stops
+                      / replaces / starts the unit).
+                    </li>
+                    <li>
+                      Leave the data directory in place — do not delete{' '}
+                      <span className="mono">device.json</span>.
+                    </li>
+                    <li>
+                      Confirm with{' '}
+                      <span className="mono">systemctl status sailguard-agent</span>.
+                    </li>
+                  </ol>
+                ) : (
+                  <ol className="callout-steps">
+                    <li>
+                      Run setup as Administrator (it stops/replaces/starts the
+                      service).
+                    </li>
+                    <li>
+                      Leave ProgramData in place — do not delete device.json.
+                    </li>
+                    <li>
+                      Confirm with{' '}
+                      <span className="mono">sc query SailGuardAgent</span>.
+                    </li>
+                  </ol>
+                )}
               </div>
             ) : null}
 
@@ -442,11 +516,16 @@ export default function AgentDownloadPage() {
                         className="input mono"
                         value={dataDir}
                         onChange={(e) => setDataDir(e.target.value)}
-                        placeholder="C:\\ProgramData\\SailGuard\\agent"
+                        placeholder={
+                          isLinux
+                            ? '/var/lib/sailguard/agent'
+                            : 'C:\\ProgramData\\SailGuard\\agent'
+                        }
                       />
                       <p className="field-hint">
-                        Default ProgramData path preserves credentials across
-                        reinstalls.
+                        {isLinux
+                          ? 'Default /var/lib path preserves credentials across reinstalls.'
+                          : 'Default ProgramData path preserves credentials across reinstalls.'}
                       </p>
                     </div>
                   ) : null}
@@ -509,10 +588,22 @@ export default function AgentDownloadPage() {
                   : 'Download installer'}
             </button>
             <p className="field-hint dl-aside-hint">
-              After download, run{' '}
-              <span className="mono">sailguard-agent-setup.exe</span> as
-              Administrator. Setup registers the{' '}
-              <span className="mono">SailGuardAgent</span> service for auto-start.
+              {isLinux ? (
+                <>
+                  After download, run{' '}
+                  <span className="mono">sudo ./install.sh</span>. It installs
+                  the binary, writes config, and enables{' '}
+                  <span className="mono">sailguard-agent.service</span>.
+                </>
+              ) : (
+                <>
+                  After download, run{' '}
+                  <span className="mono">sailguard-agent-setup.exe</span> as
+                  Administrator. Setup registers the{' '}
+                  <span className="mono">SailGuardAgent</span> service for
+                  auto-start.
+                </>
+              )}
             </p>
           </aside>
         </form>

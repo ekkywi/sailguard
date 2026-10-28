@@ -67,24 +67,55 @@ func (h *Host) List(ctx context.Context) ([]host.Process, error) {
 func readProcIdentity(pid string) (name, path string) {
 	base := filepath.Join("/proc", pid)
 
+	var comm string
 	if b, err := os.ReadFile(filepath.Join(base, "comm")); err == nil {
-		name = strings.TrimSpace(string(b))
+		comm = strings.TrimSpace(string(b))
 	}
 
+	var argv0 string
 	if b, err := os.ReadFile(filepath.Join(base, "cmdline")); err == nil && len(b) > 0 {
 		parts := strings.Split(string(b), "\x00")
-		if len(parts) > 0 && parts[0] != "" {
-			path = parts[0]
-			if name == "" {
-				name = filepath.Base(parts[0])
-			}
+		if len(parts) > 0 {
+			argv0 = parts[0]
 		}
 	}
 
+	return identityFromCommAndCmdline(comm, argv0)
+}
+
+// linuxMaxCommLen is TASK_COMM_LEN-1: /proc/<pid>/comm truncates names longer than this.
+const linuxMaxCommLen = 15
+
+func identityFromCommAndCmdline(comm, argv0 string) (name, path string) {
+	name = strings.TrimSpace(comm)
+	path = argv0
+	if path == "" {
+		return name, path
+	}
+	baseName := filepath.Base(path)
+	if preferCmdlineBaseName(name, baseName) {
+		name = baseName
+	}
 	if name == "" {
-		return "", ""
+		return "", path
 	}
 	return name, path
+}
+
+// preferCmdlineBaseName upgrades a truncated /proc/comm value (e.g. "gnome-calculato")
+// to the full executable basename from cmdline ("gnome-calculator").
+func preferCmdlineBaseName(comm, baseName string) bool {
+	if baseName == "" {
+		return false
+	}
+	if comm == "" {
+		return true
+	}
+	// Only replace when comm looks truncated and is a prefix of the real basename.
+	// Avoid rewriting short names like "sh" → "shutdown".
+	return len(comm) == linuxMaxCommLen &&
+		len(baseName) > len(comm) &&
+		strings.HasPrefix(baseName, comm)
 }
 
 func (h *Host) Terminate(ctx context.Context, pid uint32) error {

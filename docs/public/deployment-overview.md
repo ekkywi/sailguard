@@ -43,23 +43,26 @@ Agents are installed on endpoints and are **not** packaged inside the control-pl
 | Platform | Support level | Notes |
 |----------|---------------|--------|
 | **Windows 7 SP1 and later** (including 8.1, 10, 11) | Supported target | Prefer 64-bit; TLS 1.2; Toolhelp list/terminate; WMI watch (PID-diff fallback); MachineGuid identity; build Win7 with Go 1.20 |
-| **Linux** | Supported target | Process enumeration via `/proc`; Level 1 terminate; poll-based observe (event watch later); identity from `/etc/machine-id` and `/etc/os-release` |
+| **Linux** | Supported target | Process enumeration via `/proc` (name from `cmdline` when `comm` is truncated); Level 1 terminate; poll-based observe (event watch later); download ZIP + `install.sh` / systemd; identity from `/etc/machine-id` and `/etc/os-release` |
 | **Windows XP / Vista** | **Not supported** | Out of scope for the current Go agent |
 | **macOS** | Later | Agent stubs only |
 
 Primary validation focus: Windows 10/11 and Linux; Windows 7 is in scope and should be regression-tested when agent binaries change. Use classic Win32 APIs for process list/terminate where possible so Windows 7–11 stay on one code path.
 
-**Dual Windows channels:**  
+**Build channels:**  
 - **Legacy (Win7 SP1+ / 8.1):** Go **1.20** via `scripts/build-agent-win7.sh` → `bin/sailguard-agent-win7.exe` (`SG_AGENT_WIN7_PATH`). Go 1.21+ crashes on Windows 7.  
 - **Current (Win10 / 11):** current repo Go via `scripts/build-agent-windows.sh` → `bin/sailguard-agent-windows.exe` (`SG_AGENT_WINDOWS_PATH`).  
+- **Linux amd64:** current repo Go via `scripts/build-agent-linux.sh` → `bin/sailguard-agent-linux` (`SG_AGENT_LINUX_PATH`).
 
 Day-to-day control-plane development uses the newer Go toolchain; only the legacy agent artefact pins Go 1.20.
 
 **Endpoint packages:** Administrators use console **Download agent** to pick a channel and **package kind**:
 - **First install** — ZIP includes enrollment token in `config.json` (token required).
-- **Update** — same binaries, **no** enrollment token; keep `ProgramData\…\device.json` so the device stays enrolled.
+- **Update** — same binaries, **no** enrollment token; keep the endpoint data directory `device.json` so the device stays enrolled.
 
-On the endpoint, run `sailguard-agent-setup.exe` **as Administrator**; it installs to `C:\Program Files\SailGuard\Agent\`, stores config/credentials under `C:\ProgramData\SailGuard\agent\`, and registers the **SailGuardAgent** Windows service (`SERVICE_AUTO_START`) so the agent starts at boot without a console UAC prompt. If Service Control Manager refuses start (common on locked-down Win7 labs: Access denied / marked-for-delete), setup falls back to a SYSTEM `ONSTART` scheduled task plus a detached process start so the agent still runs without leaving a console open. Setup requires an enrollment token only when `device.json` is missing. Service logs append to `ProgramData\…\agent-service.log`. Start Menu includes Start/Stop service shortcuts; console `start.bat` remains for debugging. Build setup with `./scripts/build-agent-setup.sh` (`SG_AGENT_SETUP_PATH`). Optional `SG_PUBLIC_AGENT_URL` pre-fills the LAN API URL. Linux channel is reserved (coming soon). Signed remote/fleet auto-update is planned later.
+**Windows:** run `sailguard-agent-setup.exe` **as Administrator**; it installs to `C:\Program Files\SailGuard\Agent\`, stores config/credentials under `C:\ProgramData\SailGuard\agent\`, and registers the **SailGuardAgent** Windows service (`SERVICE_AUTO_START`) so the agent starts at boot without a console UAC prompt. If Service Control Manager refuses start (common on locked-down Win7 labs: Access denied / marked-for-delete), setup falls back to a SYSTEM `ONSTART` scheduled task plus a detached process start so the agent still runs without leaving a console open. Setup requires an enrollment token only when `device.json` is missing. Service logs append to `ProgramData\…\agent-service.log`. Start Menu includes Start/Stop service shortcuts; console `start.bat` remains for debugging. Build setup with `./scripts/build-agent-setup.sh` (`SG_AGENT_SETUP_PATH`).
+
+**Linux:** unzip the package and run `sudo ./install.sh`. It installs `/usr/local/bin/sailguard-agent` (with `config.json` beside the binary), creates the data directory (default `/var/lib/sailguard/agent`), and enables `sailguard-agent.service`. Keep `device.json` under the data directory on updates. For binary-only upgrades, use an **update** package (no enrollment token) or replace `/usr/local/bin/sailguard-agent` and `systemctl restart sailguard-agent`. Confirm with `systemctl status sailguard-agent` / `journalctl -u sailguard-agent`. Optional `SG_PUBLIC_AGENT_URL` pre-fills the LAN API URL in the download UI. Signed remote/fleet auto-update is planned later.
 
 ## Configuration
 

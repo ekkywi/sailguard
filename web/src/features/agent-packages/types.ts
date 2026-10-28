@@ -17,6 +17,8 @@ export type AgentChannel = {
 export type AgentPackageMeta = {
   default_server_url: string
   default_data_dir?: string
+  default_data_dir_windows?: string
+  default_data_dir_linux?: string
   setup_binary_name?: string
   setup_binary_path?: string
   setup_binary_available?: boolean

@@ -52,7 +52,7 @@ curl -s http://127.0.0.1:18080/v1/ready   # db + redis true
 ## Milestone orientation
 
 - M0–M3 magang core **done** (policy UI, audit match, Events persist/UI; mode PATCH + add/edit/delete rules).
-- M4 **partial**: Linux `/proc` List+Terminate **done**; Windows Toolhelp List+Terminate+WMI Watch+scan **done**; Win7 Go 1.20 build **done**; installer ZIP + setup **done**; install vs update download packages **done**; Windows Service `SailGuardAgent` auto-start **done** (Task Scheduler + detached fallback if SCM Access denied); MachineGuid/os-release **done**; process user on events **done**; enroll reclaim **done**; device/group/policy DELETE (and device/group PATCH) **done**; disabled-device auth gate (403 `device_disabled` + enroll refuse) **done**; offline violation queue + flush **done**; edit-rule in place (**PATCH** rules + UI) **done**; category rules in builder (`GET /v1/categories` + type-driven form) + lab signature seeds + **Categories admin UI** **done**; re-enroll on 401 **done** (lab smoke deferred); **dashboard summary** (`GET /v1/dashboard/summary` + Home; top processes/hosts + stale devices) **done**; **violations timeseries** (`GET /v1/dashboard/violations-timeseries?range=24h|7d` + Home chart) **done**; **Redis stream/worker Phase A** (`sg:events` enqueue + worker `InsertViolation`; heartbeat sync) **done**; **XAUTOCLAIM** PEL reclaim **done**; admin session TTL/revoke/idle **done**; **Events filters + CSV export** **done**; **alerts webhook v1** + **retry/dead-letter** (`alert_deliveries` + `sg:alerts`; Settings deliveries + admin retry) **done**; **rate limits + body/batch caps** **done**; **event retention** **done** (`SG_EVENTS_RETENTION_DAYS` default 180; `0` = off). Remaining: optional ETW/Linux Watch; signed fleet auto-update; email alerts; prod compose E2E / TLS docs.
+- M4 **partial**: Linux `/proc` List+Terminate **done**; Windows Toolhelp List+Terminate+WMI Watch+scan **done**; Win7 Go 1.20 build **done**; installer ZIP + setup **done**; install vs update download packages **done**; Windows Service `SailGuardAgent` auto-start **done** (Task Scheduler + detached fallback if SCM Access denied); MachineGuid/os-release **done**; process user on events **done**; enroll reclaim **done**; device/group/policy DELETE (and device/group PATCH) **done**; disabled-device auth gate (403 `device_disabled` + enroll refuse) **done**; offline violation queue + flush **done**; edit-rule in place (**PATCH** rules + UI) **done**; category rules in builder (`GET /v1/categories` + type-driven form) + lab signature seeds + **Categories admin UI** **done**; re-enroll on 401 **done** (lab smoke deferred); **dashboard summary** (`GET /v1/dashboard/summary` + Home; top processes/hosts + stale devices) **done**; **violations timeseries** (`GET /v1/dashboard/violations-timeseries?range=24h|7d` + Home chart) **done**; **Redis stream/worker Phase A** (`sg:events` enqueue + worker `InsertViolation`; heartbeat sync) **done**; **XAUTOCLAIM** PEL reclaim **done**; admin session TTL/revoke/idle **done**; **Events filters + CSV export** **done**; **alerts webhook v1** + **retry/dead-letter** (`alert_deliveries` + `sg:alerts`; Settings deliveries + admin retry) **done**; **rate limits + body/batch caps** **done**; **event retention** **done** (`SG_EVENTS_RETENTION_DAYS` default 180; `0` = off). **Linux package** **done** (`build-agent-linux.sh`, channel download + systemd `install.sh`); **Linux `/proc` name truncate fix** **done** (prefer cmdline basename when `comm` is 15 chars). Remaining: optional ETW/Linux Watch; signed fleet auto-update; email alerts; prod compose E2E / TLS docs.
 - Later: LDAP, etc. (users admin + RBAC UI gates + device overrides + audit Batch 1–4 done; credential ACL + revoke done).
 - Admin console visual rules: `docs/internal/ui-console.md` (limited `--sg-gold`, operational copy, no marketing/AI-slop chrome).
 
@@ -61,9 +61,11 @@ curl -s http://127.0.0.1:18080/v1/ready   # db + redis true
 - `SG_SCAN_INTERVAL` default `3s` — full list reconciliation (and Linux enforce path today).
 - `SG_HEARTBEAT_INTERVAL` default `30s` — policy sync + heartbeat (not enforce).
 - Windows `Watch`: WMI `__InstanceCreationEvent` first; on failure → Toolhelp PID-diff ~500ms; Linux → `ErrWatchUnsupported` (poll only).
+- Linux process name: `/proc/comm` max 15 chars; agent upgrades truncated `comm` to cmdline basename (so `gnome-calculator` rules match).
 - Shared `recentSet` dedupe (~45s) across watch + scan to avoid double kill/report.
 - Win7 build: `./scripts/build-agent-win7.sh` (sed go 1.20 + `go mod tidy` with Go 1.20).
-- Windows setup: `./scripts/build-agent-setup.sh` → `bin/sailguard-agent-setup.exe` (Go 1.20; required for Download agent packages).
+- Windows setup: `./scripts/build-agent-setup.sh` → `bin/sailguard-agent-setup.exe` (Go 1.20; required for Windows Download packages).
+- Linux build: `./scripts/build-agent-linux.sh` → `bin/sailguard-agent-linux` (`SG_AGENT_LINUX_PATH`).
 
 ## When resuming
 
@@ -81,6 +83,9 @@ export SG_DATA_DIR=$HOME/.sailguard-agent-lab
 go run ./agent/cmd/sailguard-agent
 # expect: process watch: unsupported — poll fallback only
 # expect: audit scan: processes=<large N> …
+
+# Linux packaged: ./scripts/build-agent-linux.sh → Download Linux ZIP → sudo ./install.sh
+# enforce smoke: block process_name=gnome-calculator → journalctl -u sailguard-agent -f
 
 # Win7 enforce: ./scripts/build-agent-win7.sh → SG_SERVER_URL=http://<lan-ip>:18080
 # API LAN bind: SG_HTTP_ADDR=0.0.0.0:18080 (source .env)
