@@ -14,7 +14,7 @@ import (
 )
 
 // watchWMI blocks until ctx is cancelled, calling onCreate for each new Win32_Process.
-// Uses WMI __InstanceCreationEvent (WITHIN 1 ≈ 1s). On setup failure, Watch falls back to PID-diff.
+// Uses WMI __InstanceCreationEvent (WITHIN 0.5 ≈ 0.5s). On setup failure, Watch falls back to PID-diff.
 func (h *Host) watchWMI(ctx context.Context, onCreate func(host.Process)) error {
 	if err := ole.CoInitializeEx(0, ole.COINIT_MULTITHREADED); err != nil {
 		return fmt.Errorf("CoInitializeEx: %w", err)
@@ -46,7 +46,7 @@ func (h *Host) watchWMI(ctx context.Context, onCreate func(host.Process)) error 
 		return fmt.Errorf("ConnectServer: nil service")
 	}
 
-	const query = `SELECT * FROM __InstanceCreationEvent WITHIN 1 WHERE TargetInstance ISA 'Win32_Process'`
+	const query = `SELECT * FROM __InstanceCreationEvent WITHIN 0.2 WHERE TargetInstance ISA 'Win32_Process'`
 	eventsVar, err := oleutil.CallMethod(service, "ExecNotificationQuery", query)
 	if err != nil {
 		return fmt.Errorf("ExecNotificationQuery: %w", err)
