@@ -11,13 +11,12 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// EventListFilter selects device_events rows. Empty fields are ignored.
 type EventListFilter struct {
 	From      *time.Time
 	To        *time.Time
-	EventType string // violation_detected | violation_blocked
+	EventType string
 	DeviceID  *uuid.UUID
-	Q         string // substring: hostname, process, user, match value
+	Q         string
 	Limit     int
 	Offset    int
 }
@@ -130,7 +129,6 @@ func scanDeviceEvent(rows pgx.Rows) (DeviceEvent, error) {
 	return e, err
 }
 
-// ListEvents returns newest matching device events with total count.
 func (s *Store) ListEvents(ctx context.Context, f EventListFilter) (EventListResult, error) {
 	where, args := f.buildWhere()
 	limit := clampEventListLimit(f.Limit)
@@ -179,7 +177,6 @@ func (s *Store) ListEvents(ctx context.Context, f EventListFilter) (EventListRes
 	return EventListResult{Items: out, Total: total}, nil
 }
 
-// ListEventsForExport returns up to maxRows matching the filter (newest first).
 func (s *Store) ListEventsForExport(ctx context.Context, f EventListFilter, maxRows int) ([]DeviceEvent, error) {
 	if maxRows <= 0 || maxRows > 10000 {
 		maxRows = 10000
@@ -212,8 +209,6 @@ func (s *Store) ListEventsForExport(ctx context.Context, f EventListFilter, maxR
 	return out, rows.Err()
 }
 
-// InsertViolation inserts a violation row.
-// Returns inserted=false when (device_id, client_event_id) already exists (idempotent).
 func (s *Store) InsertViolation(
 	ctx context.Context,
 	in InsertViolationInput,
@@ -314,4 +309,23 @@ func (s *Store) GetViolationByID(ctx context.Context, id uuid.UUID) (*ViolationR
 		return nil, err
 	}
 	return &r, nil
+}
+
+func (s *Store) DeleteOlderThan(ctx context.Context, cutoff time.Time, limit int) (int64, error) {
+	if limit <= 0 {
+		limit = 1000
+	}
+	tag, err := s.pool.Exec(ctx,
+		`DELETE FROM device_events
+		WHERE id IN (
+			SELECT id FROM device_events
+			WHERE occurred_at < $1
+			ORDER BY occurred_at
+			LIMIT $2
+		)
+	`, cutoff.UTC(), limit)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
 }

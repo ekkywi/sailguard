@@ -65,6 +65,8 @@ On the endpoint, run `sailguard-agent-setup.exe` **as Administrator**; it instal
 
 Runtime configuration is supplied through environment variables (database URL, Redis URL, HTTP bind address, token signing material, agent package path, and similar). Example templates ship without production secrets. Windows agents also accept a local `config.json` next to the executable (environment variables override file values).
 
+**Event retention:** the worker deletes PostgreSQL `device_events` older than `SG_EVENTS_RETENTION_DAYS` (default **180**; set `0` to disable). Related `alert_deliveries` rows are removed by foreign-key cascade. This does not clear the agent’s offline upload queue on endpoints, and it does not purge administrative audit logs.
+
 ## Capacity guidance (indicative)
 
 The architecture targets mid-scale estates (on the order of **hundreds to low thousands** of Windows 7 SP1+ and Linux endpoints) with batched agent telemetry and asynchronous workers. Exact sizing depends on event volume, retention policy, and hardware.

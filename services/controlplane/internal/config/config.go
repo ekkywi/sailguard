@@ -7,21 +7,22 @@ import (
 )
 
 type Config struct {
-	HTTPAddr         string
-	DBURL            string
-	RedisURL         string
-	JWTSecret        string
-	Env              string
-	AgentWin7Path    string
-	AgentWindowsPath string
-	AgentSetupPath   string
-	PublicAgentURL   string
-	AdminTokenTTL    time.Duration
-	EnrollRatePerMin int
-	EventsRatePerMin int
-	EnrollMaxBody    int64
-	EventsMaxBody    int64
-	EventsMaxBatch   int
+	HTTPAddr            string
+	DBURL               string
+	RedisURL            string
+	JWTSecret           string
+	Env                 string
+	AgentWin7Path       string
+	AgentWindowsPath    string
+	AgentSetupPath      string
+	PublicAgentURL      string
+	AdminTokenTTL       time.Duration
+	EnrollRatePerMin    int
+	EventsRatePerMin    int
+	EnrollMaxBody       int64
+	EventsMaxBody       int64
+	EventsMaxBatch      int
+	EventsRetentionDays int
 }
 
 func Load() Config {
@@ -41,6 +42,7 @@ func Load() Config {
 		EnrollMaxBody:    int64(getEnvInt("SG_ENROLL_MAX_BODY", 16*1024)),
 		EventsMaxBody:    int64(getEnvInt("SG_EVENTS_MAX_BODY", 512*1024)),
 		EventsMaxBatch:   getEnvInt("SG_EVENTS_MAX_BATCH", 100),
+		EventsRetentionDays: getEnvInt("SG_EVENTS_RETENTION_DAYS", 180),
 	}
 }
 

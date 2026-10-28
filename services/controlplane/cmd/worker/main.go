@@ -56,6 +56,7 @@ func main() {
 	q := queue.New(rdb)
 	events := telemetry.NewStore(pool)
 	alerts := alerting.NewStore(pool)
+	go runEventRetention(ctx, cfg.EventsRetentionDays, events)
 
 	if err := q.EnsureGroup(ctx, queue.StreamEvents, queue.GroupEvents); err != nil {
 		log.Fatalf("ensure group: %v", err)
@@ -164,7 +165,6 @@ func main() {
 		requeueDueAlerts(ctx, q, alerts)
 
 		if len(msgs) == 0 && len(alertMsgs) == 0 {
-			// ReadGroup already blocked ~2s; avoid busy spin when idle.
 			continue
 		}
 	}
@@ -231,8 +231,6 @@ func processStreamMessage(
 		PolicyMode:         msg.PolicyMode,
 	}
 
-	// Retry in-process for short DB blips; longer failures stay in the PEL
-	// until AutoClaim reclaims them (DefaultClaimMinIdle).
 	for attempt := 1; attempt <= 3; attempt++ {
 		inserted, id, err := events.InsertViolation(ctx, in)
 		if err != nil {
@@ -352,7 +350,6 @@ func processAlertMessage(
 		return
 	}
 	if d.NextRetryAt != nil && d.NextRetryAt.After(time.Now()) {
-		// Too early — ack; ListDueRetries will re-produce when due.
 		ack()
 		return
 	}
@@ -410,4 +407,47 @@ func processAlertMessage(
 	}
 	log.Printf("alert webhook ok delivery=%s", deliveryID)
 	ack()
+}
+
+func runEventRetention(ctx context.Context, days int, events *telemetry.Store) {
+	if days <= 0 {
+		log.Println("event retention disabled (SG_EVENTS_RETENTION_DAYS=0)")
+		return
+	}
+	log.Printf("event retention: keep %d days", days)
+
+	runOnce := func() {
+		cutoff := time.Now().UTC().AddDate(0, 0, -days)
+		var total int64
+		for {
+			n, err := events.DeleteOlderThan(ctx, cutoff, 1000)
+			if err != nil {
+				if ctx.Err() != nil {
+					return
+				}
+				log.Printf("event retention: %v", err)
+				return
+			}
+			total += n
+			if n == 0 {
+				break
+			}
+		}
+		if total > 0 {
+			log.Printf("event retention: purged %d rows (before %s)", total, cutoff.Format(time.RFC3339))
+		}
+	}
+
+	runOnce()
+
+	t := time.NewTicker(time.Hour)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			runOnce()
+		}
+	}
 }
