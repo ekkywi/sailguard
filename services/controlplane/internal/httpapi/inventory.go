@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/ekkywi/sailguard/services/controlplane/internal/domain/inventory"
@@ -23,6 +24,10 @@ type patchGroupRequest struct {
 type patchDeviceRequest struct {
 	DisplayName *string `json:"display_name"`
 	Status      *string `json:"status"`
+	PIC         *string `json:"pic"`
+	Location    *string `json:"location"`
+	AssetTag    *string `json:"asset_tag"`
+	Notes       *string `json:"notes"`
 }
 
 func groupJSON(g inventory.DeviceGroup) map[string]any {
@@ -45,6 +50,10 @@ func deviceJSON(d inventory.Device) map[string]any {
 		"agent_version": d.AgentVersion,
 		"machine_guid":  d.MachineGUID,
 		"status":        d.Status,
+		"pic":           d.PIC,
+		"location":      d.Location,
+		"asset_tag":     d.AssetTag,
+		"notes":         d.Notes,
 		"last_seen_at":  d.LastSeenAt,
 		"enrolled_at":   d.EnrolledAt,
 		"created_at":    d.CreatedAt,
@@ -245,8 +254,28 @@ func (a *API) handleDeleteGroup(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) handleListDevices(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	limit := 50
+	offset := 0
+	if v := strings.TrimSpace(q.Get("limit")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			limit = n
+		}
+	}
+	if v := strings.TrimSpace(q.Get("offset")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			offset = n
+		}
+	}
+
 	store := inventory.NewStore(a.pool)
-	devices, err := store.ListDevices(r.Context())
+	result, err := store.ListDevices(r.Context(), inventory.DeviceListFilter{
+		Status: strings.TrimSpace(q.Get("status")),
+		OS:     strings.TrimSpace(q.Get("os")),
+		Q:      strings.TrimSpace(q.Get("q")),
+		Limit:  limit,
+		Offset: offset,
+	})
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, envelope{
 			OK:    false,
@@ -255,13 +284,18 @@ func (a *API) handleListDevices(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	items := make([]map[string]any, 0, len(devices))
-	for _, d := range devices {
+	items := make([]map[string]any, 0, len(result.Items))
+	for _, d := range result.Items {
 		items = append(items, deviceJSON(d))
 	}
 	writeJSON(w, http.StatusOK, envelope{
-		OK:   true,
-		Data: map[string]any{"items": items},
+		OK: true,
+		Data: map[string]any{
+			"items":  items,
+			"total":  result.Total,
+			"limit":  limit,
+			"offset": offset,
+		},
 	})
 }
 
@@ -316,16 +350,24 @@ func (a *API) handlePatchDevice(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	if req.DisplayName == nil && req.Status == nil {
+	if req.DisplayName == nil && req.Status == nil &&
+		req.PIC == nil && req.Location == nil && req.AssetTag == nil && req.Notes == nil {
 		writeJSON(w, http.StatusBadRequest, envelope{
-			OK:    false,
-			Error: map[string]any{"code": "validation_error", "message": "display_name or status is required"},
+			OK: false,
+			Error: map[string]any{
+				"code":    "validation_error",
+				"message": "at least one of display_name, status, pic, location, asset_tag, notes is required",
+			},
 		})
 		return
 	}
 
 	store := inventory.NewStore(a.pool)
-	device, err := store.UpdateDevice(r.Context(), id, req.DisplayName, req.Status)
+	device, err := store.UpdateDevice(
+		r.Context(), id,
+		req.DisplayName, req.Status,
+		req.PIC, req.Location, req.AssetTag, req.Notes,
+	)
 	if errors.Is(err, inventory.ErrNotFound) {
 		writeJSON(w, http.StatusNotFound, envelope{
 			OK:    false,
@@ -354,6 +396,9 @@ func (a *API) handlePatchDevice(w http.ResponseWriter, r *http.Request) {
 			"hostname":     device.Hostname,
 			"display_name": device.DisplayName,
 			"status":       device.Status,
+			"pic":          device.PIC,
+			"location":     device.Location,
+			"asset_tag":    device.AssetTag,
 		},
 	)
 

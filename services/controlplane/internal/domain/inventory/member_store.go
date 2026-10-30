@@ -11,7 +11,9 @@ import (
 func (s *Store) ListGroupMembers(ctx context.Context, groupID uuid.UUID) ([]Device, error) {
 	const q = `
 		SELECT d.id, d.hostname, d.display_name, d.os, d.os_version, d.agent_version,
-			d.machine_guid, d.status, d.last_seen_at, d.enrolled_at, d.created_at, d.updated_at
+			d.machine_guid, d.status,
+			d.pic, d.location, d.asset_tag, d.notes,
+			d.last_seen_at, d.enrolled_at, d.created_at, d.updated_at
 		FROM device_group_members m
 		JOIN devices d ON d.id = m.device_id
 		WHERE m.group_id = $1
@@ -29,7 +31,9 @@ func (s *Store) ListGroupMembers(ctx context.Context, groupID uuid.UUID) ([]Devi
 		var d Device
 		if err := rows.Scan(
 			&d.ID, &d.Hostname, &d.DisplayName, &d.OS, &d.OSVersion, &d.AgentVersion,
-			&d.MachineGUID, &d.Status, &d.LastSeenAt, &d.EnrolledAt, &d.CreatedAt, &d.UpdatedAt,
+			&d.MachineGUID, &d.Status,
+			&d.PIC, &d.Location, &d.AssetTag, &d.Notes,
+			&d.LastSeenAt, &d.EnrolledAt, &d.CreatedAt, &d.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

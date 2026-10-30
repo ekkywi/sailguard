@@ -23,6 +23,10 @@ type Device struct {
 	AgentVersion string
 	MachineGUID  *string
 	Status       string
+	PIC          string
+	Location     string
+	AssetTag     string
+	Notes        string
 	LastSeenAt   *time.Time
 	EnrolledAt   *time.Time
 	CreatedAt    time.Time

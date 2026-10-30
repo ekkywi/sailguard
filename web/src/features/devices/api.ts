@@ -3,12 +3,25 @@ import type {
   CreateDeviceOverrideInput,
   Device,
   DeviceListData,
+  DeviceListQuery,
   DeviceOverride,
   DeviceOverrideListData,
 } from './types'
 
-export function listDevices() {
-  return apiFetch<DeviceListData>('/v1/devices')
+function toSearchParams(query: DeviceListQuery = {}): URLSearchParams {
+  const sp = new URLSearchParams()
+  if (query.status) sp.set('status', query.status)
+  if (query.os) sp.set('os', query.os)
+  if (query.q) sp.set('q', query.q)
+  if (query.limit != null) sp.set('limit', String(query.limit))
+  if (query.offset != null) sp.set('offset', String(query.offset))
+  return sp
+}
+
+export function listDevices(query: DeviceListQuery = {}) {
+  const sp = toSearchParams(query)
+  const qs = sp.toString()
+  return apiFetch<DeviceListData>(qs ? `/v1/devices?${qs}` : '/v1/devices')
 }
 
 export function getDevice(id: string) {
@@ -17,7 +30,14 @@ export function getDevice(id: string) {
 
 export function patchDevice(
   id: string,
-  body: { display_name?: string; status?: string },
+  body: {
+    display_name?: string
+    status?: string
+    pic?: string
+    location?: string
+    asset_tag?: string
+    notes?: string
+  },
 ) {
   return apiFetch<Device>(`/v1/devices/${id}`, {
     method: 'PATCH',
