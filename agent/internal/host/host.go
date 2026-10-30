@@ -69,6 +69,20 @@ type HardwareProvider interface {
 	Hardware() (HardwareInfo, error)
 }
 
+// ResourceSample is a last-sample CPU/RAM/disk/uptime snapshot (heartbeat only).
+type ResourceSample struct {
+	UptimeSec   int64
+	CPUPercent  float64
+	RAMUsedMB   int64
+	RAMPercent  float64
+	DiskPercent float64
+}
+
+type MetricsProvider interface {
+	// Metrics samples current resource use. May briefly sleep for CPU delta.
+	Metrics() (ResourceSample, error)
+}
+
 type ServiceManager interface {
 	// Run runs fn as a background service when supported; otherwise foreground.
 	Run(ctx context.Context, fn func(context.Context) error) error
@@ -79,6 +93,7 @@ type Host interface {
 	OSFamily() string // windows | linux | darwin
 	IdentityProvider
 	HardwareProvider
+	MetricsProvider
 	ProcessMonitor
 	ProcessWatcher
 	Enforcer

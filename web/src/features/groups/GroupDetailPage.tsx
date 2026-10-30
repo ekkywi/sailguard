@@ -5,7 +5,10 @@ import { PermissionDenied } from '../../components/PermissionDenied'
 import { toast } from '../../components/toast'
 import type { AppOutletContext } from '../../layouts/AppLayout'
 import {
+  devicePresence,
   formatRelativeTime,
+  presenceBadgeClass,
+  presenceLabel,
   statusBadgeClass,
 } from '../../lib/format'
 import { hasPermission } from '../../lib/permissions'
@@ -378,6 +381,7 @@ export default function GroupDetailPage() {
                   <th>Hostname</th>
                   <th>OS</th>
                   <th>Status</th>
+                  <th>Connectivity</th>
                   <th>Last seen</th>
                   {canWrite ? <th /> : null}
                 </tr>
@@ -403,6 +407,16 @@ export default function GroupDetailPage() {
                       <span className={statusBadgeClass(d.status)}>
                         {d.status}
                       </span>
+                    </td>
+                    <td>
+                      {(() => {
+                        const p = devicePresence(d.last_seen_at)
+                        return (
+                          <span className={presenceBadgeClass(p)}>
+                            {presenceLabel(p)}
+                          </span>
+                        )
+                      })()}
                     </td>
                     <td
                       className="muted"

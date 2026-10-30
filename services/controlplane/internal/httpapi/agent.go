@@ -222,6 +222,8 @@ func (a *API) handleAgentEvents(w http.ResponseWriter, r *http.Request) {
 	sawHeartbeat := false
 	var hbHostname, hbOSVersion, hbAgentVersion string
 	var hbHardware *inventory.HardwareReport
+	var hbMetrics *inventory.MetricsReport
+	var hbPrimaryIP string
 
 	for _, ev := range req.Events {
 		clientID := strings.TrimSpace(ev.ClientEventID)
@@ -255,6 +257,18 @@ func (a *API) handleAgentEvents(w http.ResponseWriter, r *http.Request) {
 					HWManufacturer: ev.Hardware.HWManufacturer,
 					HWModel:        ev.Hardware.HWModel,
 				}
+			}
+			if ev.Metrics != nil {
+				hbMetrics = &inventory.MetricsReport{
+					UptimeSec:   ev.Metrics.UptimeSec,
+					CPUPercent:  ev.Metrics.CPUPercent,
+					RAMUsedMB:   ev.Metrics.RAMUsedMB,
+					RAMPercent:  ev.Metrics.RAMPercent,
+					DiskPercent: ev.Metrics.DiskPercent,
+				}
+			}
+			if ip := strings.TrimSpace(ev.PrimaryIP); ip != "" {
+				hbPrimaryIP = ip
 			}
 			accepted++
 		case agentcontract.EventViolationDetected, agentcontract.EventViolationBlocked:
@@ -328,7 +342,7 @@ func (a *API) handleAgentEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if sawHeartbeat {
-		if err := store.ApplyHeartbeat(r.Context(), deviceID, hbHostname, hbOSVersion, hbAgentVersion, hbHardware); err != nil {
+		if err := store.ApplyHeartbeat(r.Context(), deviceID, hbHostname, hbOSVersion, hbAgentVersion, hbHardware, hbMetrics, hbPrimaryIP); err != nil {
 			writeJSON(w, http.StatusInternalServerError, envelope{
 				OK: false,
 				Error: map[string]any{

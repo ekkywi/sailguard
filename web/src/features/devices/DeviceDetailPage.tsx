@@ -11,8 +11,11 @@ import { PermissionDenied } from '../../components/PermissionDenied'
 import { toast } from '../../components/toast'
 import type { AppOutletContext } from '../../layouts/AppLayout'
 import {
+  devicePresence,
   formatDateTime,
   formatRelativeTime,
+  presenceBadgeClass,
+  presenceLabel,
   statusBadgeClass,
 } from '../../lib/format'
 import { hasPermission } from '../../lib/permissions'
@@ -337,6 +340,30 @@ export default function DeviceDetailPage() {
                       {device.status}
                     </span>
                   </DetailRow>
+                  <DetailRow label="Connectivity">
+                    {(() => {
+                      const p = devicePresence(device.last_seen_at)
+                      return (
+                        <span
+                          className={presenceBadgeClass(p)}
+                          title={
+                            device.last_seen_at
+                              ? `Last seen ${device.last_seen_at}`
+                              : undefined
+                          }
+                        >
+                          {presenceLabel(p)}
+                        </span>
+                      )
+                    })()}
+                  </DetailRow>
+                  <DetailRow label="Primary IP">
+                    {device.primary_ip ? (
+                      <span className="mono">{device.primary_ip}</span>
+                    ) : (
+                      '—'
+                    )}
+                  </DetailRow>
                   <DetailRow label="Hostname">{device.hostname}</DetailRow>
                   <DetailRow label="Display name">
                     {device.display_name || '—'}
@@ -446,6 +473,60 @@ export default function DeviceDetailPage() {
                         <span className="muted">
                           {' '}
                           · {formatDateTime(device.hardware_reported_at)}
+                        </span>
+                      </span>
+                    ) : (
+                      '—'
+                    )}
+                  </DetailRow>
+                </div>
+              </section>
+
+              <section
+                className="panel"
+                aria-labelledby="device-resources-heading"
+              >
+                <h2 id="device-resources-heading" className="panel-title">
+                  Resources
+                </h2>
+                <div className="info-list" aria-label="Resource sample">
+                  <DetailRow label="Uptime">
+                    {device.uptime_sec > 0
+                      ? formatUptime(device.uptime_sec)
+                      : '—'}
+                  </DetailRow>
+                  <DetailRow label="CPU">
+                    {device.metrics_at
+                      ? `${formatPercent(device.cpu_percent)}%`
+                      : '—'}
+                  </DetailRow>
+                  <DetailRow label="RAM">
+                    {device.metrics_at ? (
+                      <>
+                        {formatPercent(device.ram_percent)}%
+                        {device.ram_used_mb > 0 ? (
+                          <span className="muted">
+                            {' '}
+                            · {formatMemoryMB(device.ram_used_mb)} used
+                          </span>
+                        ) : null}
+                      </>
+                    ) : (
+                      '—'
+                    )}
+                  </DetailRow>
+                  <DetailRow label="Disk">
+                    {device.metrics_at
+                      ? `${formatPercent(device.disk_percent)}% used`
+                      : '—'}
+                  </DetailRow>
+                  <DetailRow label="Sampled">
+                    {device.metrics_at ? (
+                      <span title={device.metrics_at}>
+                        {formatRelativeTime(device.metrics_at)}
+                        <span className="muted">
+                          {' '}
+                          · {formatDateTime(device.metrics_at)}
                         </span>
                       </span>
                     ) : (
@@ -616,4 +697,21 @@ function formatMemoryMB(mb: number): string {
     return `${rounded} GB (${mb} MB)`
   }
   return `${mb} MB`
+}
+
+function formatPercent(v: number): string {
+  if (!Number.isFinite(v)) return '0'
+  return (Math.round(v * 10) / 10).toString()
+}
+
+function formatUptime(sec: number): string {
+  if (sec < 60) return `${sec}s`
+  const days = Math.floor(sec / 86400)
+  const hours = Math.floor((sec % 86400) / 3600)
+  const mins = Math.floor((sec % 3600) / 60)
+  const parts: string[] = []
+  if (days > 0) parts.push(`${days}d`)
+  if (hours > 0) parts.push(`${hours}h`)
+  if (mins > 0 || parts.length === 0) parts.push(`${mins}m`)
+  return parts.join(' ')
 }

@@ -57,8 +57,9 @@ func (f DeviceListFilter) buildWhere() (string, []any) {
 			 OR lower(location) LIKE $%d
 			 OR lower(asset_tag) LIKE $%d
 			 OR lower(COALESCE(machine_guid, '')) LIKE $%d
-			 OR lower(notes) LIKE $%d)`,
-			n, n, n, n, n, n, n,
+			 OR lower(notes) LIKE $%d
+			 OR lower(primary_ip) LIKE $%d)`,
+			n, n, n, n, n, n, n, n,
 		))
 	}
 
@@ -74,6 +75,8 @@ const deviceSelectCols = `
 	pic, location, asset_tag, notes,
 	cpu_model, cpu_cores, ram_mb, disk_gb,
 	hw_manufacturer, hw_model, hardware_reported_at,
+	uptime_sec, cpu_percent, ram_used_mb, ram_percent, disk_percent, metrics_at,
+	primary_ip, ip_reported_at,
 	last_seen_at, enrolled_at, created_at, updated_at
 `
 
@@ -99,6 +102,14 @@ func scanDevice(row pgx.Row) (Device, error) {
 		&d.HWManufacturer,
 		&d.HWModel,
 		&d.HardwareReportedAt,
+		&d.UptimeSec,
+		&d.CPUPercent,
+		&d.RAMUsedMB,
+		&d.RAMPercent,
+		&d.DiskPercent,
+		&d.MetricsAt,
+		&d.PrimaryIP,
+		&d.IPReportedAt,
 		&d.LastSeenAt,
 		&d.EnrolledAt,
 		&d.CreatedAt,
@@ -294,13 +305,26 @@ func (h HardwareReport) HasAny() bool {
 		strings.TrimSpace(h.HWModel) != ""
 }
 
+// MetricsReport is a last-sample resource snapshot from the agent heartbeat.
+type MetricsReport struct {
+	UptimeSec   int64
+	CPUPercent  float64
+	RAMUsedMB   int64
+	RAMPercent  float64
+	DiskPercent float64
+}
+
 // ApplyHeartbeat updates last_seen_at and optionally soft-refreshes identity
 // and hardware inventory fields (non-empty / non-zero values only).
+// When metrics is non-nil, last resource sample columns are overwritten.
+// primaryIP soft-updates when non-empty.
 func (s *Store) ApplyHeartbeat(
 	ctx context.Context,
 	id uuid.UUID,
 	hostname, osVersion, agentVersion string,
 	hw *HardwareReport,
+	metrics *MetricsReport,
+	primaryIP string,
 ) error {
 	cpuModel, cpuCores, ramMB, diskGB := "", 0, int64(0), int64(0)
 	hwMfg, hwModel := "", ""
@@ -315,6 +339,19 @@ func (s *Store) ApplyHeartbeat(
 		hwModel = strings.TrimSpace(hw.HWModel)
 	}
 
+	uptimeSec, cpuPct, ramUsed, ramPct, diskPct := int64(0), 0.0, int64(0), 0.0, 0.0
+	reportMetrics := metrics != nil
+	if reportMetrics {
+		uptimeSec = metrics.UptimeSec
+		cpuPct = clampPercent(metrics.CPUPercent)
+		ramUsed = metrics.RAMUsedMB
+		ramPct = clampPercent(metrics.RAMPercent)
+		diskPct = clampPercent(metrics.DiskPercent)
+	}
+
+	primaryIP = strings.TrimSpace(primaryIP)
+	reportIP := primaryIP != ""
+
 	const q = `
 		UPDATE devices
 		SET last_seen_at = now(),
@@ -327,13 +364,23 @@ func (s *Store) ApplyHeartbeat(
 		    disk_gb = CASE WHEN $8 > 0 THEN $8 ELSE disk_gb END,
 		    hw_manufacturer = CASE WHEN $9 <> '' THEN $9 ELSE hw_manufacturer END,
 		    hw_model = CASE WHEN $10 <> '' THEN $10 ELSE hw_model END,
-		    hardware_reported_at = CASE WHEN $11 THEN now() ELSE hardware_reported_at END
+		    hardware_reported_at = CASE WHEN $11 THEN now() ELSE hardware_reported_at END,
+		    uptime_sec = CASE WHEN $12 THEN $13 ELSE uptime_sec END,
+		    cpu_percent = CASE WHEN $12 THEN $14 ELSE cpu_percent END,
+		    ram_used_mb = CASE WHEN $12 THEN $15 ELSE ram_used_mb END,
+		    ram_percent = CASE WHEN $12 THEN $16 ELSE ram_percent END,
+		    disk_percent = CASE WHEN $12 THEN $17 ELSE disk_percent END,
+		    metrics_at = CASE WHEN $12 THEN now() ELSE metrics_at END,
+		    primary_ip = CASE WHEN $18 THEN $19 ELSE primary_ip END,
+		    ip_reported_at = CASE WHEN $18 THEN now() ELSE ip_reported_at END
 		WHERE id = $1
 	`
 	tag, err := s.pool.Exec(
 		ctx, q,
 		id, hostname, osVersion, agentVersion,
 		cpuModel, cpuCores, ramMB, diskGB, hwMfg, hwModel, reportHW,
+		reportMetrics, uptimeSec, cpuPct, ramUsed, ramPct, diskPct,
+		reportIP, primaryIP,
 	)
 	if err != nil {
 		return err
@@ -342,6 +389,16 @@ func (s *Store) ApplyHeartbeat(
 		return ErrNotFound
 	}
 	return nil
+}
+
+func clampPercent(v float64) float64 {
+	if v < 0 {
+		return 0
+	}
+	if v > 100 {
+		return 100
+	}
+	return v
 }
 
 func (s *Store) FindDeviceMachineGUID(ctx context.Context, machineGUID string) (*Device, error) {

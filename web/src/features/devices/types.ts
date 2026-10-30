@@ -18,6 +18,14 @@ export type Device = {
   hw_manufacturer: string
   hw_model: string
   hardware_reported_at: string | null
+  uptime_sec: number
+  cpu_percent: number
+  ram_used_mb: number
+  ram_percent: number
+  disk_percent: number
+  metrics_at: string | null
+  primary_ip: string
+  ip_reported_at: string | null
   last_seen_at: string | null
   enrolled_at: string | null
   created_at: string

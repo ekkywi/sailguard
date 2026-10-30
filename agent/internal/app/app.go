@@ -273,6 +273,20 @@ func sendHeartbeat(
 	} else {
 		log.Printf("hardware inventory: %v", err)
 	}
+	if m, err := h.Metrics(); err == nil {
+		ev.Metrics = &agentcontract.ResourceMetrics{
+			UptimeSec:   m.UptimeSec,
+			CPUPercent:  m.CPUPercent,
+			RAMUsedMB:   m.RAMUsedMB,
+			RAMPercent:  m.RAMPercent,
+			DiskPercent: m.DiskPercent,
+		}
+	} else {
+		log.Printf("resource metrics: %v", err)
+	}
+	if ip := host.PrimaryIPv4(); ip != "" {
+		ev.PrimaryIP = ip
+	}
 	req := agentcontract.EventBatchRequest{
 		SchemaVersion: 1,
 		DeviceID:      cred.DeviceID,

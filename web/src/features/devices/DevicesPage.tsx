@@ -3,7 +3,13 @@ import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import { PermissionDenied } from '../../components/PermissionDenied'
 import { TableSkeleton } from '../../components/TableSkeleton'
 import type { AppOutletContext } from '../../layouts/AppLayout'
-import { formatRelativeTime, statusBadgeClass } from '../../lib/format'
+import {
+  devicePresence,
+  formatRelativeTime,
+  presenceBadgeClass,
+  presenceLabel,
+  statusBadgeClass,
+} from '../../lib/format'
 import { hasPermission } from '../../lib/permissions'
 import { useDocumentTitle } from '../../lib/useDocumentTitle'
 import { listDevices } from './api'
@@ -259,7 +265,9 @@ export default function DevicesPage() {
                     <th>OS</th>
                     <th>PIC</th>
                     <th>Location</th>
+                    <th>IP</th>
                     <th>Status</th>
+                    <th>Connectivity</th>
                     <th>Agent</th>
                     <th>Last seen</th>
                     <th>Enrolled</th>
@@ -295,10 +303,30 @@ export default function DevicesPage() {
                       </td>
                       <td className="muted">{d.pic || '—'}</td>
                       <td className="muted">{d.location || '—'}</td>
+                      <td className="muted mono">{d.primary_ip || '—'}</td>
                       <td>
                         <span className={statusBadgeClass(d.status)}>
                           {d.status}
                         </span>
+                      </td>
+                      <td>
+                        {(() => {
+                          const p = devicePresence(d.last_seen_at)
+                          return (
+                            <span
+                              className={presenceBadgeClass(p)}
+                              title={
+                                p === 'online'
+                                  ? 'Heartbeat within online window'
+                                  : p === 'stale'
+                                    ? 'No recent heartbeat'
+                                    : 'Never seen'
+                              }
+                            >
+                              {presenceLabel(p)}
+                            </span>
+                          )
+                        })()}
                       </td>
                       <td className="muted">{d.agent_version || '—'}</td>
                       <td className="muted" title={d.last_seen_at ?? undefined}>

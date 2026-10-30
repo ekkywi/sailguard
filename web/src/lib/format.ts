@@ -43,3 +43,32 @@ export function statusBadgeClass(status: string): string {
   if (key === 'offline' || key === 'inactive') return 'badge badge-status-offline'
   return 'badge'
 }
+
+/** Matches control-plane dashboard DefaultOnlineWindowSec (120s). */
+export const DEVICE_ONLINE_WINDOW_SEC = 120
+
+export type DevicePresence = 'online' | 'stale' | 'unknown'
+
+/** Connectivity from last_seen_at — separate from device status active|disabled. */
+export function devicePresence(
+  lastSeenAt: string | null | undefined,
+  nowMs: number = Date.now(),
+): DevicePresence {
+  if (!lastSeenAt) return 'unknown'
+  const then = new Date(lastSeenAt).getTime()
+  if (Number.isNaN(then)) return 'unknown'
+  const ageSec = (nowMs - then) / 1000
+  return ageSec <= DEVICE_ONLINE_WINDOW_SEC ? 'online' : 'stale'
+}
+
+export function presenceLabel(p: DevicePresence): string {
+  if (p === 'online') return 'Online'
+  if (p === 'stale') return 'Stale'
+  return 'Unknown'
+}
+
+export function presenceBadgeClass(p: DevicePresence): string {
+  if (p === 'online') return 'badge badge-status-active'
+  if (p === 'stale') return 'badge badge-status-offline'
+  return 'badge'
+}

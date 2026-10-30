@@ -34,6 +34,14 @@ type Device struct {
 	HWManufacturer     string
 	HWModel            string
 	HardwareReportedAt *time.Time
+	UptimeSec          int64
+	CPUPercent         float64
+	RAMUsedMB          int64
+	RAMPercent         float64
+	DiskPercent        float64
+	MetricsAt          *time.Time
+	PrimaryIP          string
+	IPReportedAt       *time.Time
 	LastSeenAt         *time.Time
 	EnrolledAt         *time.Time
 	CreatedAt          time.Time

@@ -65,7 +65,8 @@ type Event struct {
 	PolicyVersion int64              `json:"policy_version,omitempty"`
 	PolicyHash    string             `json:"policy_hash,omitempty"`
 	Hardware      *HardwareInventory `json:"hardware,omitempty"`
-	Metrics       map[string]any     `json:"metrics,omitempty"`
+	Metrics       *ResourceMetrics   `json:"metrics,omitempty"`
+	PrimaryIP     string             `json:"primary_ip,omitempty"`
 
 	// violation_*
 	Process     *ProcessInfo `json:"process,omitempty"`
@@ -86,6 +87,15 @@ type HardwareInventory struct {
 	DiskGB         int64  `json:"disk_gb,omitempty"`
 	HWManufacturer string `json:"hw_manufacturer,omitempty"`
 	HWModel        string `json:"hw_model,omitempty"`
+}
+
+// ResourceMetrics is a last-sample health snapshot (Fase 3), sent on heartbeat only.
+type ResourceMetrics struct {
+	UptimeSec   int64   `json:"uptime_sec,omitempty"`
+	CPUPercent  float64 `json:"cpu_percent,omitempty"`
+	RAMUsedMB   int64   `json:"ram_used_mb,omitempty"`
+	RAMPercent  float64 `json:"ram_percent,omitempty"`
+	DiskPercent float64 `json:"disk_percent,omitempty"`
 }
 
 type ProcessInfo struct {

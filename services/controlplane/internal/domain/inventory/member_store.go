@@ -15,6 +15,8 @@ func (s *Store) ListGroupMembers(ctx context.Context, groupID uuid.UUID) ([]Devi
 			d.pic, d.location, d.asset_tag, d.notes,
 			d.cpu_model, d.cpu_cores, d.ram_mb, d.disk_gb,
 			d.hw_manufacturer, d.hw_model, d.hardware_reported_at,
+			d.uptime_sec, d.cpu_percent, d.ram_used_mb, d.ram_percent, d.disk_percent, d.metrics_at,
+			d.primary_ip, d.ip_reported_at,
 			d.last_seen_at, d.enrolled_at, d.created_at, d.updated_at
 		FROM device_group_members m
 		JOIN devices d ON d.id = m.device_id
