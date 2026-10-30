@@ -18,22 +18,22 @@ type Error struct {
 // --- Enroll ---
 
 type EnrollRequest struct {
-	SchemaVersion    int    `json:"schema_version"`
-	EnrollmentToken  string `json:"enrollment_token"`
-	Hostname         string `json:"hostname"`
-	MachineGUID      string `json:"machine_guid"`
-	OSVersion        string `json:"os_version"`
-	OSFamily         string `json:"os_family"` // windows | linux | darwin
-	AgentVersion     string `json:"agent_version"`
+	SchemaVersion   int    `json:"schema_version"`
+	EnrollmentToken string `json:"enrollment_token"`
+	Hostname        string `json:"hostname"`
+	MachineGUID     string `json:"machine_guid"`
+	OSVersion       string `json:"os_version"`
+	OSFamily        string `json:"os_family"` // windows | linux | darwin
+	AgentVersion    string `json:"agent_version"`
 }
 
 type EnrollResponse struct {
-	DeviceID       string `json:"device_id"`
-	DeviceToken    string `json:"device_token"`
+	DeviceID       string  `json:"device_id"`
+	DeviceToken    string  `json:"device_token"`
 	TokenExpiresAt *string `json:"token_expires_at"`
-	PolicyPollSec  int    `json:"policy_poll_sec"`
-	EventFlushSec  int    `json:"event_flush_sec"`
-	HeartbeatSec   int    `json:"heartbeat_sec"`
+	PolicyPollSec  int     `json:"policy_poll_sec"`
+	EventFlushSec  int     `json:"event_flush_sec"`
+	HeartbeatSec   int     `json:"heartbeat_sec"`
 }
 
 // --- Policy sync ---
@@ -59,12 +59,13 @@ type Event struct {
 	DedupeKey     string `json:"dedupe_key,omitempty"`
 
 	// heartbeat
-	AgentVersion  string         `json:"agent_version,omitempty"`
-	Hostname      string         `json:"hostname,omitempty"`
-	OSVersion     string         `json:"os_version,omitempty"`
-	PolicyVersion int64          `json:"policy_version,omitempty"`
-	PolicyHash    string         `json:"policy_hash,omitempty"`
-	Metrics       map[string]any `json:"metrics,omitempty"`
+	AgentVersion  string             `json:"agent_version,omitempty"`
+	Hostname      string             `json:"hostname,omitempty"`
+	OSVersion     string             `json:"os_version,omitempty"`
+	PolicyVersion int64              `json:"policy_version,omitempty"`
+	PolicyHash    string             `json:"policy_hash,omitempty"`
+	Hardware      *HardwareInventory `json:"hardware,omitempty"`
+	Metrics       map[string]any     `json:"metrics,omitempty"`
 
 	// violation_*
 	Process     *ProcessInfo `json:"process,omitempty"`
@@ -74,6 +75,17 @@ type Event struct {
 
 	// agent_error
 	Error *AgentError `json:"error,omitempty"`
+}
+
+// HardwareInventory is relatively stable host inventory (Fase 2).
+// Sent on heartbeat; control plane soft-updates device columns when non-empty.
+type HardwareInventory struct {
+	CPUModel       string `json:"cpu_model,omitempty"`
+	CPUCores       int    `json:"cpu_cores,omitempty"`
+	RAMMB          int64  `json:"ram_mb,omitempty"`
+	DiskGB         int64  `json:"disk_gb,omitempty"`
+	HWManufacturer string `json:"hw_manufacturer,omitempty"`
+	HWModel        string `json:"hw_model,omitempty"`
 }
 
 type ProcessInfo struct {
@@ -113,9 +125,9 @@ type AgentError struct {
 }
 
 type EventBatchResponse struct {
-	Accepted int              `json:"accepted"`
-	Rejected []RejectedEvent  `json:"rejected,omitempty"`
-	Policy   *PolicyHint      `json:"policy,omitempty"`
+	Accepted int             `json:"accepted"`
+	Rejected []RejectedEvent `json:"rejected,omitempty"`
+	Policy   *PolicyHint     `json:"policy,omitempty"`
 }
 
 type RejectedEvent struct {
@@ -131,8 +143,8 @@ type PolicyHint struct {
 
 // Event type constants
 const (
-	EventHeartbeat          = "heartbeat"
-	EventViolationDetected  = "violation_detected"
-	EventViolationBlocked   = "violation_blocked"
-	EventAgentError         = "agent_error"
+	EventHeartbeat         = "heartbeat"
+	EventViolationDetected = "violation_detected"
+	EventViolationBlocked  = "violation_blocked"
+	EventAgentError        = "agent_error"
 )

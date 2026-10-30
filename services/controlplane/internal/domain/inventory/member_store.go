@@ -13,6 +13,8 @@ func (s *Store) ListGroupMembers(ctx context.Context, groupID uuid.UUID) ([]Devi
 		SELECT d.id, d.hostname, d.display_name, d.os, d.os_version, d.agent_version,
 			d.machine_guid, d.status,
 			d.pic, d.location, d.asset_tag, d.notes,
+			d.cpu_model, d.cpu_cores, d.ram_mb, d.disk_gb,
+			d.hw_manufacturer, d.hw_model, d.hardware_reported_at,
 			d.last_seen_at, d.enrolled_at, d.created_at, d.updated_at
 		FROM device_group_members m
 		JOIN devices d ON d.id = m.device_id
@@ -28,13 +30,8 @@ func (s *Store) ListGroupMembers(ctx context.Context, groupID uuid.UUID) ([]Devi
 
 	out := make([]Device, 0)
 	for rows.Next() {
-		var d Device
-		if err := rows.Scan(
-			&d.ID, &d.Hostname, &d.DisplayName, &d.OS, &d.OSVersion, &d.AgentVersion,
-			&d.MachineGUID, &d.Status,
-			&d.PIC, &d.Location, &d.AssetTag, &d.Notes,
-			&d.LastSeenAt, &d.EnrolledAt, &d.CreatedAt, &d.UpdatedAt,
-		); err != nil {
+		d, err := scanDevice(rows)
+		if err != nil {
 			return nil, err
 		}
 		out = append(out, d)
@@ -99,7 +96,7 @@ func (s *Store) ListGroupIDsForDevice(ctx context.Context, deviceID uuid.UUID) (
 	}
 	defer rows.Close()
 
-	out := make ([]uuid.UUID, 0)
+	out := make([]uuid.UUID, 0)
 	for rows.Next() {
 		var id uuid.UUID
 		if err := rows.Scan(&id); err != nil {

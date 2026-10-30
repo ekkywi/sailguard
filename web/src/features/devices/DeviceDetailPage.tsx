@@ -409,6 +409,51 @@ export default function DeviceDetailPage() {
                   <DetailRow label="Notes">{device.notes || '—'}</DetailRow>
                 </div>
               </section>
+
+              <section
+                className="panel"
+                aria-labelledby="device-hardware-heading"
+              >
+                <h2 id="device-hardware-heading" className="panel-title">
+                  Hardware
+                </h2>
+                <div className="info-list" aria-label="Hardware inventory">
+                  <DetailRow label="Manufacturer">
+                    {device.hw_manufacturer || '—'}
+                  </DetailRow>
+                  <DetailRow label="Model">{device.hw_model || '—'}</DetailRow>
+                  <DetailRow label="CPU">
+                    {device.cpu_model || '—'}
+                    {device.cpu_cores > 0 ? (
+                      <span className="muted">
+                        {' '}
+                        · {device.cpu_cores} cores
+                      </span>
+                    ) : null}
+                  </DetailRow>
+                  <DetailRow label="RAM">
+                    {device.ram_mb > 0
+                      ? formatMemoryMB(device.ram_mb)
+                      : '—'}
+                  </DetailRow>
+                  <DetailRow label="Disk">
+                    {device.disk_gb > 0 ? `${device.disk_gb} GB` : '—'}
+                  </DetailRow>
+                  <DetailRow label="Reported">
+                    {device.hardware_reported_at ? (
+                      <span title={device.hardware_reported_at}>
+                        {formatRelativeTime(device.hardware_reported_at)}
+                        <span className="muted">
+                          {' '}
+                          · {formatDateTime(device.hardware_reported_at)}
+                        </span>
+                      </span>
+                    ) : (
+                      '—'
+                    )}
+                  </DetailRow>
+                </div>
+              </section>
             </div>
           ) : null}
 
@@ -562,4 +607,13 @@ function DetailRow({
       <span className="info-val">{children}</span>
     </div>
   )
+}
+
+function formatMemoryMB(mb: number): string {
+  if (mb >= 1024) {
+    const gb = mb / 1024
+    const rounded = Math.round(gb * 10) / 10
+    return `${rounded} GB (${mb} MB)`
+  }
+  return `${mb} MB`
 }

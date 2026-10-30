@@ -11,6 +11,13 @@ export type Device = {
   location: string
   asset_tag: string
   notes: string
+  cpu_model: string
+  cpu_cores: number
+  ram_mb: number
+  disk_gb: number
+  hw_manufacturer: string
+  hw_model: string
+  hardware_reported_at: string | null
   last_seen_at: string | null
   enrolled_at: string | null
   created_at: string

@@ -53,6 +53,22 @@ type IdentityProvider interface {
 	OSVersion() (string, error)
 }
 
+// HardwareInfo is relatively stable inventory for control-plane device detail.
+type HardwareInfo struct {
+	CPUModel       string
+	CPUCores       int
+	RAMMB          int64
+	DiskGB         int64
+	HWManufacturer string
+	HWModel        string
+}
+
+type HardwareProvider interface {
+	// Hardware returns best-effort static inventory. Partial results are OK;
+	// callers should ignore empty / zero fields.
+	Hardware() (HardwareInfo, error)
+}
+
 type ServiceManager interface {
 	// Run runs fn as a background service when supported; otherwise foreground.
 	Run(ctx context.Context, fn func(context.Context) error) error
@@ -62,6 +78,7 @@ type ServiceManager interface {
 type Host interface {
 	OSFamily() string // windows | linux | darwin
 	IdentityProvider
+	HardwareProvider
 	ProcessMonitor
 	ProcessWatcher
 	Enforcer

@@ -253,20 +253,31 @@ func sendHeartbeat(
 	dataDir, hostname, machineID, osVersion string,
 ) {
 	now := time.Now().UTC().Format(time.RFC3339)
+	ev := agentcontract.Event{
+		ClientEventID: fmt.Sprintf("hb-%d", time.Now().UnixNano()),
+		EventType:     agentcontract.EventHeartbeat,
+		OccurredAt:    now,
+		Hostname:      hostname,
+		OSVersion:     osVersion,
+		AgentVersion:  cfg.AgentVersion,
+	}
+	if hw, err := h.Hardware(); err == nil {
+		ev.Hardware = &agentcontract.HardwareInventory{
+			CPUModel:       hw.CPUModel,
+			CPUCores:       hw.CPUCores,
+			RAMMB:          hw.RAMMB,
+			DiskGB:         hw.DiskGB,
+			HWManufacturer: hw.HWManufacturer,
+			HWModel:        hw.HWModel,
+		}
+	} else {
+		log.Printf("hardware inventory: %v", err)
+	}
 	req := agentcontract.EventBatchRequest{
 		SchemaVersion: 1,
 		DeviceID:      cred.DeviceID,
 		SentAt:        now,
-		Events: []agentcontract.Event{
-			{
-				ClientEventID: fmt.Sprintf("hb-%d", time.Now().UnixNano()),
-				EventType:     agentcontract.EventHeartbeat,
-				OccurredAt:    now,
-				Hostname:      hostname,
-				OSVersion:     osVersion,
-				AgentVersion:  cfg.AgentVersion,
-			},
-		},
+		Events:        []agentcontract.Event{ev},
 	}
 
 	res, err := client.PostEvents(ctx, cred.DeviceToken, req)

@@ -63,7 +63,7 @@ func (s *Store) EnrollDevice(
 			if err := s.IncrementEnrollmentTokenUse(ctx, tx, tok.ID); err != nil {
 				return nil, "", err
 			}
-			const updateDevice = `
+			updateDevice := `
 				UPDATE devices
 				SET hostname = $2,
 					display_name = $3,
@@ -73,20 +73,10 @@ func (s *Store) EnrollDevice(
 					status = 'active',
 					updated_at = now()
 				WHERE id = $1
-				RETURNING id, hostname, display_name, os, os_version, agent_version,
-						machine_guid, status,
-						pic, location, asset_tag, notes,
-						last_seen_at, enrolled_at, created_at, updated_at
-			`
-			var d Device
-			err = tx.QueryRow(ctx, updateDevice,
+				RETURNING ` + deviceSelectCols
+			d, err := scanDevice(tx.QueryRow(ctx, updateDevice,
 				existing.ID, hostname, displayName, osFamily, osVersion, agentVersion,
-			).Scan(
-				&d.ID, &d.Hostname, &d.DisplayName, &d.OS, &d.OSVersion, &d.AgentVersion,
-				&d.MachineGUID, &d.Status,
-				&d.PIC, &d.Location, &d.AssetTag, &d.Notes,
-				&d.LastSeenAt, &d.EnrolledAt, &d.CreatedAt, &d.UpdatedAt,
-			)
+			))
 			if err != nil {
 				return nil, "", err
 			}
@@ -107,26 +97,16 @@ func (s *Store) EnrollDevice(
 		return nil, "", err
 	}
 
-	const insertDevice = `
+	insertDevice := `
 	INSERT INTO devices (
 		hostname, display_name, os, os_version, agent_version,
 		machine_guid, status, enrolled_at
 	) VALUES ($1, $2, $3, $4, $5, $6, 'active', now())
-	 RETURNING id, hostname, display_name, os, os_version, agent_version,
-	 			machine_guid, status,
-	 			pic, location, asset_tag, notes,
-	 			last_seen_at, enrolled_at, created_at, updated_at
-	`
+	RETURNING ` + deviceSelectCols
 
-	var d Device
-	err = tx.QueryRow(ctx, insertDevice,
+	d, err := scanDevice(tx.QueryRow(ctx, insertDevice,
 		hostname, displayName, osFamily, osVersion, agentVersion, mg,
-	).Scan(
-		&d.ID, &d.Hostname, &d.DisplayName, &d.OS, &d.OSVersion, &d.AgentVersion,
-		&d.MachineGUID, &d.Status,
-		&d.PIC, &d.Location, &d.AssetTag, &d.Notes,
-		&d.LastSeenAt, &d.EnrolledAt, &d.CreatedAt, &d.UpdatedAt,
-	)
+	))
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {

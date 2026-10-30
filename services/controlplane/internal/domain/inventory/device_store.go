@@ -72,6 +72,8 @@ const deviceSelectCols = `
 	id, hostname, display_name, os, os_version, agent_version,
 	machine_guid, status,
 	pic, location, asset_tag, notes,
+	cpu_model, cpu_cores, ram_mb, disk_gb,
+	hw_manufacturer, hw_model, hardware_reported_at,
 	last_seen_at, enrolled_at, created_at, updated_at
 `
 
@@ -90,6 +92,13 @@ func scanDevice(row pgx.Row) (Device, error) {
 		&d.Location,
 		&d.AssetTag,
 		&d.Notes,
+		&d.CPUModel,
+		&d.CPUCores,
+		&d.RAMMB,
+		&d.DiskGB,
+		&d.HWManufacturer,
+		&d.HWModel,
+		&d.HardwareReportedAt,
 		&d.LastSeenAt,
 		&d.EnrolledAt,
 		&d.CreatedAt,
@@ -142,34 +151,8 @@ func (s *Store) ListDevices(ctx context.Context, f DeviceListFilter) (DeviceList
 }
 
 func (s *Store) FindDeviceByID(ctx context.Context, id uuid.UUID) (*Device, error) {
-	const q = `
-		SELECT id, hostname, display_name, os, os_version, agent_version,
-		       machine_guid, status,
-			   pic, location, asset_tag, notes,
-			   last_seen_at, enrolled_at, created_at, updated_at
-		FROM devices
-		WHERE id = $1
-	`
-
-	var d Device
-	err := s.pool.QueryRow(ctx, q, id).Scan(
-		&d.ID,
-		&d.Hostname,
-		&d.DisplayName,
-		&d.OS,
-		&d.OSVersion,
-		&d.AgentVersion,
-		&d.MachineGUID,
-		&d.Status,
-		&d.PIC,
-		&d.Location,
-		&d.AssetTag,
-		&d.Notes,
-		&d.LastSeenAt,
-		&d.EnrolledAt,
-		&d.CreatedAt,
-		&d.UpdatedAt,
-	)
+	q := `SELECT ` + deviceSelectCols + ` FROM devices WHERE id = $1`
+	d, err := scanDevice(s.pool.QueryRow(ctx, q, id))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -184,25 +167,15 @@ func (s *Store) CreateDevice(
 	hostname, displayName, os, osVersion, agentVersion string,
 	machineGUID *string,
 ) (*Device, error) {
-	const q = `
+	q := `
 		INSERT INTO devices (
 			hostname, display_name, os, os_version, agent_version,
 			machine_guid, status, enrolled_at
 		) VALUES ($1, $2, $3, $4, $5, $6, 'active', now())
-		 RETURNING id, hostname, display_name, os, os_version, agent_version,
-		 	machine_guid, status,
-			pic, location, asset_tag, notes,
-			last_seen_at, enrolled_at, created_at, updated_at
-	`
-	var d Device
-	err := s.pool.QueryRow(
+		RETURNING ` + deviceSelectCols
+	d, err := scanDevice(s.pool.QueryRow(
 		ctx, q, hostname, displayName, os, osVersion, agentVersion, machineGUID,
-	).Scan(
-		&d.ID, &d.Hostname, &d.DisplayName, &d.OS, &d.OSVersion, &d.AgentVersion,
-		&d.MachineGUID, &d.Status,
-		&d.PIC, &d.Location, &d.AssetTag, &d.Notes,
-		&d.LastSeenAt, &d.EnrolledAt, &d.CreatedAt, &d.UpdatedAt,
-	)
+	))
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +222,7 @@ func (s *Store) UpdateDevice(
 		cur.Notes = strings.TrimSpace(*notes)
 	}
 
-	const q = `
+	q := `
 		UPDATE devices
 		SET display_name = $2,
 		    status = $3,
@@ -259,22 +232,12 @@ func (s *Store) UpdateDevice(
 		    notes = $7,
 		    updated_at = now()
 		WHERE id = $1
-		RETURNING id, hostname, display_name, os, os_version, agent_version,
-		          machine_guid, status,
-		          pic, location, asset_tag, notes,
-		          last_seen_at, enrolled_at, created_at, updated_at
-	`
-	var d Device
-	err = s.pool.QueryRow(
+		RETURNING ` + deviceSelectCols
+	d, err := scanDevice(s.pool.QueryRow(
 		ctx, q,
 		id, cur.DisplayName, cur.Status,
 		cur.PIC, cur.Location, cur.AssetTag, cur.Notes,
-	).Scan(
-		&d.ID, &d.Hostname, &d.DisplayName, &d.OS, &d.OSVersion, &d.AgentVersion,
-		&d.MachineGUID, &d.Status,
-		&d.PIC, &d.Location, &d.AssetTag, &d.Notes,
-		&d.LastSeenAt, &d.EnrolledAt, &d.CreatedAt, &d.UpdatedAt,
-	)
+	))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -312,21 +275,66 @@ func (s *Store) TouchLastSeen(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-// ApplyHeartbeat updates last_seen_at and optionally soft-refreshes identity fields.
+// HardwareReport is agent-reported static inventory (optional on heartbeat).
+type HardwareReport struct {
+	CPUModel       string
+	CPUCores       int
+	RAMMB          int64
+	DiskGB         int64
+	HWManufacturer string
+	HWModel        string
+}
+
+func (h HardwareReport) HasAny() bool {
+	return strings.TrimSpace(h.CPUModel) != "" ||
+		h.CPUCores > 0 ||
+		h.RAMMB > 0 ||
+		h.DiskGB > 0 ||
+		strings.TrimSpace(h.HWManufacturer) != "" ||
+		strings.TrimSpace(h.HWModel) != ""
+}
+
+// ApplyHeartbeat updates last_seen_at and optionally soft-refreshes identity
+// and hardware inventory fields (non-empty / non-zero values only).
 func (s *Store) ApplyHeartbeat(
 	ctx context.Context,
 	id uuid.UUID,
 	hostname, osVersion, agentVersion string,
+	hw *HardwareReport,
 ) error {
+	cpuModel, cpuCores, ramMB, diskGB := "", 0, int64(0), int64(0)
+	hwMfg, hwModel := "", ""
+	reportHW := false
+	if hw != nil && hw.HasAny() {
+		reportHW = true
+		cpuModel = strings.TrimSpace(hw.CPUModel)
+		cpuCores = hw.CPUCores
+		ramMB = hw.RAMMB
+		diskGB = hw.DiskGB
+		hwMfg = strings.TrimSpace(hw.HWManufacturer)
+		hwModel = strings.TrimSpace(hw.HWModel)
+	}
+
 	const q = `
 		UPDATE devices
 		SET last_seen_at = now(),
 		    hostname = CASE WHEN $2 <> '' THEN $2 ELSE hostname END,
 		    os_version = CASE WHEN $3 <> '' THEN $3 ELSE os_version END,
-		    agent_version = CASE WHEN $4 <> '' THEN $4 ELSE agent_version END
+		    agent_version = CASE WHEN $4 <> '' THEN $4 ELSE agent_version END,
+		    cpu_model = CASE WHEN $5 <> '' THEN $5 ELSE cpu_model END,
+		    cpu_cores = CASE WHEN $6 > 0 THEN $6 ELSE cpu_cores END,
+		    ram_mb = CASE WHEN $7 > 0 THEN $7 ELSE ram_mb END,
+		    disk_gb = CASE WHEN $8 > 0 THEN $8 ELSE disk_gb END,
+		    hw_manufacturer = CASE WHEN $9 <> '' THEN $9 ELSE hw_manufacturer END,
+		    hw_model = CASE WHEN $10 <> '' THEN $10 ELSE hw_model END,
+		    hardware_reported_at = CASE WHEN $11 THEN now() ELSE hardware_reported_at END
 		WHERE id = $1
 	`
-	tag, err := s.pool.Exec(ctx, q, id, hostname, osVersion, agentVersion)
+	tag, err := s.pool.Exec(
+		ctx, q,
+		id, hostname, osVersion, agentVersion,
+		cpuModel, cpuCores, ramMB, diskGB, hwMfg, hwModel, reportHW,
+	)
 	if err != nil {
 		return err
 	}
@@ -337,23 +345,8 @@ func (s *Store) ApplyHeartbeat(
 }
 
 func (s *Store) FindDeviceMachineGUID(ctx context.Context, machineGUID string) (*Device, error) {
-	const q = `
-		SELECT id, hostname, display_name, os, os_version, agent_version,
-		       machine_guid, status,
-			   pic, location, asset_tag, notes,
-			   last_seen_at, enrolled_at, created_at, updated_at
-		FROM devices
-		WHERE machine_guid = $1
-		LIMIT 1
-	`
-
-	var d Device
-	err := s.pool.QueryRow(ctx, q, machineGUID).Scan(
-		&d.ID, &d.Hostname, &d.DisplayName, &d.OS, &d.OSVersion, &d.AgentVersion,
-		&d.MachineGUID, &d.Status,
-		&d.PIC, &d.Location, &d.AssetTag, &d.Notes,
-		&d.LastSeenAt, &d.EnrolledAt, &d.CreatedAt, &d.UpdatedAt,
-	)
+	q := `SELECT ` + deviceSelectCols + ` FROM devices WHERE machine_guid = $1 LIMIT 1`
+	d, err := scanDevice(s.pool.QueryRow(ctx, q, machineGUID))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}

@@ -221,6 +221,7 @@ func (a *API) handleAgentEvents(w http.ResponseWriter, r *http.Request) {
 	rejected := make([]map[string]any, 0)
 	sawHeartbeat := false
 	var hbHostname, hbOSVersion, hbAgentVersion string
+	var hbHardware *inventory.HardwareReport
 
 	for _, ev := range req.Events {
 		clientID := strings.TrimSpace(ev.ClientEventID)
@@ -244,6 +245,16 @@ func (a *API) handleAgentEvents(w http.ResponseWriter, r *http.Request) {
 			}
 			if ev.AgentVersion != "" {
 				hbAgentVersion = ev.AgentVersion
+			}
+			if ev.Hardware != nil {
+				hbHardware = &inventory.HardwareReport{
+					CPUModel:       ev.Hardware.CPUModel,
+					CPUCores:       ev.Hardware.CPUCores,
+					RAMMB:          ev.Hardware.RAMMB,
+					DiskGB:         ev.Hardware.DiskGB,
+					HWManufacturer: ev.Hardware.HWManufacturer,
+					HWModel:        ev.Hardware.HWModel,
+				}
 			}
 			accepted++
 		case agentcontract.EventViolationDetected, agentcontract.EventViolationBlocked:
@@ -317,7 +328,7 @@ func (a *API) handleAgentEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if sawHeartbeat {
-		if err := store.ApplyHeartbeat(r.Context(), deviceID, hbHostname, hbOSVersion, hbAgentVersion); err != nil {
+		if err := store.ApplyHeartbeat(r.Context(), deviceID, hbHostname, hbOSVersion, hbAgentVersion, hbHardware); err != nil {
 			writeJSON(w, http.StatusInternalServerError, envelope{
 				OK: false,
 				Error: map[string]any{
