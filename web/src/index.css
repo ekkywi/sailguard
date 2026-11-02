@@ -558,6 +558,7 @@ input {
   background: transparent;
   color: var(--fg);
   font-size: var(--text-sm);
+  text-decoration: none;
   cursor: pointer;
 }
 

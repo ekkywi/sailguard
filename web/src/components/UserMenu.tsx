@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { endSession } from '../lib/session'
 
 type UserMenuProps = {
@@ -60,6 +61,14 @@ export function UserMenu({ userLabel }: UserMenuProps) {
 
       {open ? (
         <div className="user-menu-panel" id={menuId} role="menu">
+          <Link
+            to="/account"
+            role="menuitem"
+            className="user-menu-item"
+            onClick={() => setOpen(false)}
+          >
+            Account
+          </Link>
           <button
             type="button"
             role="menuitem"

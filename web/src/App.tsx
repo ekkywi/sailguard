@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router-dom'
 import { RequireAuth } from './features/auth/RequireAuth'
 import LoginPage from './features/auth/LoginPage'
+import AccountPage from './features/auth/AccountPage'
 import DevicesPage from './features/devices/DevicesPage'
 import DeviceDetailPage from './features/devices/DeviceDetailPage'
 import TokensPage from './features/tokens/TokensPage'
@@ -33,6 +34,7 @@ export default function App() {
         }
       >
         <Route path="/" element={<HomePage />} />
+        <Route path="/account" element={<AccountPage />} />
         <Route path="/devices" element={<DevicesPage />} />
         <Route path="/devices/:id" element={<DeviceDetailPage />} />
         <Route path="/tokens" element={<TokensPage />} />

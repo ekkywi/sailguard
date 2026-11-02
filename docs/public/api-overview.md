@@ -32,8 +32,8 @@ Administrative APIs are further protected by role-based permissions as routes co
 ### Identity & access
 
 - **Available now:** login; current-user profile with roles and permission codes (`/auth/me`); **users admin** (`GET/POST /v1/users`, `GET/PATCH /v1/users/{id}`, `POST …/reset-password`, `GET /v1/roles`, `GET /v1/permissions`; web `/users` gated by `user.read` / `user.write`). Admin console also hides nav links and write controls from `/auth/me` permission codes (API `requirePermission` remains authoritative).
-- **Available now (sessions):** configurable admin token TTL (`SG_ADMIN_TOKEN_TTL`); Redis-backed session revoke on logout; console idle timeout (10m) and 401 → re-login.
-- **Planned:** password change, session list / revoke-all UI, LDAP/AD, MFA
+- **Available now (sessions):** configurable admin token TTL (`SG_ADMIN_TOKEN_TTL`); Redis-backed session revoke on logout; console idle timeout (10m) and 401 → re-login; self-service `POST /v1/auth/change-password`; `GET /v1/auth/sessions` + revoke one / revoke-others; Account page in the console user menu.
+- **Planned:** LDAP/AD, MFA
 
 ### Inventory
 
