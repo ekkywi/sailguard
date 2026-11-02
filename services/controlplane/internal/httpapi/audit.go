@@ -73,6 +73,8 @@ func parseAuditListFilter(r *http.Request) (audit.ListFilter, error) {
 		Actor:        strings.TrimSpace(q.Get("actor")),
 		ResourceType: strings.TrimSpace(q.Get("resource_type")),
 		Q:            strings.TrimSpace(q.Get("q")),
+		Sort:         strings.TrimSpace(q.Get("sort")),
+		Order:        strings.TrimSpace(q.Get("order")),
 	}
 
 	if family := strings.TrimSpace(strings.ToLower(q.Get("family"))); family != "" {

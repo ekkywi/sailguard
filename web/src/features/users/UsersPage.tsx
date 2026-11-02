@@ -10,6 +10,7 @@ import {
 import { useOutletContext } from 'react-router-dom'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { PermissionDenied } from '../../components/PermissionDenied'
+import { SortableTh } from '../../components/SortableTh'
 import { TableSkeleton } from '../../components/TableSkeleton'
 import { toast } from '../../components/toast'
 import type { AppOutletContext } from '../../layouts/AppLayout'
@@ -19,6 +20,12 @@ import {
   statusBadgeClass,
 } from '../../lib/format'
 import { hasPermission } from '../../lib/permissions'
+import {
+  compareDate,
+  compareString,
+  useClientList,
+  type ClientListCompare,
+} from '../../lib/useClientList'
 import { useDocumentTitle } from '../../lib/useDocumentTitle'
 import {
   createUser,
@@ -32,6 +39,21 @@ import type { AdminUser, Role } from './types'
 const PAGE_SIZE = 10
 
 type StatusFilter = 'all' | 'active' | 'disabled'
+
+function matchesUser(u: AdminUser, q: string): boolean {
+  return (
+    u.name.toLowerCase().includes(q) ||
+    u.email.toLowerCase().includes(q) ||
+    u.roles.some((r) => r.toLowerCase().includes(q))
+  )
+}
+
+const USER_COMPARE: ClientListCompare<AdminUser> = {
+  name: (a, b) => compareString(a.name, b.name),
+  roles: (a, b) => compareString(a.roles.join(','), b.roles.join(',')),
+  status: (a, b) => Number(b.is_active) - Number(a.is_active),
+  created_at: (a, b) => compareDate(a.created_at, b.created_at),
+}
 
 function RolePicker({
   roles,
@@ -81,9 +103,7 @@ export default function UsersPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
-  const [page, setPage] = useState(1)
 
   const [createOpen, setCreateOpen] = useState(false)
   const [email, setEmail] = useState('')
@@ -160,39 +180,20 @@ export default function UsersPage() {
     }
   }, [users])
 
-  const filtered = useMemo(() => {
-    if (!users) return []
-    const q = query.trim().toLowerCase()
-    return users.filter((u) => {
-      if (statusFilter === 'active' && !u.is_active) return false
-      if (statusFilter === 'disabled' && u.is_active) return false
-      if (!q) return true
-      return (
-        u.name.toLowerCase().includes(q) ||
-        u.email.toLowerCase().includes(q) ||
-        u.roles.some((r) => r.toLowerCase().includes(q))
-      )
-    })
-  }, [users, query, statusFilter])
+  const statusFilterFn = useMemo(() => {
+    if (statusFilter === 'all') return undefined
+    return (u: AdminUser) =>
+      statusFilter === 'active' ? u.is_active : !u.is_active
+  }, [statusFilter])
 
-  const total = filtered.length
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE) || 1)
-
-  useEffect(() => {
-    setPage(1)
-  }, [query, statusFilter])
-
-  useEffect(() => {
-    setPage((p) => Math.min(p, pageCount))
-  }, [pageCount])
-
-  const pageItems = useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE
-    return filtered.slice(start, start + PAGE_SIZE)
-  }, [filtered, page])
-
-  const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
-  const rangeEnd = Math.min(page * PAGE_SIZE, total)
+  const list = useClientList({
+    items: users,
+    pageSize: PAGE_SIZE,
+    matches: matchesUser,
+    compare: USER_COMPARE,
+    defaultSortKey: 'name',
+    filter: statusFilterFn,
+  })
 
   function toggleCreateRole(code: string) {
     setCreateRoles((prev) =>
@@ -250,7 +251,7 @@ export default function UsersPage() {
       })
       setCreateOpen(false)
       setCreateFieldErrors({})
-      setPage(1)
+      list.setPage(1)
       toast.success('User created')
       load()
     } catch (err: unknown) {
@@ -375,7 +376,10 @@ export default function UsersPage() {
               ? 'user-stat user-stat-active'
               : 'user-stat'
           }
-          onClick={() => setStatusFilter('all')}
+          onClick={() => {
+            setStatusFilter('all')
+            list.setPage(1)
+          }}
         >
           <span className="stat-label">Total</span>
           <span className="stat-value">{stats.total}</span>
@@ -387,7 +391,10 @@ export default function UsersPage() {
               ? 'user-stat user-stat-active'
               : 'user-stat'
           }
-          onClick={() => setStatusFilter('active')}
+          onClick={() => {
+            setStatusFilter('active')
+            list.setPage(1)
+          }}
         >
           <span className="stat-label">Active</span>
           <span className="stat-value">{stats.active}</span>
@@ -399,25 +406,45 @@ export default function UsersPage() {
               ? 'user-stat user-stat-active'
               : 'user-stat'
           }
-          onClick={() => setStatusFilter('disabled')}
+          onClick={() => {
+            setStatusFilter('disabled')
+            list.setPage(1)
+          }}
         >
           <span className="stat-label">Disabled</span>
           <span className="stat-value">{stats.disabled}</span>
         </button>
       </div>
 
-      <div className="users-toolbar">
-        <div className="field users-search">
-          <label className="label" htmlFor="users-query">
-            Search
-          </label>
-          <input
-            id="users-query"
-            className="input"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Name, email, or role…"
-          />
+      <div className="users-toolbar audit-toolbar" role="search">
+        <div className="audit-filters">
+          <div className="field users-search audit-filter-grow">
+            <label className="label" htmlFor="users-query">
+              Search
+            </label>
+            <input
+              id="users-query"
+              className="input"
+              value={list.queryDraft}
+              onChange={(e) => list.setQueryDraft(e.target.value)}
+              placeholder="Name, email, or role…"
+            />
+          </div>
+          {list.hasActiveQuery || statusFilter !== 'all' ? (
+            <div className="field audit-filter-actions">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => {
+                  list.clearSearch()
+                  setStatusFilter('all')
+                  list.setPage(1)
+                }}
+              >
+                Clear
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -432,11 +459,11 @@ export default function UsersPage() {
           <h2 id="user-list-heading" className="panel-title">
             Directory
           </h2>
-          {total > 0 ? (
+          {list.total > 0 ? (
             <p className="muted list-range">
-              Showing {rangeStart}–{rangeEnd} of {total}
-              {users && filtered.length !== users.length
-                ? ` (filtered from ${users.length})`
+              Showing {list.rangeStart}–{list.rangeEnd} of {list.total}
+              {list.filteredFromSource
+                ? ` (filtered from ${list.sourceTotal})`
                 : ''}
             </p>
           ) : null}
@@ -446,17 +473,13 @@ export default function UsersPage() {
           <TableSkeleton label="Loading users…" />
         ) : null}
 
-        {!loading && users && filtered.length === 0 ? (
+        {!loading && users && users.length === 0 ? (
           <div className="empty-state" role="status">
-            <p className="empty-title">
-              {users.length === 0 ? 'No users yet' : 'No matches'}
-            </p>
+            <p className="empty-title">No users yet</p>
             <p className="muted">
-              {users.length === 0
-                ? 'Create an admin account to share access beyond the seed user.'
-                : 'Try another search or clear the status filter.'}
+              Create an admin account to share access beyond the seed user.
             </p>
-            {users.length === 0 && canWrite ? (
+            {canWrite ? (
               <div className="empty-actions">
                 <button
                   type="button"
@@ -470,21 +493,67 @@ export default function UsersPage() {
           </div>
         ) : null}
 
-        {pageItems.length > 0 ? (
+        {!loading && users && users.length > 0 && list.total === 0 ? (
+          <div className="empty-state" role="status">
+            <p className="empty-title">No matches</p>
+            <p className="muted">
+              Try another search or clear the status filter.
+            </p>
+            <div className="empty-actions">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => {
+                  list.clearSearch()
+                  setStatusFilter('all')
+                  list.setPage(1)
+                }}
+              >
+                Clear filters
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {list.pageItems.length > 0 ? (
           <>
             <div className="table-wrap table-scroll">
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>User</th>
-                    <th>Roles</th>
-                    <th>Status</th>
-                    <th>Created</th>
+                    <SortableTh
+                      label="User"
+                      columnKey="name"
+                      sortKey={list.sortKey}
+                      sortDir={list.sortDir}
+                      onSort={list.toggleSort}
+                    />
+                    <SortableTh
+                      label="Roles"
+                      columnKey="roles"
+                      sortKey={list.sortKey}
+                      sortDir={list.sortDir}
+                      onSort={list.toggleSort}
+                    />
+                    <SortableTh
+                      label="Status"
+                      columnKey="status"
+                      sortKey={list.sortKey}
+                      sortDir={list.sortDir}
+                      onSort={list.toggleSort}
+                    />
+                    <SortableTh
+                      label="Created"
+                      columnKey="created_at"
+                      sortKey={list.sortKey}
+                      sortDir={list.sortDir}
+                      onSort={list.toggleSort}
+                    />
                     {canWrite ? <th>Actions</th> : null}
                   </tr>
                 </thead>
                 <tbody>
-                  {pageItems.map((u) => {
+                  {list.pageItems.map((u) => {
                     const isSelf = u.id === me?.id
                     return (
                       <tr key={u.id} className={u.is_active ? undefined : 'row-muted'}>
@@ -567,24 +636,24 @@ export default function UsersPage() {
                 </tbody>
               </table>
             </div>
-            {pageCount > 1 ? (
+            {list.pageCount > 1 ? (
               <div className="pager">
                 <button
                   type="button"
                   className="btn btn-ghost"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => p - 1)}
+                  disabled={list.page <= 1}
+                  onClick={() => list.setPage((p) => p - 1)}
                 >
                   Previous
                 </button>
                 <span className="muted">
-                  Page {page} / {pageCount}
+                  Page {list.page} / {list.pageCount}
                 </span>
                 <button
                   type="button"
                   className="btn btn-ghost"
-                  disabled={page >= pageCount}
-                  onClick={() => setPage((p) => p + 1)}
+                  disabled={list.page >= list.pageCount}
+                  onClick={() => list.setPage((p) => p + 1)}
                 >
                   Next
                 </button>

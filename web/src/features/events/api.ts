@@ -10,6 +10,8 @@ function toSearchParams(query: EventListQuery = {}): URLSearchParams {
   if (query.event_type) sp.set('event_type', query.event_type)
   if (query.device_id) sp.set('device_id', query.device_id)
   if (query.q) sp.set('q', query.q)
+  if (query.sort) sp.set('sort', query.sort)
+  if (query.order) sp.set('order', query.order)
   if (query.limit != null) sp.set('limit', String(query.limit))
   if (query.offset != null) sp.set('offset', String(query.offset))
   return sp

@@ -86,7 +86,7 @@ export default function AgentDownloadPage() {
           if (preferred.os_family === 'linux' && m.default_data_dir_linux) {
             setDataDir(m.default_data_dir_linux)
           } else if (m.default_data_dir_windows || m.default_data_dir) {
-            setDataDir(m.default_data_dir_windows ?? m.default_data_dir)
+            setDataDir(m.default_data_dir_windows ?? m.default_data_dir ?? '')
           }
         }
       })

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/ekkywi/sailguard/services/controlplane/internal/listquery"
 )
 
 func (s *Store) Record(ctx context.Context, in RecordInput) error {
@@ -44,8 +46,18 @@ type ListFilter struct {
 	Actor        string // substring match on actor_email (case-insensitive)
 	ResourceType string
 	Q            string // substring on action, summary, actor_email, resource_id
+	Sort         string
+	Order        string
 	Limit        int
 	Offset       int
+}
+
+var auditListSortColumns = map[string]string{
+	"created_at":    "created_at",
+	"actor_email":   "actor_email",
+	"action":        "action",
+	"summary":       "summary",
+	"resource_type": "resource_type",
 }
 
 type ListResult struct {
@@ -117,6 +129,7 @@ func (s *Store) List(ctx context.Context, f ListFilter) (ListResult, error) {
 		return ListResult{}, err
 	}
 
+	orderBy := listquery.OrderBy(f.Sort, f.Order, auditListSortColumns, "created_at DESC")
 	listArgs := append(append([]any{}, args...), limit, offset)
 	limPos := len(args) + 1
 	offPos := len(args) + 2
@@ -125,9 +138,9 @@ func (s *Store) List(ctx context.Context, f ListFilter) (ListResult, error) {
 				resource_type, resource_id, summary, metadata, created_at
 		FROM admin_audit_logs
 		%s
-		ORDER BY created_at DESC
+		ORDER BY %s
 		LIMIT $%d OFFSET $%d
-	`, where, limPos, offPos)
+	`, where, orderBy, limPos, offPos)
 
 	rows, err := s.pool.Query(ctx, listSQL, listArgs...)
 	if err != nil {
@@ -161,15 +174,16 @@ func (s *Store) ListForExport(ctx context.Context, f ListFilter, maxRows int) ([
 	f.Offset = 0
 	// bypass clampListLimit 200 for export
 	where, args := f.buildWhere()
+	orderBy := listquery.OrderBy(f.Sort, f.Order, auditListSortColumns, "created_at DESC")
 	listArgs := append(append([]any{}, args...), maxRows)
 	listSQL := fmt.Sprintf(`
 		SELECT id, actor_user_id, actor_email, action,
 				resource_type, resource_id, summary, metadata, created_at
 		FROM admin_audit_logs
 		%s
-		ORDER BY created_at DESC
+		ORDER BY %s
 		LIMIT $%d
-	`, where, len(args)+1)
+	`, where, orderBy, len(args)+1)
 
 	rows, err := s.pool.Query(ctx, listSQL, listArgs...)
 	if err != nil {

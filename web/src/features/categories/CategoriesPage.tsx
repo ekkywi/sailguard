@@ -1,16 +1,47 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { PermissionDenied } from '../../components/PermissionDenied'
+import { SortableTh } from '../../components/SortableTh'
 import { TableSkeleton } from '../../components/TableSkeleton'
 import { toast } from '../../components/toast'
 import type { AppOutletContext } from '../../layouts/AppLayout'
 import { formatRelativeTime } from '../../lib/format'
 import { hasPermission } from '../../lib/permissions'
+import {
+  compareDate,
+  compareString,
+  useClientList,
+  type ClientListCompare,
+} from '../../lib/useClientList'
 import { useDocumentTitle } from '../../lib/useDocumentTitle'
 import { createCategory, listCategories } from './api'
 import type { Category, CreateCategoryInput } from './types'
 
 const PAGE_SIZE = 10
+
+function matchesCategory(c: Category, q: string): boolean {
+  return (
+    c.name.toLowerCase().includes(q) ||
+    c.code.toLowerCase().includes(q) ||
+    (c.description || '').toLowerCase().includes(q)
+  )
+}
+
+const CATEGORY_COMPARE: ClientListCompare<Category> = {
+  name: (a, b) => compareString(a.name, b.name),
+  code: (a, b) => compareString(a.code, b.code),
+  description: (a, b) =>
+    compareString(a.description || '', b.description || ''),
+  updated_at: (a, b) =>
+    compareDate(a.updated_at || a.created_at, b.updated_at || b.created_at),
+}
 
 export default function CategoriesPage() {
   useDocumentTitle('Categories')
@@ -22,11 +53,22 @@ export default function CategoriesPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
+  const [createOpen, setCreateOpen] = useState(false)
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [creating, setCreating] = useState(false)
-  const [page, setPage] = useState(1)
+  const [formError, setFormError] = useState<string | null>(null)
+  const createTitleId = useId()
+  const createFirstRef = useRef<HTMLInputElement>(null)
+
+  const list = useClientList({
+    items: categories,
+    pageSize: PAGE_SIZE,
+    matches: matchesCategory,
+    compare: CATEGORY_COMPARE,
+    defaultSortKey: 'name',
+  })
 
   const load = useCallback(() => {
     if (!canRead) {
@@ -50,33 +92,57 @@ export default function CategoriesPage() {
     load()
   }, [load])
 
-  const total = categories?.length ?? 0
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE) || 1)
-
   useEffect(() => {
-    setPage((p) => Math.min(p, pageCount))
-  }, [pageCount])
+    if (!createOpen) return
+    createFirstRef.current?.focus()
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !creating) {
+        setCreateOpen(false)
+        setCode('')
+        setName('')
+        setDescription('')
+        setFormError(null)
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = prevOverflow
+    }
+  }, [createOpen, creating])
 
-  const pageItems = useMemo(() => {
-    if (!categories) return []
-    const start = (page - 1) * PAGE_SIZE
-    return categories.slice(start, start + PAGE_SIZE)
-  }, [categories, page])
+  function openCreate() {
+    setCode('')
+    setName('')
+    setDescription('')
+    setFormError(null)
+    setError(null)
+    setCreateOpen(true)
+  }
 
-  const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
-  const rangeEnd = Math.min(page * PAGE_SIZE, total)
+  function closeCreate() {
+    if (creating) return
+    setCreateOpen(false)
+    setCode('')
+    setName('')
+    setDescription('')
+    setFormError(null)
+  }
 
   async function onCreate(e: FormEvent) {
     e.preventDefault()
     const trimmedCode = code.trim().toLowerCase()
     const trimmedName = name.trim()
     if (!trimmedCode || !trimmedName) {
-      setError('code and name are required')
+      setFormError('Code and name are required')
       return
     }
 
     setCreating(true)
     setError(null)
+    setFormError(null)
     const body: CreateCategoryInput = {
       code: trimmedCode,
       name: trimmedName,
@@ -86,17 +152,18 @@ export default function CategoriesPage() {
 
     try {
       const created = await createCategory(body)
+      setCreateOpen(false)
       setCode('')
       setName('')
       setDescription('')
-      setPage(1)
+      list.setPage(1)
       toast.success('Category created')
       load()
       navigate(`/categories/${created.code}`)
     } catch (err: unknown) {
       const msg =
         err instanceof Error ? err.message : 'failed to create category'
-      setError(msg)
+      setFormError(msg)
       toast.error(msg)
     } finally {
       setCreating(false)
@@ -106,6 +173,9 @@ export default function CategoriesPage() {
   if (!canRead) {
     return <PermissionDenied permission="policy.read" title="Categories" />
   }
+
+  const hasSource = (categories?.length ?? 0) > 0
+  const showNoMatches = hasSource && list.total === 0
 
   return (
     <div className="stack">
@@ -124,74 +194,54 @@ export default function CategoriesPage() {
             ) : null}
           </p>
         </div>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          onClick={load}
-          disabled={loading}
-        >
-          Refresh
-        </button>
+        <div className="btn-row">
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={load}
+            disabled={loading}
+          >
+            Refresh
+          </button>
+          {canWrite ? (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={openCreate}
+            >
+              Create category
+            </button>
+          ) : null}
+        </div>
       </header>
 
-      {canWrite ? (
-        <section className="panel" aria-labelledby="create-category-heading">
-          <h2 id="create-category-heading" className="panel-title">
-            Create category
-          </h2>
-          <form className="rule-form-grid" onSubmit={onCreate}>
-            <div className="field">
-              <label className="label" htmlFor="category-code">
-                Code
-              </label>
-              <input
-                id="category-code"
-                className="input mono"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                placeholder="messaging"
-                pattern="[a-zA-Z0-9_]+"
-                title="Letters, digits, and underscore only"
-                required
-              />
-            </div>
-            <div className="field">
-              <label className="label" htmlFor="category-name">
-                Name
-              </label>
-              <input
-                id="category-name"
-                className="input"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Messaging"
-                required
-              />
-            </div>
-            <div className="field rule-form-value">
-              <label className="label" htmlFor="category-desc">
-                Description (optional)
-              </label>
-              <input
-                id="category-desc"
-                className="input"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Consumer chat / messaging apps"
-              />
-            </div>
-            <div className="rule-form-actions">
+      <div className="audit-toolbar" role="search">
+        <div className="audit-filters">
+          <div className="field audit-filter-grow">
+            <label className="label" htmlFor="categories-q">
+              Search
+            </label>
+            <input
+              id="categories-q"
+              className="input"
+              value={list.queryDraft}
+              onChange={(e) => list.setQueryDraft(e.target.value)}
+              placeholder="Name, code, or description…"
+            />
+          </div>
+          {list.hasActiveQuery ? (
+            <div className="field audit-filter-actions">
               <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={creating}
+                type="button"
+                className="btn btn-ghost"
+                onClick={list.clearSearch}
               >
-                {creating ? 'Creating…' : 'Create category'}
+                Clear
               </button>
             </div>
-          </form>
-        </section>
-      ) : null}
+          ) : null}
+        </div>
+      </div>
 
       {error ? (
         <p className="error" role="alert">
@@ -204,9 +254,12 @@ export default function CategoriesPage() {
           <h2 id="category-list-heading" className="panel-title">
             All categories
           </h2>
-          {total > 0 ? (
+          {list.total > 0 ? (
             <p className="muted list-range">
-              Showing {rangeStart}–{rangeEnd} of {total}
+              Showing {list.rangeStart}–{list.rangeEnd} of {list.total}
+              {list.filteredFromSource
+                ? ` (filtered from ${list.sourceTotal})`
+                : ''}
             </p>
           ) : null}
         </div>
@@ -220,26 +273,77 @@ export default function CategoriesPage() {
             <p className="empty-title">No categories yet</p>
             <p className="muted">
               {canWrite
-                ? 'Create a category above, then add signatures.'
+                ? 'Create a category, then add signatures.'
                 : 'No categories in the catalog.'}
             </p>
+            {canWrite ? (
+              <div className="empty-actions">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={openCreate}
+                >
+                  Create category
+                </button>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
-        {categories && categories.length > 0 ? (
+        {showNoMatches ? (
+          <div className="empty-state" role="status">
+            <p className="empty-title">No matches</p>
+            <p className="muted">Try another search or clear filters.</p>
+            <div className="empty-actions">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={list.clearSearch}
+              >
+                Clear search
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {list.pageItems.length > 0 ? (
           <>
             <div className="table-wrap table-scroll">
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Name</th>
-                    <th>Code</th>
-                    <th>Description</th>
-                    <th>Updated</th>
+                    <SortableTh
+                      label="Name"
+                      columnKey="name"
+                      sortKey={list.sortKey}
+                      sortDir={list.sortDir}
+                      onSort={list.toggleSort}
+                    />
+                    <SortableTh
+                      label="Code"
+                      columnKey="code"
+                      sortKey={list.sortKey}
+                      sortDir={list.sortDir}
+                      onSort={list.toggleSort}
+                    />
+                    <SortableTh
+                      label="Description"
+                      columnKey="description"
+                      sortKey={list.sortKey}
+                      sortDir={list.sortDir}
+                      onSort={list.toggleSort}
+                    />
+                    <SortableTh
+                      label="Updated"
+                      columnKey="updated_at"
+                      sortKey={list.sortKey}
+                      sortDir={list.sortDir}
+                      onSort={list.toggleSort}
+                    />
                   </tr>
                 </thead>
                 <tbody>
-                  {pageItems.map((c) => (
+                  {list.pageItems.map((c) => (
                     <tr
                       key={c.code}
                       className="table-row-link"
@@ -257,9 +361,14 @@ export default function CategoriesPage() {
                       </td>
                       <td className="mono">{c.code}</td>
                       <td className="muted">{c.description || '—'}</td>
-                      <td className="muted" title={c.updated_at || c.created_at}>
+                      <td
+                        className="muted"
+                        title={c.updated_at || c.created_at}
+                      >
                         {c.updated_at || c.created_at
-                          ? formatRelativeTime(c.updated_at || c.created_at || '')
+                          ? formatRelativeTime(
+                              c.updated_at || c.created_at || '',
+                            )
                           : '—'}
                       </td>
                     </tr>
@@ -268,32 +377,130 @@ export default function CategoriesPage() {
               </table>
             </div>
 
-            <div className="pagination">
-              <p className="muted pagination-meta">
-                Page {page} of {pageCount}
-              </p>
-              <div className="pagination-actions">
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  Previous
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  disabled={page >= pageCount}
-                  onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-                >
-                  Next
-                </button>
+            {list.pageCount > 1 ? (
+              <div className="pagination">
+                <p className="muted pagination-meta">
+                  Page {list.page} of {list.pageCount}
+                </p>
+                <div className="pagination-actions">
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={list.page <= 1}
+                    onClick={() => list.setPage((p) => Math.max(1, p - 1))}
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={list.page >= list.pageCount}
+                    onClick={() =>
+                      list.setPage((p) => Math.min(list.pageCount, p + 1))
+                    }
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : null}
           </>
         ) : null}
       </section>
+
+      {createOpen ? (
+        <div className="dialog-root" role="presentation">
+          <button
+            type="button"
+            className="dialog-backdrop"
+            aria-label="Close dialog"
+            disabled={creating}
+            onClick={closeCreate}
+          />
+          <div
+            className="dialog-panel dialog-panel--form"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={createTitleId}
+          >
+            <h2 id={createTitleId} className="dialog-title">
+              Create category
+            </h2>
+            <p className="dialog-desc muted">
+              Codes are stable identifiers used in policy rules.
+            </p>
+            {formError ? (
+              <p className="error" role="alert">
+                {formError}
+              </p>
+            ) : null}
+            <form className="users-dialog-form" onSubmit={onCreate}>
+              <div className="field">
+                <label className="label" htmlFor="category-code">
+                  Code
+                </label>
+                <input
+                  ref={createFirstRef}
+                  id="category-code"
+                  className="input mono"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  placeholder="messaging"
+                  pattern="[a-zA-Z0-9_]+"
+                  title="Letters, digits, and underscore only"
+                  required
+                  disabled={creating}
+                />
+              </div>
+              <div className="field">
+                <label className="label" htmlFor="category-name">
+                  Name
+                </label>
+                <input
+                  id="category-name"
+                  className="input"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Messaging"
+                  required
+                  disabled={creating}
+                />
+              </div>
+              <div className="field">
+                <label className="label" htmlFor="category-desc">
+                  Description (optional)
+                </label>
+                <input
+                  id="category-desc"
+                  className="input"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Consumer chat / messaging apps"
+                  disabled={creating}
+                />
+              </div>
+              <div className="dialog-actions">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={closeCreate}
+                  disabled={creating}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={creating}
+                  aria-busy={creating}
+                >
+                  {creating ? 'Creating…' : 'Create category'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

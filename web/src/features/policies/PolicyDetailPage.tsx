@@ -55,6 +55,9 @@ export default function PolicyDetailPage() {
   const [ruleValue, setRuleValue] = useState('')
   const [ruleCategory, setRuleCategory] = useState('')
   const [addingRule, setAddingRule] = useState(false)
+  const [addRuleOpen, setAddRuleOpen] = useState(false)
+  const addRuleTitleId = useId()
+  const addRuleFirstRef = useRef<HTMLSelectElement>(null)
 
   const [editingRule, setEditingRule] = useState<PolicyRule | null>(null)
   const [editAction, setEditAction] = useState('block')
@@ -70,6 +73,13 @@ export default function PolicyDetailPage() {
   const [assignGroupId, setAssignGroupId] = useState('')
   const [assignDeviceId, setAssignDeviceId] = useState('')
   const [addingAssign, setAddingAssign] = useState(false)
+  const [addAssignOpen, setAddAssignOpen] = useState(false)
+  const addAssignTitleId = useId()
+  const addAssignFirstRef = useRef<HTMLSelectElement>(null)
+
+  const [modeOpen, setModeOpen] = useState(false)
+  const modeTitleId = useId()
+  const modeFirstRef = useRef<HTMLSelectElement>(null)
 
   const [removeAssign, setRemoveAssign] = useState<PolicyAssignment | null>(
     null,
@@ -149,6 +159,76 @@ export default function PolicyDetailPage() {
     }
   }, [editingRule, savingRule])
 
+  useEffect(() => {
+    if (!addRuleOpen) return
+    addRuleFirstRef.current?.focus()
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !addingRule) setAddRuleOpen(false)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = prevOverflow
+    }
+  }, [addRuleOpen, addingRule])
+
+  useEffect(() => {
+    if (!addAssignOpen) return
+    addAssignFirstRef.current?.focus()
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !addingAssign) setAddAssignOpen(false)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = prevOverflow
+    }
+  }, [addAssignOpen, addingAssign])
+
+  useEffect(() => {
+    if (!modeOpen) return
+    modeFirstRef.current?.focus()
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !savingMode) setModeOpen(false)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = prevOverflow
+    }
+  }, [modeOpen, savingMode])
+
+  function openAddRule() {
+    setRuleAction('block')
+    setRuleType('process_name')
+    setRuleOperator('equals')
+    setRuleValue('')
+    setRuleCategory(categories[0]?.code ?? '')
+    setError(null)
+    setAddRuleOpen(true)
+  }
+
+  function openAddAssign() {
+    setAssignScope('org')
+    setAssignGroupId('')
+    setAssignDeviceId('')
+    setError(null)
+    setAddAssignOpen(true)
+  }
+
+  function openMode() {
+    if (!policy) return
+    setModeDraft(policy.mode || 'audit')
+    setError(null)
+    setModeOpen(true)
+  }
+
   function beginEditRule(r: PolicyRule) {
     setEditingRule(r)
     setEditAction(r.action || 'block')
@@ -199,6 +279,7 @@ export default function PolicyDetailPage() {
             },
       )
       if (!isCategory) setRuleValue('')
+      setAddRuleOpen(false)
       toast.success('Rule added')
       load()
     } catch (err: unknown) {
@@ -310,6 +391,7 @@ export default function PolicyDetailPage() {
       await addPolicyAssignment(id, body)
       setAssignGroupId('')
       setAssignDeviceId('')
+      setAddAssignOpen(false)
       toast.success('Assignment added')
       load()
     } catch (err: unknown) {
@@ -367,6 +449,7 @@ export default function PolicyDetailPage() {
       const p = await patchPolicy(id, { mode: modeDraft })
       setPolicy(p)
       setModeDraft(p.mode)
+      setModeOpen(false)
       toast.success(`Mode set to ${p.mode}`)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'failed to update mode'
@@ -454,15 +537,6 @@ export default function PolicyDetailPage() {
           </p>
         </div>
         <div className="page-header-actions">
-          {policy && canWrite ? (
-            <button
-              type="button"
-              className="btn btn-danger"
-              onClick={() => setConfirmDeletePolicy(true)}
-            >
-              Delete
-            </button>
-          ) : null}
           <button
             type="button"
             className="btn btn-ghost"
@@ -471,6 +545,11 @@ export default function PolicyDetailPage() {
           >
             Refresh
           </button>
+          {policy && canWrite ? (
+            <button type="button" className="btn btn-ghost" onClick={openMode}>
+              Change mode
+            </button>
+          ) : null}
           {canWrite ? (
             <button
               type="button"
@@ -479,6 +558,15 @@ export default function PolicyDetailPage() {
               disabled={publishing || !policy}
             >
               {publishing ? 'Publishing…' : 'Publish'}
+            </button>
+          ) : null}
+          {policy && canWrite ? (
+            <button
+              type="button"
+              className="btn btn-danger"
+              onClick={() => setConfirmDeletePolicy(true)}
+            >
+              Delete
             </button>
           ) : null}
         </div>
@@ -522,162 +610,7 @@ export default function PolicyDetailPage() {
               <span className="info-val mono">{policy.id}</span>
             </div>
           </div>
-
-          {canWrite ? (
-            <section className="panel" aria-labelledby="mode-heading">
-              <h2 id="mode-heading" className="panel-title">
-                Change mode
-              </h2>
-              <p className="muted" style={{ marginTop: 0 }}>
-                Audit reports matches only. Enforce will terminate when agent
-                Level&nbsp;1 kill is implemented — publish after switching so
-                operators see a new version.
-              </p>
-              <form
-                className="token-create-grid"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  void onSaveMode()
-                }}
-              >
-                <div className="field">
-                  <label className="label" htmlFor="policy-mode-edit">
-                    Mode
-                  </label>
-                  <select
-                    id="policy-mode-edit"
-                    className="input"
-                    value={modeDraft}
-                    onChange={(e) => setModeDraft(e.target.value)}
-                  >
-                    <option value="audit">audit</option>
-                    <option value="enforce">enforce</option>
-                  </select>
-                </div>
-                <div className="token-create-submit">
-                  <button
-                    type="submit"
-                    className="btn btn-primary"
-                    disabled={
-                      savingMode || modeDraft === policy.mode || !modeDraft
-                    }
-                  >
-                    {savingMode ? 'Saving…' : 'Save mode'}
-                  </button>
-                </div>
-              </form>
-            </section>
-          ) : null}
         </>
-      ) : null}
-
-      {policy && canWrite ? (
-        <section className="panel" aria-labelledby="add-rule-heading">
-          <h2 id="add-rule-heading" className="panel-title">
-            Add rule
-          </h2>
-          <p className="muted panel-lead">
-            New rules apply after the next publish (agents sync the new version).
-          </p>
-          <form className="rule-form-grid" onSubmit={onAddRule}>
-            <div className="field">
-              <label className="label" htmlFor="rule-action">
-                Action
-              </label>
-              <select
-                id="rule-action"
-                className="input"
-                value={ruleAction}
-                onChange={(e) => setRuleAction(e.target.value)}
-              >
-                <option value="block">block</option>
-                <option value="allow">allow</option>
-              </select>
-            </div>
-            <div className="field">
-              <label className="label" htmlFor="rule-type">
-                Type
-              </label>
-              <select
-                id="rule-type"
-                className="input"
-                value={ruleType}
-                onChange={(e) => setRuleType(e.target.value)}
-              >
-                <option value="process_name">process_name</option>
-                <option value="path">path</option>
-                <option value="hash_sha256">hash_sha256</option>
-                <option value="publisher">publisher</option>
-                <option value="product_name">product_name</option>
-                <option value="category">category</option>
-              </select>
-            </div>
-            {ruleType === 'category' ? (
-              <div className="field rule-form-value">
-                <label className="label" htmlFor="rule-category">
-                  Category
-                </label>
-                <select
-                  id="rule-category"
-                  className="input"
-                  value={ruleCategory}
-                  onChange={(e) => setRuleCategory(e.target.value)}
-                  required
-                >
-                  {categories.length === 0 ? (
-                    <option value="">No categories</option>
-                  ) : (
-                    categories.map((c) => (
-                      <option key={c.code} value={c.code}>
-                        {c.name} ({c.code})
-                      </option>
-                    ))
-                  )}
-                </select>
-              </div>
-            ) : (
-              <>
-                <div className="field">
-                  <label className="label" htmlFor="rule-op">
-                    Operator
-                  </label>
-                  <select
-                    id="rule-op"
-                    className="input"
-                    value={ruleOperator}
-                    onChange={(e) => setRuleOperator(e.target.value)}
-                  >
-                    <option value="equals">equals</option>
-                    <option value="prefix">prefix</option>
-                    <option value="contains">contains</option>
-                  </select>
-                </div>
-                <div className="field rule-form-value">
-                  <label className="label" htmlFor="rule-value">
-                    Value
-                  </label>
-                  <input
-                    id="rule-value"
-                    className="input"
-                    value={ruleValue}
-                    onChange={(e) => setRuleValue(e.target.value)}
-                    placeholder={ruleValuePlaceholder(ruleType)}
-                    required
-                  />
-                </div>
-              </>
-            )}
-            <div className="rule-form-actions">
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={addingRule}
-              >
-                {addingRule ? 'Adding…' : 'Add rule'}
-              </button>
-            </div>
-          </form>
-        </section>
       ) : null}
 
       <section className="list-panel" aria-labelledby="rules-heading">
@@ -685,15 +618,35 @@ export default function PolicyDetailPage() {
           <h2 id="rules-heading" className="panel-title">
             Rules
           </h2>
+          {policy && canWrite ? (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={openAddRule}
+            >
+              Add rule
+            </button>
+          ) : null}
         </div>
         {rules && rules.length === 0 ? (
           <div className="empty-state" role="status">
             <p className="empty-title">No rules yet</p>
             <p className="muted">
               {canWrite
-                ? 'Add a process_name block rule above.'
+                ? 'Add a process_name block rule, then publish.'
                 : 'No rules on this policy.'}
             </p>
+            {canWrite ? (
+              <div className="empty-actions">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={openAddRule}
+                >
+                  Add rule
+                </button>
+              </div>
+            ) : null}
           </div>
         ) : null}
         {rules && rules.length > 0 ? (
@@ -754,87 +707,20 @@ export default function PolicyDetailPage() {
         ) : null}
       </section>
 
-      {policy && canWrite ? (
-        <section className="panel" aria-labelledby="add-assign-heading">
-          <h2 id="add-assign-heading" className="panel-title">
-            Add assignment
-          </h2>
-          <form className="token-create-grid" onSubmit={onAddAssignment}>
-            <div className="field">
-              <label className="label" htmlFor="assign-scope">
-                Scope
-              </label>
-              <select
-                id="assign-scope"
-                className="input"
-                value={assignScope}
-                onChange={(e) => setAssignScope(e.target.value)}
-              >
-                <option value="org">org</option>
-                <option value="group">group</option>
-                <option value="device">device</option>
-              </select>
-            </div>
-            {assignScope === 'group' ? (
-              <div className="field" style={{ gridColumn: 'span 2' }}>
-                <label className="label" htmlFor="assign-group">
-                  Group
-                </label>
-                <select
-                  id="assign-group"
-                  className="input"
-                  value={assignGroupId}
-                  onChange={(e) => setAssignGroupId(e.target.value)}
-                  required
-                >
-                  <option value="">Select group…</option>
-                  {(groups ?? []).map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : null}
-            {assignScope === 'device' ? (
-              <div className="field" style={{ gridColumn: 'span 2' }}>
-                <label className="label" htmlFor="assign-device">
-                  Device
-                </label>
-                <select
-                  id="assign-device"
-                  className="input"
-                  value={assignDeviceId}
-                  onChange={(e) => setAssignDeviceId(e.target.value)}
-                  required
-                >
-                  <option value="">Select device…</option>
-                  {(devices ?? []).map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.hostname}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : null}
-            <div className="token-create-submit">
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={addingAssign}
-              >
-                {addingAssign ? 'Adding…' : 'Add assignment'}
-              </button>
-            </div>
-          </form>
-        </section>
-      ) : null}
-
       <section className="list-panel" aria-labelledby="assign-heading">
         <div className="list-panel-header">
           <h2 id="assign-heading" className="panel-title">
             Assignments
           </h2>
+          {policy && canWrite ? (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={openAddAssign}
+            >
+              Add assignment
+            </button>
+          ) : null}
         </div>
         {assignments && assignments.length === 0 ? (
           <div className="empty-state" role="status">
@@ -844,6 +730,17 @@ export default function PolicyDetailPage() {
                 ? 'Assign to org, a group, or a device before publishing.'
                 : 'No assignments on this policy.'}
             </p>
+            {canWrite ? (
+              <div className="empty-actions">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={openAddAssign}
+                >
+                  Add assignment
+                </button>
+              </div>
+            ) : null}
           </div>
         ) : null}
         {assignments && assignments.length > 0 ? (
@@ -879,6 +776,333 @@ export default function PolicyDetailPage() {
           </div>
         ) : null}
       </section>
+
+      {modeOpen && policy && canWrite ? (
+        <div className="dialog-root" role="presentation">
+          <button
+            type="button"
+            className="dialog-backdrop"
+            aria-label="Close dialog"
+            disabled={savingMode}
+            onClick={() => {
+              if (!savingMode) setModeOpen(false)
+            }}
+          />
+          <div
+            className="dialog-panel dialog-panel--form"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={modeTitleId}
+          >
+            <h2 id={modeTitleId} className="dialog-title">
+              Change mode
+            </h2>
+            <p className="dialog-desc muted">
+              Audit reports matches only. Enforce terminates matching processes
+              on the agent — publish after switching so operators see a new
+              version.
+            </p>
+            <form
+              className="users-dialog-form"
+              onSubmit={(e) => {
+                e.preventDefault()
+                void onSaveMode()
+              }}
+            >
+              <div className="field">
+                <label className="label" htmlFor="policy-mode-edit">
+                  Mode
+                </label>
+                <select
+                  ref={modeFirstRef}
+                  id="policy-mode-edit"
+                  className="input"
+                  value={modeDraft}
+                  onChange={(e) => setModeDraft(e.target.value)}
+                  disabled={savingMode}
+                >
+                  <option value="audit">audit</option>
+                  <option value="enforce">enforce</option>
+                </select>
+              </div>
+              <div className="dialog-actions">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => {
+                    if (!savingMode) setModeOpen(false)
+                  }}
+                  disabled={savingMode}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={
+                    savingMode || modeDraft === policy.mode || !modeDraft
+                  }
+                >
+                  {savingMode ? 'Saving…' : 'Save mode'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {addRuleOpen && canWrite ? (
+        <div className="dialog-root" role="presentation">
+          <button
+            type="button"
+            className="dialog-backdrop"
+            aria-label="Close dialog"
+            disabled={addingRule}
+            onClick={() => {
+              if (!addingRule) setAddRuleOpen(false)
+            }}
+          />
+          <div
+            className="dialog-panel dialog-panel--form"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={addRuleTitleId}
+          >
+            <h2 id={addRuleTitleId} className="dialog-title">
+              Add rule
+            </h2>
+            <p className="dialog-desc muted">
+              New rules apply after the next publish (agents sync the new
+              version).
+            </p>
+            <form
+              className="rule-form-grid rule-form-grid--dialog"
+              onSubmit={onAddRule}
+            >
+              <div className="field">
+                <label className="label" htmlFor="rule-action">
+                  Action
+                </label>
+                <select
+                  ref={addRuleFirstRef}
+                  id="rule-action"
+                  className="input"
+                  value={ruleAction}
+                  onChange={(e) => setRuleAction(e.target.value)}
+                  disabled={addingRule}
+                >
+                  <option value="block">block</option>
+                  <option value="allow">allow</option>
+                </select>
+              </div>
+              <div className="field">
+                <label className="label" htmlFor="rule-type">
+                  Type
+                </label>
+                <select
+                  id="rule-type"
+                  className="input"
+                  value={ruleType}
+                  onChange={(e) => setRuleType(e.target.value)}
+                  disabled={addingRule}
+                >
+                  <option value="process_name">process_name</option>
+                  <option value="path">path</option>
+                  <option value="hash_sha256">hash_sha256</option>
+                  <option value="publisher">publisher</option>
+                  <option value="product_name">product_name</option>
+                  <option value="category">category</option>
+                </select>
+              </div>
+              {ruleType === 'category' ? (
+                <div className="field rule-form-value">
+                  <label className="label" htmlFor="rule-category">
+                    Category
+                  </label>
+                  <select
+                    id="rule-category"
+                    className="input"
+                    value={ruleCategory}
+                    onChange={(e) => setRuleCategory(e.target.value)}
+                    required
+                    disabled={addingRule}
+                  >
+                    {categories.length === 0 ? (
+                      <option value="">No categories</option>
+                    ) : (
+                      categories.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.name} ({c.code})
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+              ) : (
+                <>
+                  <div className="field">
+                    <label className="label" htmlFor="rule-op">
+                      Operator
+                    </label>
+                    <select
+                      id="rule-op"
+                      className="input"
+                      value={ruleOperator}
+                      onChange={(e) => setRuleOperator(e.target.value)}
+                      disabled={addingRule}
+                    >
+                      <option value="equals">equals</option>
+                      <option value="prefix">prefix</option>
+                      <option value="contains">contains</option>
+                    </select>
+                  </div>
+                  <div className="field rule-form-value">
+                    <label className="label" htmlFor="rule-value">
+                      Value
+                    </label>
+                    <input
+                      id="rule-value"
+                      className="input"
+                      value={ruleValue}
+                      onChange={(e) => setRuleValue(e.target.value)}
+                      placeholder={ruleValuePlaceholder(ruleType)}
+                      required
+                      disabled={addingRule}
+                    />
+                  </div>
+                </>
+              )}
+              <div className="dialog-actions">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => {
+                    if (!addingRule) setAddRuleOpen(false)
+                  }}
+                  disabled={addingRule}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={addingRule}
+                  aria-busy={addingRule}
+                >
+                  {addingRule ? 'Adding…' : 'Add rule'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {addAssignOpen && canWrite ? (
+        <div className="dialog-root" role="presentation">
+          <button
+            type="button"
+            className="dialog-backdrop"
+            aria-label="Close dialog"
+            disabled={addingAssign}
+            onClick={() => {
+              if (!addingAssign) setAddAssignOpen(false)
+            }}
+          />
+          <div
+            className="dialog-panel dialog-panel--form"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={addAssignTitleId}
+          >
+            <h2 id={addAssignTitleId} className="dialog-title">
+              Add assignment
+            </h2>
+            <form className="users-dialog-form" onSubmit={onAddAssignment}>
+              <div className="field">
+                <label className="label" htmlFor="assign-scope">
+                  Scope
+                </label>
+                <select
+                  ref={addAssignFirstRef}
+                  id="assign-scope"
+                  className="input"
+                  value={assignScope}
+                  onChange={(e) => setAssignScope(e.target.value)}
+                  disabled={addingAssign}
+                >
+                  <option value="org">org</option>
+                  <option value="group">group</option>
+                  <option value="device">device</option>
+                </select>
+              </div>
+              {assignScope === 'group' ? (
+                <div className="field">
+                  <label className="label" htmlFor="assign-group">
+                    Group
+                  </label>
+                  <select
+                    id="assign-group"
+                    className="input"
+                    value={assignGroupId}
+                    onChange={(e) => setAssignGroupId(e.target.value)}
+                    required
+                    disabled={addingAssign}
+                  >
+                    <option value="">Select group…</option>
+                    {(groups ?? []).map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
+              {assignScope === 'device' ? (
+                <div className="field">
+                  <label className="label" htmlFor="assign-device">
+                    Device
+                  </label>
+                  <select
+                    id="assign-device"
+                    className="input"
+                    value={assignDeviceId}
+                    onChange={(e) => setAssignDeviceId(e.target.value)}
+                    required
+                    disabled={addingAssign}
+                  >
+                    <option value="">Select device…</option>
+                    {(devices ?? []).map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.hostname}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
+              <div className="dialog-actions">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => {
+                    if (!addingAssign) setAddAssignOpen(false)
+                  }}
+                  disabled={addingAssign}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={addingAssign}
+                  aria-busy={addingAssign}
+                >
+                  {addingAssign ? 'Adding…' : 'Add assignment'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
 
       {editingRule && canWrite ? (
         <div className="dialog-root" role="presentation">

@@ -13,6 +13,8 @@ function toSearchParams(query: DeviceListQuery = {}): URLSearchParams {
   if (query.status) sp.set('status', query.status)
   if (query.os) sp.set('os', query.os)
   if (query.q) sp.set('q', query.q)
+  if (query.sort) sp.set('sort', query.sort)
+  if (query.order) sp.set('order', query.order)
   if (query.limit != null) sp.set('limit', String(query.limit))
   if (query.offset != null) sp.set('offset', String(query.offset))
   return sp

@@ -39,6 +39,8 @@ export type DeviceListQuery = {
   status?: string
   os?: string
   q?: string
+  sort?: string
+  order?: 'asc' | 'desc'
   limit?: number
   offset?: number
 }

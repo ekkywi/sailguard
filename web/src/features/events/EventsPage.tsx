@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
 import { PermissionDenied } from '../../components/PermissionDenied'
+import { SortableTh } from '../../components/SortableTh'
 import { TableSkeleton } from '../../components/TableSkeleton'
 import type { AppOutletContext } from '../../layouts/AppLayout'
 import { formatDateTime, formatRelativeTime } from '../../lib/format'
 import { hasPermission } from '../../lib/permissions'
 import { useDocumentTitle } from '../../lib/useDocumentTitle'
+import { useServerSort } from '../../lib/useServerSort'
 import { exportEventsCSV, listEvents } from './api'
 import type { DeviceEvent, EventListQuery, EventTypeFilter } from './types'
 
@@ -53,6 +55,7 @@ export default function EventsPage() {
   const [toLocal, setToLocal] = useState('')
   const [q, setQ] = useState('')
   const [qDraft, setQDraft] = useState('')
+  const sort = useServerSort('occurred_at', 'desc')
 
   useEffect(() => {
     const t = window.setTimeout(() => {
@@ -62,16 +65,22 @@ export default function EventsPage() {
     return () => window.clearTimeout(t)
   }, [qDraft])
 
+  useEffect(() => {
+    setPage(1)
+  }, [sort.sortKey, sort.sortDir])
+
   const query: EventListQuery = useMemo(() => {
     return {
       event_type: eventType || undefined,
       from: localInputToRFC3339(fromLocal, false),
       to: localInputToRFC3339(toLocal, true),
       q: q || undefined,
+      sort: sort.sort,
+      order: sort.order,
       limit: PAGE_SIZE,
       offset: (page - 1) * PAGE_SIZE,
     }
-  }, [eventType, fromLocal, toLocal, q, page])
+  }, [eventType, fromLocal, toLocal, q, sort.sort, sort.order, page])
 
   const filterQuery = useMemo((): EventListQuery => {
     return {
@@ -79,6 +88,8 @@ export default function EventsPage() {
       from: query.from,
       to: query.to,
       q: query.q,
+      sort: query.sort,
+      order: query.order,
     }
   }, [query])
 
@@ -312,13 +323,55 @@ export default function EventsPage() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>When</th>
-                    <th>Device</th>
-                    <th>Type</th>
-                    <th>Process</th>
-                    <th>User</th>
-                    <th>Match</th>
-                    <th>Mode</th>
+                    <SortableTh
+                      label="When"
+                      columnKey="occurred_at"
+                      sortKey={sort.sortKey}
+                      sortDir={sort.sortDir}
+                      onSort={sort.toggleSort}
+                    />
+                    <SortableTh
+                      label="Device"
+                      columnKey="hostname"
+                      sortKey={sort.sortKey}
+                      sortDir={sort.sortDir}
+                      onSort={sort.toggleSort}
+                    />
+                    <SortableTh
+                      label="Type"
+                      columnKey="event_type"
+                      sortKey={sort.sortKey}
+                      sortDir={sort.sortDir}
+                      onSort={sort.toggleSort}
+                    />
+                    <SortableTh
+                      label="Process"
+                      columnKey="process_name"
+                      sortKey={sort.sortKey}
+                      sortDir={sort.sortDir}
+                      onSort={sort.toggleSort}
+                    />
+                    <SortableTh
+                      label="User"
+                      columnKey="process_user_name"
+                      sortKey={sort.sortKey}
+                      sortDir={sort.sortDir}
+                      onSort={sort.toggleSort}
+                    />
+                    <SortableTh
+                      label="Match"
+                      columnKey="match_action"
+                      sortKey={sort.sortKey}
+                      sortDir={sort.sortDir}
+                      onSort={sort.toggleSort}
+                    />
+                    <SortableTh
+                      label="Mode"
+                      columnKey="policy_mode"
+                      sortKey={sort.sortKey}
+                      sortDir={sort.sortDir}
+                      onSort={sort.toggleSort}
+                    />
                   </tr>
                 </thead>
                 <tbody>

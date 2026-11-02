@@ -288,6 +288,8 @@ func (a *API) handleListDevices(w http.ResponseWriter, r *http.Request) {
 		Status: strings.TrimSpace(q.Get("status")),
 		OS:     strings.TrimSpace(q.Get("os")),
 		Q:      strings.TrimSpace(q.Get("q")),
+		Sort:   strings.TrimSpace(q.Get("sort")),
+		Order:  strings.TrimSpace(q.Get("order")),
 		Limit:  limit,
 		Offset: offset,
 	})

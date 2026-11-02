@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ekkywi/sailguard/services/controlplane/internal/listquery"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
@@ -17,8 +18,20 @@ type EventListFilter struct {
 	EventType string
 	DeviceID  *uuid.UUID
 	Q         string
+	Sort      string
+	Order     string
 	Limit     int
 	Offset    int
+}
+
+var eventListSortColumns = map[string]string{
+	"occurred_at":       "e.occurred_at",
+	"hostname":          "d.hostname",
+	"event_type":        "e.event_type",
+	"process_name":      "e.process_name",
+	"process_user_name": "e.process_user_name",
+	"match_action":      "e.match_action",
+	"policy_mode":       "e.policy_mode",
 }
 
 type EventListResult struct {
@@ -147,15 +160,19 @@ func (s *Store) ListEvents(ctx context.Context, f EventListFilter) (EventListRes
 		return EventListResult{}, err
 	}
 
+	orderBy := listquery.OrderBy(
+		f.Sort, f.Order, eventListSortColumns,
+		"e.occurred_at DESC, e.received_at DESC",
+	)
 	listArgs := append(append([]any{}, args...), limit, offset)
 	listSQL := fmt.Sprintf(`
 		SELECT %s
 		FROM device_events e
 		LEFT JOIN devices d ON d.id = e.device_id
 		%s
-		ORDER BY e.occurred_at DESC, e.received_at DESC
+		ORDER BY %s
 		LIMIT $%d OFFSET $%d
-	`, eventSelectCols, where, len(args)+1, len(args)+2)
+	`, eventSelectCols, where, orderBy, len(args)+1, len(args)+2)
 
 	rows, err := s.pool.Query(ctx, listSQL, listArgs...)
 	if err != nil {
@@ -182,15 +199,19 @@ func (s *Store) ListEventsForExport(ctx context.Context, f EventListFilter, maxR
 		maxRows = 10000
 	}
 	where, args := f.buildWhere()
+	orderBy := listquery.OrderBy(
+		f.Sort, f.Order, eventListSortColumns,
+		"e.occurred_at DESC, e.received_at DESC",
+	)
 	listArgs := append(append([]any{}, args...), maxRows)
 	listSQL := fmt.Sprintf(`
 		SELECT %s
 		FROM device_events e
 		LEFT JOIN devices d ON d.id = e.device_id
 		%s
-		ORDER BY e.occurred_at DESC, e.received_at DESC
+		ORDER BY %s
 		LIMIT $%d
-	`, eventSelectCols, where, len(args)+1)
+	`, eventSelectCols, where, orderBy, len(args)+1)
 
 	rows, err := s.pool.Query(ctx, listSQL, listArgs...)
 	if err != nil {

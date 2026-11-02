@@ -29,6 +29,8 @@ export type AuditLogQuery = {
   actor?: string
   q?: string
   resource_type?: string
+  sort?: string
+  order?: 'asc' | 'desc'
   limit?: number
   offset?: number
 }

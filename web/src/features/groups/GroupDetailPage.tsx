@@ -1,4 +1,12 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { PermissionDenied } from '../../components/PermissionDenied'
@@ -52,6 +60,14 @@ export default function GroupDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
+  const [editOpen, setEditOpen] = useState(false)
+  const editTitleId = useId()
+  const editFirstRef = useRef<HTMLInputElement>(null)
+
+  const [addMemberOpen, setAddMemberOpen] = useState(false)
+  const addMemberTitleId = useId()
+  const addMemberFirstRef = useRef<HTMLSelectElement>(null)
+
   const load = useCallback(() => {
     if (!canRead) {
       setLoading(false)
@@ -87,6 +103,40 @@ export default function GroupDetailPage() {
     load()
   }, [load])
 
+  useEffect(() => {
+    if (!editOpen) return
+    editFirstRef.current?.focus()
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !savingMeta) setEditOpen(false)
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = prevOverflow
+    }
+  }, [editOpen, savingMeta])
+
+  useEffect(() => {
+    if (!addMemberOpen) return
+    addMemberFirstRef.current?.focus()
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !adding) setAddMemberOpen(false)
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = prevOverflow
+    }
+  }, [addMemberOpen, adding])
+
   const memberIds = useMemo(
     () => new Set((members ?? []).map((d) => d.id)),
     [members],
@@ -106,6 +156,30 @@ export default function GroupDetailPage() {
     return <PermissionDenied permission="device.read" title="Group" />
   }
 
+  function openEdit() {
+    if (!group) return
+    setNameDraft(group.name)
+    setDescriptionDraft(group.description || '')
+    setError(null)
+    setEditOpen(true)
+  }
+
+  function closeEdit() {
+    if (savingMeta) return
+    setEditOpen(false)
+  }
+
+  function openAddMember() {
+    setSelectedDeviceId('')
+    setError(null)
+    setAddMemberOpen(true)
+  }
+
+  function closeAddMember() {
+    if (adding) return
+    setAddMemberOpen(false)
+  }
+
   async function onAdd(e: FormEvent) {
     e.preventDefault()
     if (!id || !selectedDeviceId) {
@@ -118,6 +192,7 @@ export default function GroupDetailPage() {
     try {
       await addGroupMember(id, selectedDeviceId)
       setSelectedDeviceId('')
+      setAddMemberOpen(false)
       toast.success('Member added')
       load()
     } catch (err: unknown) {
@@ -167,6 +242,7 @@ export default function GroupDetailPage() {
       setGroup(updated)
       setNameDraft(updated.name)
       setDescriptionDraft(updated.description || '')
+      setEditOpen(false)
       toast.success('Group updated')
     } catch (err: unknown) {
       const msg =
@@ -228,6 +304,20 @@ export default function GroupDetailPage() {
             Refresh
           </button>
           {group && canWrite ? (
+            <button type="button" className="btn btn-ghost" onClick={openEdit}>
+              Edit
+            </button>
+          ) : null}
+          {group && canWrite ? (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={openAddMember}
+            >
+              Add member
+            </button>
+          ) : null}
+          {group && canWrite ? (
             <button
               type="button"
               className="btn btn-danger"
@@ -248,111 +338,18 @@ export default function GroupDetailPage() {
       {loading && !group ? <p className="loading">Loading group…</p> : null}
 
       {group ? (
-        <>
-          <div className="info-list" aria-label="Group details">
-            <div className="info-row">
-              <span className="info-key">Created</span>
-              <span className="info-val" title={group.created_at}>
-                {formatRelativeTime(group.created_at)}
-              </span>
-            </div>
-            <div className="info-row">
-              <span className="info-key">ID</span>
-              <span className="info-val mono">{group.id}</span>
-            </div>
+        <div className="info-list" aria-label="Group details">
+          <div className="info-row">
+            <span className="info-key">Created</span>
+            <span className="info-val" title={group.created_at}>
+              {formatRelativeTime(group.created_at)}
+            </span>
           </div>
-
-          {canWrite ? (
-            <section className="panel" aria-labelledby="edit-group-heading">
-              <h2 id="edit-group-heading" className="panel-title">
-                Edit group
-              </h2>
-              <form className="token-create-grid" onSubmit={onSaveMeta}>
-                <div className="field" style={{ gridColumn: '1 / -1' }}>
-                  <label className="label" htmlFor="group-name">
-                    Name
-                  </label>
-                  <input
-                    id="group-name"
-                    className="input"
-                    value={nameDraft}
-                    onChange={(e) => setNameDraft(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="field" style={{ gridColumn: '1 / -1' }}>
-                  <label className="label" htmlFor="group-description">
-                    Description
-                  </label>
-                  <input
-                    id="group-description"
-                    className="input"
-                    value={descriptionDraft}
-                    onChange={(e) => setDescriptionDraft(e.target.value)}
-                    placeholder="optional"
-                  />
-                </div>
-                <div className="token-create-submit">
-                  <button
-                    type="submit"
-                    className="btn btn-primary"
-                    disabled={savingMeta || !metaDirty}
-                  >
-                    {savingMeta ? 'Saving…' : 'Save'}
-                  </button>
-                </div>
-              </form>
-            </section>
-          ) : null}
-        </>
-      ) : null}
-
-      {group && canWrite ? (
-        <section className="panel" aria-labelledby="add-member-heading">
-          <h2 id="add-member-heading" className="panel-title">
-            Add member
-          </h2>
-          {candidates.length === 0 ? (
-            <p className="muted">
-              {allDevices && allDevices.length === 0
-                ? 'No enrolled devices yet. Enroll an agent first.'
-                : 'All devices are already in this group.'}
-            </p>
-          ) : (
-            <form className="token-create-grid" onSubmit={onAdd}>
-              <div className="field" style={{ gridColumn: 'span 2' }}>
-                <label className="label" htmlFor="member-device">
-                  Device
-                </label>
-                <select
-                  id="member-device"
-                  className="input"
-                  value={selectedDeviceId}
-                  onChange={(e) => setSelectedDeviceId(e.target.value)}
-                  required
-                >
-                  <option value="">Select a device…</option>
-                  {candidates.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.hostname}
-                      {d.display_name ? ` (${d.display_name})` : ''}
-                      {` · ${d.os}`}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="token-create-submit">
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={adding || !selectedDeviceId}
-                >
-                  {adding ? 'Adding…' : 'Add to group'}
-                </button>
-              </div>
-            </form>
-          )}
-        </section>
+          <div className="info-row">
+            <span className="info-key">ID</span>
+            <span className="info-val mono">{group.id}</span>
+          </div>
+        </div>
       ) : null}
 
       <section className="list-panel" aria-labelledby="member-list-heading">
@@ -360,6 +357,15 @@ export default function GroupDetailPage() {
           <h2 id="member-list-heading" className="panel-title">
             Members
           </h2>
+          {group && canWrite ? (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={openAddMember}
+            >
+              Add member
+            </button>
+          ) : null}
         </div>
 
         {loading && !members ? (
@@ -369,7 +375,7 @@ export default function GroupDetailPage() {
         {!loading && members && members.length === 0 ? (
           <div className="empty-state" role="status">
             <p className="empty-title">No members yet</p>
-            <p className="muted">Add an enrolled device above.</p>
+            <p className="muted">Add an enrolled device.</p>
           </div>
         ) : null}
 
@@ -442,6 +448,146 @@ export default function GroupDetailPage() {
           </div>
         ) : null}
       </section>
+
+      {editOpen && group ? (
+        <div className="dialog-root" role="presentation">
+          <button
+            type="button"
+            className="dialog-backdrop"
+            aria-label="Close dialog"
+            disabled={savingMeta}
+            onClick={closeEdit}
+          />
+          <div
+            className="dialog-panel dialog-panel--form"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={editTitleId}
+          >
+            <h2 id={editTitleId} className="dialog-title">
+              Edit group
+            </h2>
+            <form className="users-dialog-form" onSubmit={onSaveMeta}>
+              <div className="field">
+                <label className="label" htmlFor="group-name">
+                  Name
+                </label>
+                <input
+                  ref={editFirstRef}
+                  id="group-name"
+                  className="input"
+                  value={nameDraft}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                  required
+                  disabled={savingMeta}
+                />
+              </div>
+              <div className="field">
+                <label className="label" htmlFor="group-description">
+                  Description
+                </label>
+                <input
+                  id="group-description"
+                  className="input"
+                  value={descriptionDraft}
+                  onChange={(e) => setDescriptionDraft(e.target.value)}
+                  placeholder="optional"
+                  disabled={savingMeta}
+                />
+              </div>
+              <div className="dialog-actions">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={closeEdit}
+                  disabled={savingMeta}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={savingMeta || !metaDirty}
+                >
+                  {savingMeta ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {addMemberOpen && group ? (
+        <div className="dialog-root" role="presentation">
+          <button
+            type="button"
+            className="dialog-backdrop"
+            aria-label="Close dialog"
+            disabled={adding}
+            onClick={closeAddMember}
+          />
+          <div
+            className="dialog-panel dialog-panel--form"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={addMemberTitleId}
+          >
+            <h2 id={addMemberTitleId} className="dialog-title">
+              Add member
+            </h2>
+            {candidates.length === 0 ? (
+              <p className="muted">
+                {allDevices && allDevices.length === 0
+                  ? 'No enrolled devices yet. Enroll an agent first.'
+                  : 'All devices are already in this group.'}
+              </p>
+            ) : (
+              <form className="users-dialog-form" onSubmit={onAdd}>
+                <div className="field">
+                  <label className="label" htmlFor="member-device">
+                    Device
+                  </label>
+                  <select
+                    ref={addMemberFirstRef}
+                    id="member-device"
+                    className="input"
+                    value={selectedDeviceId}
+                    onChange={(e) => setSelectedDeviceId(e.target.value)}
+                    required
+                    disabled={adding}
+                  >
+                    <option value="">Select a device…</option>
+                    {candidates.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.hostname}
+                        {d.display_name ? ` (${d.display_name})` : ''}
+                        {` · ${d.os}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="dialog-actions">
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={closeAddMember}
+                    disabled={adding}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={adding || !selectedDeviceId}
+                  >
+                    {adding ? 'Adding…' : 'Add to group'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       <ConfirmDialog
         open={removeTarget !== null}

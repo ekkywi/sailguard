@@ -1,4 +1,11 @@
-import { FormEvent, useCallback, useEffect, useState } from 'react'
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { PermissionDenied } from '../../components/PermissionDenied'
@@ -33,11 +40,17 @@ export default function CategoryDetailPage() {
   const [nameDraft, setNameDraft] = useState('')
   const [descriptionDraft, setDescriptionDraft] = useState('')
   const [savingMeta, setSavingMeta] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const editTitleId = useId()
+  const editFirstRef = useRef<HTMLInputElement>(null)
 
   const [sigType, setSigType] = useState('process_name')
   const [sigOperator, setSigOperator] = useState('equals')
   const [sigValue, setSigValue] = useState('')
   const [addingSig, setAddingSig] = useState(false)
+  const [addSigOpen, setAddSigOpen] = useState(false)
+  const addSigTitleId = useId()
+  const addSigFirstRef = useRef<HTMLSelectElement>(null)
 
   const [removeSig, setRemoveSig] = useState<CategorySignature | null>(null)
   const [removingSig, setRemovingSig] = useState(false)
@@ -79,6 +92,67 @@ export default function CategoryDetailPage() {
     load()
   }, [load])
 
+  useEffect(() => {
+    if (!editOpen) return
+    editFirstRef.current?.focus()
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !savingMeta) setEditOpen(false)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = prevOverflow
+    }
+  }, [editOpen, savingMeta])
+
+  useEffect(() => {
+    if (!addSigOpen) return
+    addSigFirstRef.current?.focus()
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !addingSig) setAddSigOpen(false)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = prevOverflow
+    }
+  }, [addSigOpen, addingSig])
+
+  const metaDirty =
+    !!category &&
+    (nameDraft.trim() !== category.name ||
+      descriptionDraft.trim() !== (category.description || ''))
+
+  function openEdit() {
+    if (!category) return
+    setNameDraft(category.name)
+    setDescriptionDraft(category.description || '')
+    setError(null)
+    setEditOpen(true)
+  }
+
+  function closeEdit() {
+    if (savingMeta) return
+    setEditOpen(false)
+  }
+
+  function openAddSig() {
+    setSigType('process_name')
+    setSigOperator('equals')
+    setSigValue('')
+    setError(null)
+    setAddSigOpen(true)
+  }
+
+  function closeAddSig() {
+    if (addingSig) return
+    setAddSigOpen(false)
+  }
+
   async function onSaveMeta(e: FormEvent) {
     e.preventDefault()
     if (!code) return
@@ -98,6 +172,7 @@ export default function CategoryDetailPage() {
       setCategory(c)
       setNameDraft(c.name)
       setDescriptionDraft(c.description || '')
+      setEditOpen(false)
       toast.success('Category updated')
     } catch (err: unknown) {
       const msg =
@@ -127,6 +202,7 @@ export default function CategoryDetailPage() {
         value,
       })
       setSigValue('')
+      setAddSigOpen(false)
       toast.success('Signature added')
       load()
     } catch (err: unknown) {
@@ -207,6 +283,20 @@ export default function CategoryDetailPage() {
           >
             Refresh
           </button>
+          {category && canWrite ? (
+            <button type="button" className="btn btn-ghost" onClick={openEdit}>
+              Edit
+            </button>
+          ) : null}
+          {category && canWrite ? (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={openAddSig}
+            >
+              Add signature
+            </button>
+          ) : null}
           {canWrite ? (
             <button
               type="button"
@@ -228,65 +318,7 @@ export default function CategoryDetailPage() {
 
       {loading && !category ? <p className="loading">Loading…</p> : null}
 
-      {category && canWrite ? (
-        <section className="panel" aria-labelledby="category-meta-heading">
-          <h2 id="category-meta-heading" className="panel-title">
-            Details
-          </h2>
-          <form className="rule-form-grid" onSubmit={onSaveMeta}>
-            <div className="field">
-              <label className="label" htmlFor="cat-code-ro">
-                Code
-              </label>
-              <input
-                id="cat-code-ro"
-                className="input mono"
-                value={category.code}
-                disabled
-                readOnly
-              />
-            </div>
-            <div className="field">
-              <label className="label" htmlFor="cat-name">
-                Name
-              </label>
-              <input
-                id="cat-name"
-                className="input"
-                value={nameDraft}
-                onChange={(e) => setNameDraft(e.target.value)}
-                required
-              />
-            </div>
-            <div className="field rule-form-value">
-              <label className="label" htmlFor="cat-desc">
-                Description
-              </label>
-              <input
-                id="cat-desc"
-                className="input"
-                value={descriptionDraft}
-                onChange={(e) => setDescriptionDraft(e.target.value)}
-              />
-            </div>
-            <div className="rule-form-actions">
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={
-                  savingMeta ||
-                  (nameDraft.trim() === category.name &&
-                    descriptionDraft.trim() === (category.description || ''))
-                }
-              >
-                {savingMeta ? 'Saving…' : 'Save details'}
-              </button>
-            </div>
-          </form>
-        </section>
-      ) : null}
-
-      {category && !canWrite ? (
+      {category ? (
         <div className="info-list" aria-label="Category details">
           <div className="info-row">
             <span className="info-key">Code</span>
@@ -303,86 +335,28 @@ export default function CategoryDetailPage() {
         </div>
       ) : null}
 
-      {category && canWrite ? (
-        <section className="panel" aria-labelledby="add-sig-heading">
-          <h2 id="add-sig-heading" className="panel-title">
-            Add signature
-          </h2>
-          <p className="muted panel-lead">
-            Signatures are technical match atoms (same types as manual policy
-            rules). Agents never see the category label — only the expanded
-            list.
-          </p>
-          <form className="rule-form-grid" onSubmit={onAddSignature}>
-            <div className="field">
-              <label className="label" htmlFor="sig-type">
-                Type
-              </label>
-              <select
-                id="sig-type"
-                className="input"
-                value={sigType}
-                onChange={(e) => setSigType(e.target.value)}
-              >
-                <option value="process_name">process_name</option>
-                <option value="path">path</option>
-                <option value="hash_sha256">hash_sha256</option>
-                <option value="publisher">publisher</option>
-                <option value="product_name">product_name</option>
-              </select>
-            </div>
-            <div className="field">
-              <label className="label" htmlFor="sig-op">
-                Operator
-              </label>
-              <select
-                id="sig-op"
-                className="input"
-                value={sigOperator}
-                onChange={(e) => setSigOperator(e.target.value)}
-              >
-                <option value="equals">equals</option>
-                <option value="prefix">prefix</option>
-                <option value="contains">contains</option>
-              </select>
-            </div>
-            <div className="field rule-form-value">
-              <label className="label" htmlFor="sig-value">
-                Value
-              </label>
-              <input
-                id="sig-value"
-                className="input"
-                value={sigValue}
-                onChange={(e) => setSigValue(e.target.value)}
-                placeholder="whatsapp.exe"
-                required
-              />
-            </div>
-            <div className="rule-form-actions">
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={addingSig}
-              >
-                {addingSig ? 'Adding…' : 'Add signature'}
-              </button>
-            </div>
-          </form>
-        </section>
-      ) : null}
-
       <section className="list-panel" aria-labelledby="sig-list-heading">
         <div className="list-panel-header">
           <h2 id="sig-list-heading" className="panel-title">
             Signatures
           </h2>
-          {signatures ? (
-            <p className="muted list-range">
-              {signatures.length} signature
-              {signatures.length === 1 ? '' : 's'}
-            </p>
-          ) : null}
+          <div className="btn-row">
+            {signatures ? (
+              <p className="muted list-range">
+                {signatures.length} signature
+                {signatures.length === 1 ? '' : 's'}
+              </p>
+            ) : null}
+            {category && canWrite ? (
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={openAddSig}
+              >
+                Add signature
+              </button>
+            ) : null}
+          </div>
         </div>
 
         {signatures && signatures.length === 0 ? (
@@ -390,9 +364,20 @@ export default function CategoryDetailPage() {
             <p className="empty-title">No signatures yet</p>
             <p className="muted">
               {canWrite
-                ? 'Add process names or other matchers above so category policies can expand.'
+                ? 'Add process names or other matchers so category policies can expand.'
                 : 'No signatures on this category.'}
             </p>
+            {canWrite ? (
+              <div className="empty-actions">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={openAddSig}
+                >
+                  Add signature
+                </button>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -437,6 +422,171 @@ export default function CategoryDetailPage() {
           </div>
         ) : null}
       </section>
+
+      {editOpen && category ? (
+        <div className="dialog-root" role="presentation">
+          <button
+            type="button"
+            className="dialog-backdrop"
+            aria-label="Close dialog"
+            disabled={savingMeta}
+            onClick={closeEdit}
+          />
+          <div
+            className="dialog-panel dialog-panel--form"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={editTitleId}
+          >
+            <h2 id={editTitleId} className="dialog-title">
+              Edit category
+            </h2>
+            <p className="dialog-desc muted">
+              Code <span className="mono">{category.code}</span> cannot change.
+            </p>
+            <form className="users-dialog-form" onSubmit={onSaveMeta}>
+              <div className="field">
+                <label className="label" htmlFor="cat-name">
+                  Name
+                </label>
+                <input
+                  ref={editFirstRef}
+                  id="cat-name"
+                  className="input"
+                  value={nameDraft}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                  required
+                  disabled={savingMeta}
+                />
+              </div>
+              <div className="field">
+                <label className="label" htmlFor="cat-desc">
+                  Description
+                </label>
+                <input
+                  id="cat-desc"
+                  className="input"
+                  value={descriptionDraft}
+                  onChange={(e) => setDescriptionDraft(e.target.value)}
+                  disabled={savingMeta}
+                />
+              </div>
+              <div className="dialog-actions">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={closeEdit}
+                  disabled={savingMeta}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={savingMeta || !metaDirty}
+                >
+                  {savingMeta ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {addSigOpen ? (
+        <div className="dialog-root" role="presentation">
+          <button
+            type="button"
+            className="dialog-backdrop"
+            aria-label="Close dialog"
+            disabled={addingSig}
+            onClick={closeAddSig}
+          />
+          <div
+            className="dialog-panel dialog-panel--form"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={addSigTitleId}
+          >
+            <h2 id={addSigTitleId} className="dialog-title">
+              Add signature
+            </h2>
+            <p className="dialog-desc muted">
+              Technical match atoms (same types as manual policy rules). Agents
+              never see the category label — only the expanded list.
+            </p>
+            <form className="users-dialog-form" onSubmit={onAddSignature}>
+              <div className="field">
+                <label className="label" htmlFor="sig-type">
+                  Type
+                </label>
+                <select
+                  ref={addSigFirstRef}
+                  id="sig-type"
+                  className="input"
+                  value={sigType}
+                  onChange={(e) => setSigType(e.target.value)}
+                  disabled={addingSig}
+                >
+                  <option value="process_name">process_name</option>
+                  <option value="path">path</option>
+                  <option value="hash_sha256">hash_sha256</option>
+                  <option value="publisher">publisher</option>
+                  <option value="product_name">product_name</option>
+                </select>
+              </div>
+              <div className="field">
+                <label className="label" htmlFor="sig-op">
+                  Operator
+                </label>
+                <select
+                  id="sig-op"
+                  className="input"
+                  value={sigOperator}
+                  onChange={(e) => setSigOperator(e.target.value)}
+                  disabled={addingSig}
+                >
+                  <option value="equals">equals</option>
+                  <option value="prefix">prefix</option>
+                  <option value="contains">contains</option>
+                </select>
+              </div>
+              <div className="field">
+                <label className="label" htmlFor="sig-value">
+                  Value
+                </label>
+                <input
+                  id="sig-value"
+                  className="input"
+                  value={sigValue}
+                  onChange={(e) => setSigValue(e.target.value)}
+                  placeholder="whatsapp.exe"
+                  required
+                  disabled={addingSig}
+                />
+              </div>
+              <div className="dialog-actions">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={closeAddSig}
+                  disabled={addingSig}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={addingSig}
+                  aria-busy={addingSig}
+                >
+                  {addingSig ? 'Adding…' : 'Add signature'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
 
       <ConfirmDialog
         open={removeSig !== null}

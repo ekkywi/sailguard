@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ekkywi/sailguard/services/controlplane/internal/listquery"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
@@ -15,8 +16,22 @@ type DeviceListFilter struct {
 	Status string // active | disabled
 	OS     string // windows | linux | darwin
 	Q      string // hostname, display_name, pic, location, asset_tag, machine_guid
+	Sort   string // client key; see deviceListSortColumns
+	Order  string // asc | desc
 	Limit  int
 	Offset int
+}
+
+var deviceListSortColumns = map[string]string{
+	"hostname":     "hostname",
+	"os":           "os",
+	"pic":          "pic",
+	"location":     "location",
+	"primary_ip":   "primary_ip",
+	"status":       "status",
+	"last_seen_at": "last_seen_at",
+	"enrolled_at":  "enrolled_at",
+	"created_at":   "created_at",
 }
 
 type DeviceListResult struct {
@@ -132,12 +147,13 @@ func (s *Store) ListDevices(ctx context.Context, f DeviceListFilter) (DeviceList
 		return DeviceListResult{}, err
 	}
 
+	orderBy := listquery.OrderBy(f.Sort, f.Order, deviceListSortColumns, "hostname ASC, created_at ASC")
 	listArgs := append(append([]any{}, args...), limit, offset)
 	listSQL := `
 		SELECT ` + deviceSelectCols + `
 		FROM devices
 		` + where + `
-		ORDER BY hostname, created_at
+		ORDER BY ` + orderBy + `
 		LIMIT $` + fmt.Sprintf("%d", len(args)+1) + `
 		OFFSET $` + fmt.Sprintf("%d", len(args)+2)
 

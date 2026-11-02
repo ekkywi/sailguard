@@ -34,6 +34,8 @@ export type EventListQuery = {
   event_type?: EventTypeFilter
   device_id?: string
   q?: string
+  sort?: string
+  order?: 'asc' | 'desc'
   limit?: number
   offset?: number
 }

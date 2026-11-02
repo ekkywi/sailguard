@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import { PermissionDenied } from '../../components/PermissionDenied'
+import { SortableTh } from '../../components/SortableTh'
 import { TableSkeleton } from '../../components/TableSkeleton'
 import type { AppOutletContext } from '../../layouts/AppLayout'
 import {
@@ -12,6 +13,7 @@ import {
 } from '../../lib/format'
 import { hasPermission } from '../../lib/permissions'
 import { useDocumentTitle } from '../../lib/useDocumentTitle'
+import { useServerSort } from '../../lib/useServerSort'
 import { listDevices } from './api'
 import type { Device, DeviceListQuery, DeviceOSFilter, DeviceStatusFilter } from './types'
 
@@ -45,6 +47,7 @@ export default function DevicesPage() {
   const [os, setOS] = useState<DeviceOSFilter>('')
   const [q, setQ] = useState('')
   const [qDraft, setQDraft] = useState('')
+  const sort = useServerSort('hostname', 'asc')
 
   useEffect(() => {
     const t = window.setTimeout(() => {
@@ -54,15 +57,21 @@ export default function DevicesPage() {
     return () => window.clearTimeout(t)
   }, [qDraft])
 
+  useEffect(() => {
+    setPage(1)
+  }, [sort.sortKey, sort.sortDir])
+
   const query: DeviceListQuery = useMemo(
     () => ({
       status: status || undefined,
       os: os || undefined,
       q: q || undefined,
+      sort: sort.sort,
+      order: sort.order,
       limit: PAGE_SIZE,
       offset: (page - 1) * PAGE_SIZE,
     }),
-    [status, os, q, page],
+    [status, os, q, sort.sort, sort.order, page],
   )
 
   const hasFilters = Boolean(status || os || q)
@@ -261,16 +270,64 @@ export default function DevicesPage() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Hostname</th>
-                    <th>OS</th>
-                    <th>PIC</th>
-                    <th>Location</th>
-                    <th>IP</th>
-                    <th>Status</th>
+                    <SortableTh
+                      label="Hostname"
+                      columnKey="hostname"
+                      sortKey={sort.sortKey}
+                      sortDir={sort.sortDir}
+                      onSort={sort.toggleSort}
+                    />
+                    <SortableTh
+                      label="OS"
+                      columnKey="os"
+                      sortKey={sort.sortKey}
+                      sortDir={sort.sortDir}
+                      onSort={sort.toggleSort}
+                    />
+                    <SortableTh
+                      label="PIC"
+                      columnKey="pic"
+                      sortKey={sort.sortKey}
+                      sortDir={sort.sortDir}
+                      onSort={sort.toggleSort}
+                    />
+                    <SortableTh
+                      label="Location"
+                      columnKey="location"
+                      sortKey={sort.sortKey}
+                      sortDir={sort.sortDir}
+                      onSort={sort.toggleSort}
+                    />
+                    <SortableTh
+                      label="IP"
+                      columnKey="primary_ip"
+                      sortKey={sort.sortKey}
+                      sortDir={sort.sortDir}
+                      onSort={sort.toggleSort}
+                    />
+                    <SortableTh
+                      label="Status"
+                      columnKey="status"
+                      sortKey={sort.sortKey}
+                      sortDir={sort.sortDir}
+                      onSort={sort.toggleSort}
+                    />
                     <th>Connectivity</th>
                     <th>Agent</th>
-                    <th>Last seen</th>
-                    <th>Enrolled</th>
+                    <SortableTh
+                      label="Last seen"
+                      columnKey="last_seen_at"
+                      sortKey={sort.sortKey}
+                      sortDir={sort.sortDir}
+                      onSort={sort.toggleSort}
+                    />
+                    <SortableTh
+                      label="Enrolled"
+                      columnKey="enrolled_at"
+                      sortKey={sort.sortKey}
+                      sortDir={sort.sortDir}
+                      onSort={sort.toggleSort}
+                    />
                   </tr>
                 </thead>
                 <tbody>

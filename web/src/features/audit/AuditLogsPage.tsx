@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
 import { PermissionDenied } from '../../components/PermissionDenied'
+import { SortableTh } from '../../components/SortableTh'
+import { TableSkeleton } from '../../components/TableSkeleton'
 import type { AppOutletContext } from '../../layouts/AppLayout'
 import { formatDateTime, formatRelativeTime } from '../../lib/format'
-import { TableSkeleton } from '../../components/TableSkeleton'
 import { hasPermission } from '../../lib/permissions'
 import { useDocumentTitle } from '../../lib/useDocumentTitle'
+import { useServerSort } from '../../lib/useServerSort'
 import { exportAuditLogsCSV, listAuditLogs } from './api'
 import type { AuditFamily, AuditLog, AuditLogQuery } from './types'
 
@@ -111,6 +113,7 @@ export default function AuditLogsPage() {
   const [q, setQ] = useState('')
   const [actorDraft, setActorDraft] = useState('')
   const [qDraft, setQDraft] = useState('')
+  const sort = useServerSort('created_at', 'desc')
 
   const [selected, setSelected] = useState<AuditLog | null>(null)
 
@@ -124,6 +127,10 @@ export default function AuditLogsPage() {
     return () => window.clearTimeout(t)
   }, [actorDraft, qDraft])
 
+  useEffect(() => {
+    setPage(1)
+  }, [sort.sortKey, sort.sortDir])
+
   const query: AuditLogQuery = useMemo(() => {
     const from = localInputToRFC3339(fromLocal, false)
     const to = localInputToRFC3339(toLocal, true)
@@ -133,10 +140,12 @@ export default function AuditLogsPage() {
       to,
       actor: actor || undefined,
       q: q || undefined,
+      sort: sort.sort,
+      order: sort.order,
       limit: PAGE_SIZE,
       offset: (page - 1) * PAGE_SIZE,
     }
-  }, [family, fromLocal, toLocal, actor, q, page])
+  }, [family, fromLocal, toLocal, actor, q, sort.sort, sort.order, page])
 
   const filterQuery = useMemo((): AuditLogQuery => {
     return {
@@ -145,6 +154,8 @@ export default function AuditLogsPage() {
       to: query.to,
       actor: query.actor,
       q: query.q,
+      sort: query.sort,
+      order: query.order,
     }
   }, [query])
 
@@ -399,11 +410,41 @@ export default function AuditLogsPage() {
               <table className="data-table audit-table">
                 <thead>
                   <tr>
-                    <th>When</th>
-                    <th>Actor</th>
-                    <th>Action</th>
-                    <th>Summary</th>
-                    <th>Resource</th>
+                    <SortableTh
+                      label="When"
+                      columnKey="created_at"
+                      sortKey={sort.sortKey}
+                      sortDir={sort.sortDir}
+                      onSort={sort.toggleSort}
+                    />
+                    <SortableTh
+                      label="Actor"
+                      columnKey="actor_email"
+                      sortKey={sort.sortKey}
+                      sortDir={sort.sortDir}
+                      onSort={sort.toggleSort}
+                    />
+                    <SortableTh
+                      label="Action"
+                      columnKey="action"
+                      sortKey={sort.sortKey}
+                      sortDir={sort.sortDir}
+                      onSort={sort.toggleSort}
+                    />
+                    <SortableTh
+                      label="Summary"
+                      columnKey="summary"
+                      sortKey={sort.sortKey}
+                      sortDir={sort.sortDir}
+                      onSort={sort.toggleSort}
+                    />
+                    <SortableTh
+                      label="Resource"
+                      columnKey="resource_type"
+                      sortKey={sort.sortKey}
+                      sortDir={sort.sortDir}
+                      onSort={sort.toggleSort}
+                    />
                   </tr>
                 </thead>
                 <tbody>

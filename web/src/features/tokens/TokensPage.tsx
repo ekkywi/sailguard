@@ -1,8 +1,17 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
-import { TableSkeleton } from '../../components/TableSkeleton'
 import { PermissionDenied } from '../../components/PermissionDenied'
+import { SortableTh } from '../../components/SortableTh'
+import { TableSkeleton } from '../../components/TableSkeleton'
 import { toast } from '../../components/toast'
 import type { AppOutletContext } from '../../layouts/AppLayout'
 import {
@@ -11,6 +20,13 @@ import {
   statusBadgeClass,
 } from '../../lib/format'
 import { hasPermission } from '../../lib/permissions'
+import {
+  compareDate,
+  compareNumber,
+  compareString,
+  useClientList,
+  type ClientListCompare,
+} from '../../lib/useClientList'
 import { useDocumentTitle } from '../../lib/useDocumentTitle'
 import {
   createEnrollmentToken,
@@ -21,6 +37,8 @@ import type { CreateEnrollmentTokenInput, EnrollmentToken } from './types'
 
 const PAGE_SIZE = 10
 
+type StatusFilter = '' | 'active' | 'expired' | 'revoked'
+
 function tokenStatus(t: EnrollmentToken): 'active' | 'expired' | 'revoked' {
   if (t.revoked_at) return 'revoked'
   if (t.expires_at && new Date(t.expires_at).getTime() <= Date.now()) {
@@ -28,6 +46,29 @@ function tokenStatus(t: EnrollmentToken): 'active' | 'expired' | 'revoked' {
   }
   return 'active'
 }
+
+function matchesToken(t: EnrollmentToken, q: string): boolean {
+  return (
+    (t.label || '').toLowerCase().includes(q) ||
+    t.id.toLowerCase().includes(q) ||
+    tokenStatus(t).includes(q)
+  )
+}
+
+const TOKEN_COMPARE: ClientListCompare<EnrollmentToken> = {
+  label: (a, b) => compareString(a.label || '', b.label || ''),
+  uses: (a, b) => compareNumber(a.use_count, b.use_count),
+  expires_at: (a, b) => compareDate(a.expires_at, b.expires_at),
+  status: (a, b) => compareString(tokenStatus(a), tokenStatus(b)),
+  created_at: (a, b) => compareDate(a.created_at, b.created_at),
+}
+
+const STATUS_CHIPS: { id: StatusFilter; label: string }[] = [
+  { id: '', label: 'All' },
+  { id: 'active', label: 'Active' },
+  { id: 'expired', label: 'Expired' },
+  { id: 'revoked', label: 'Revoked' },
+]
 
 export default function TokensPage() {
   useDocumentTitle('Enrollment tokens')
@@ -37,10 +78,16 @@ export default function TokensPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('')
+
+  const [createOpen, setCreateOpen] = useState(false)
   const [label, setLabel] = useState('')
   const [maxUses, setMaxUses] = useState(1)
   const [expiresHours, setExpiresHours] = useState('')
   const [creating, setCreating] = useState(false)
+  const [labelError, setLabelError] = useState<string | null>(null)
+  const createTitleId = useId()
+  const createFirstRef = useRef<HTMLInputElement>(null)
 
   const [freshSecret, setFreshSecret] = useState<string | null>(null)
   const [copyDone, setCopyDone] = useState(false)
@@ -48,7 +95,20 @@ export default function TokensPage() {
   const [revokeTarget, setRevokeTarget] = useState<EnrollmentToken | null>(null)
   const [revoking, setRevoking] = useState(false)
 
-  const [page, setPage] = useState(1)
+  const statusFilterFn = useMemo(() => {
+    if (!statusFilter) return undefined
+    return (t: EnrollmentToken) => tokenStatus(t) === statusFilter
+  }, [statusFilter])
+
+  const list = useClientList({
+    items: tokens,
+    pageSize: PAGE_SIZE,
+    matches: matchesToken,
+    compare: TOKEN_COMPARE,
+    defaultSortKey: 'created_at',
+    defaultSortDir: 'desc',
+    filter: statusFilterFn,
+  })
 
   const load = useCallback(() => {
     if (!canWrite) {
@@ -70,39 +130,63 @@ export default function TokensPage() {
     load()
   }, [load])
 
-  const total = tokens?.length ?? 0
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE) || 1)
-
   useEffect(() => {
-    setPage((p) => Math.min(p, pageCount))
-  }, [pageCount])
+    if (!createOpen) return
+    createFirstRef.current?.focus()
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !creating) {
+        setCreateOpen(false)
+        setLabel('')
+        setMaxUses(1)
+        setExpiresHours('')
+        setLabelError(null)
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = prevOverflow
+    }
+  }, [createOpen, creating])
 
-  const pageItems = useMemo(() => {
-    if (!tokens) return []
-    const start = (page - 1) * PAGE_SIZE
-    return tokens.slice(start, start + PAGE_SIZE)
-  }, [tokens, page])
+  function openCreate() {
+    setLabel('')
+    setMaxUses(1)
+    setExpiresHours('')
+    setLabelError(null)
+    setError(null)
+    setCreateOpen(true)
+  }
 
-  const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
-  const rangeEnd = Math.min(page * PAGE_SIZE, total)
+  function closeCreate() {
+    if (creating) return
+    setCreateOpen(false)
+    setLabel('')
+    setMaxUses(1)
+    setExpiresHours('')
+    setLabelError(null)
+  }
 
-  if (!canWrite) {
-    return (
-      <PermissionDenied permission="device.write" title="Enrollment tokens" />
-    )
+  function clearFilters() {
+    list.clearSearch()
+    setStatusFilter('')
+    list.setPage(1)
   }
 
   async function onCreate(e: FormEvent) {
     e.preventDefault()
     const trimmed = label.trim()
     if (!trimmed) {
-      setError('label is required')
+      setLabelError('Label is required')
       return
     }
 
     setCreating(true)
     setError(null)
     setCopyDone(false)
+    setLabelError(null)
 
     const body: CreateEnrollmentTokenInput = {
       label: trimmed,
@@ -117,10 +201,11 @@ export default function TokensPage() {
     try {
       const created = await createEnrollmentToken(body)
       setFreshSecret(created.token ?? null)
+      setCreateOpen(false)
       setLabel('')
       setMaxUses(1)
       setExpiresHours('')
-      setPage(1)
+      list.setPage(1)
       toast.success('Token created', 'Copy the secret below — it is shown once.')
       load()
     } catch (err: unknown) {
@@ -166,6 +251,16 @@ export default function TokensPage() {
     }
   }
 
+  if (!canWrite) {
+    return (
+      <PermissionDenied permission="device.write" title="Enrollment tokens" />
+    )
+  }
+
+  const hasSource = (tokens?.length ?? 0) > 0
+  const showNoMatches = hasSource && list.total === 0
+  const hasFilters = list.hasActiveQuery || Boolean(statusFilter)
+
   return (
     <div className="stack tokens-layout">
       <header className="page-header">
@@ -182,14 +277,23 @@ export default function TokensPage() {
             ) : null}
           </p>
         </div>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          onClick={load}
-          disabled={loading}
-        >
-          Refresh
-        </button>
+        <div className="btn-row">
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={load}
+            disabled={loading}
+          >
+            Refresh
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={openCreate}
+          >
+            Create token
+          </button>
+        </div>
       </header>
 
       {freshSecret ? (
@@ -222,62 +326,50 @@ export default function TokensPage() {
         </div>
       ) : null}
 
-      <section className="panel" aria-labelledby="create-token-heading">
-        <h2 id="create-token-heading" className="panel-title">
-          Create token
-        </h2>
-        <form className="token-create-grid" onSubmit={onCreate}>
-          <div className="field">
-            <label className="label" htmlFor="token-label">
-              Label
-            </label>
-            <input
-              id="token-label"
-              className="input"
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder="lab-batch-1"
-              required
-            />
-          </div>
-          <div className="field">
-            <label className="label" htmlFor="token-max">
-              Max uses
-            </label>
-            <input
-              id="token-max"
-              className="input"
-              type="number"
-              min={1}
-              value={maxUses}
-              onChange={(e) => setMaxUses(Number(e.target.value) || 1)}
-            />
-          </div>
-          <div className="field">
-            <label className="label" htmlFor="token-exp">
-              Expires (hours)
-            </label>
-            <input
-              id="token-exp"
-              className="input"
-              type="number"
-              min={1}
-              value={expiresHours}
-              onChange={(e) => setExpiresHours(e.target.value)}
-              placeholder="Optional"
-            />
-          </div>
-          <div className="token-create-submit">
+      <div className="audit-toolbar" role="search">
+        <div className="audit-chips" aria-label="Token status">
+          {STATUS_CHIPS.map((c) => (
             <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={creating}
+              key={c.id || 'all-status'}
+              type="button"
+              className={
+                statusFilter === c.id ? 'audit-chip audit-chip-on' : 'audit-chip'
+              }
+              onClick={() => {
+                setStatusFilter(c.id)
+                list.setPage(1)
+              }}
             >
-              {creating ? 'Creating…' : 'Create token'}
+              {c.label}
             </button>
+          ))}
+        </div>
+        <div className="audit-filters">
+          <div className="field audit-filter-grow">
+            <label className="label" htmlFor="tokens-q">
+              Search
+            </label>
+            <input
+              id="tokens-q"
+              className="input"
+              value={list.queryDraft}
+              onChange={(e) => list.setQueryDraft(e.target.value)}
+              placeholder="Label or id…"
+            />
           </div>
-        </form>
-      </section>
+          {hasFilters ? (
+            <div className="field audit-filter-actions">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={clearFilters}
+              >
+                Clear
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </div>
 
       {error ? (
         <p className="error" role="alert">
@@ -290,9 +382,12 @@ export default function TokensPage() {
           <h2 id="token-list-heading" className="panel-title">
             All tokens
           </h2>
-          {total > 0 ? (
+          {list.total > 0 ? (
             <p className="muted list-range">
-              Showing {rangeStart}–{rangeEnd} of {total}
+              Showing {list.rangeStart}–{list.rangeEnd} of {list.total}
+              {list.filteredFromSource
+                ? ` (filtered from ${list.sourceTotal})`
+                : ''}
             </p>
           ) : null}
         </div>
@@ -304,8 +399,15 @@ export default function TokensPage() {
         {!loading && tokens && tokens.length === 0 ? (
           <div className="empty-state" role="status">
             <p className="empty-title">No enrollment tokens yet</p>
-            <p className="muted">Create one above, then open Download agent.</p>
+            <p className="muted">Create one, then open Download agent.</p>
             <div className="empty-actions">
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={openCreate}
+              >
+                Create token
+              </button>
               <Link className="btn btn-ghost" to="/agent-download">
                 Download agent
               </Link>
@@ -313,22 +415,68 @@ export default function TokensPage() {
           </div>
         ) : null}
 
-        {tokens && tokens.length > 0 ? (
+        {showNoMatches ? (
+          <div className="empty-state" role="status">
+            <p className="empty-title">No matches</p>
+            <p className="muted">Try another search or clear filters.</p>
+            <div className="empty-actions">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={clearFilters}
+              >
+                Clear filters
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {list.pageItems.length > 0 ? (
           <>
             <div className="table-wrap table-scroll">
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Label</th>
-                    <th>Uses</th>
-                    <th>Expires</th>
-                    <th>Status</th>
-                    <th>Created</th>
+                    <SortableTh
+                      label="Label"
+                      columnKey="label"
+                      sortKey={list.sortKey}
+                      sortDir={list.sortDir}
+                      onSort={list.toggleSort}
+                    />
+                    <SortableTh
+                      label="Uses"
+                      columnKey="uses"
+                      sortKey={list.sortKey}
+                      sortDir={list.sortDir}
+                      onSort={list.toggleSort}
+                    />
+                    <SortableTh
+                      label="Expires"
+                      columnKey="expires_at"
+                      sortKey={list.sortKey}
+                      sortDir={list.sortDir}
+                      onSort={list.toggleSort}
+                    />
+                    <SortableTh
+                      label="Status"
+                      columnKey="status"
+                      sortKey={list.sortKey}
+                      sortDir={list.sortDir}
+                      onSort={list.toggleSort}
+                    />
+                    <SortableTh
+                      label="Created"
+                      columnKey="created_at"
+                      sortKey={list.sortKey}
+                      sortDir={list.sortDir}
+                      onSort={list.toggleSort}
+                    />
                     <th />
                   </tr>
                 </thead>
                 <tbody>
-                  {pageItems.map((t) => {
+                  {list.pageItems.map((t) => {
                     const status = tokenStatus(t)
                     return (
                       <tr key={t.id}>
@@ -375,32 +523,134 @@ export default function TokensPage() {
               </table>
             </div>
 
-            <div className="pagination">
-              <p className="muted pagination-meta">
-                Page {page} of {pageCount}
-              </p>
-              <div className="pagination-actions">
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  Previous
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  disabled={page >= pageCount}
-                  onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-                >
-                  Next
-                </button>
+            {list.pageCount > 1 ? (
+              <div className="pagination">
+                <p className="muted pagination-meta">
+                  Page {list.page} of {list.pageCount}
+                </p>
+                <div className="pagination-actions">
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={list.page <= 1}
+                    onClick={() => list.setPage((p) => Math.max(1, p - 1))}
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={list.page >= list.pageCount}
+                    onClick={() =>
+                      list.setPage((p) => Math.min(list.pageCount, p + 1))
+                    }
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : null}
           </>
         ) : null}
       </section>
+
+      {createOpen ? (
+        <div className="dialog-root" role="presentation">
+          <button
+            type="button"
+            className="dialog-backdrop"
+            aria-label="Close dialog"
+            disabled={creating}
+            onClick={closeCreate}
+          />
+          <div
+            className="dialog-panel dialog-panel--form"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={createTitleId}
+          >
+            <h2 id={createTitleId} className="dialog-title">
+              Create token
+            </h2>
+            <p className="dialog-desc muted">
+              The plaintext secret is shown once after create.
+            </p>
+            <form className="users-dialog-form" onSubmit={onCreate}>
+              <div className="field">
+                <label className="label" htmlFor="token-label">
+                  Label
+                </label>
+                <input
+                  ref={createFirstRef}
+                  id="token-label"
+                  className={labelError ? 'input input-invalid' : 'input'}
+                  value={label}
+                  onChange={(e) => {
+                    setLabel(e.target.value)
+                    setLabelError(null)
+                  }}
+                  placeholder="lab-batch-1"
+                  required
+                  disabled={creating}
+                  aria-invalid={labelError ? true : undefined}
+                />
+                {labelError ? (
+                  <p className="field-error" role="alert">
+                    {labelError}
+                  </p>
+                ) : null}
+              </div>
+              <div className="field">
+                <label className="label" htmlFor="token-max">
+                  Max uses
+                </label>
+                <input
+                  id="token-max"
+                  className="input"
+                  type="number"
+                  min={1}
+                  value={maxUses}
+                  onChange={(e) => setMaxUses(Number(e.target.value) || 1)}
+                  disabled={creating}
+                />
+              </div>
+              <div className="field">
+                <label className="label" htmlFor="token-exp">
+                  Expires (hours)
+                </label>
+                <input
+                  id="token-exp"
+                  className="input"
+                  type="number"
+                  min={1}
+                  value={expiresHours}
+                  onChange={(e) => setExpiresHours(e.target.value)}
+                  placeholder="Optional"
+                  disabled={creating}
+                />
+              </div>
+              <div className="dialog-actions">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={closeCreate}
+                  disabled={creating}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={creating}
+                  aria-busy={creating}
+                >
+                  {creating ? 'Creating…' : 'Create token'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
 
       <ConfirmDialog
         open={revokeTarget !== null}

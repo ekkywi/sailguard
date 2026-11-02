@@ -45,7 +45,9 @@ func deviceEventJSON(e telemetry.DeviceEvent) map[string]any {
 func parseEventListFilter(r *http.Request) (telemetry.EventListFilter, error) {
 	q := r.URL.Query()
 	f := telemetry.EventListFilter{
-		Q: strings.TrimSpace(q.Get("q")),
+		Q:     strings.TrimSpace(q.Get("q")),
+		Sort:  strings.TrimSpace(q.Get("sort")),
+		Order: strings.TrimSpace(q.Get("order")),
 	}
 
 	if et := strings.TrimSpace(q.Get("event_type")); et != "" {

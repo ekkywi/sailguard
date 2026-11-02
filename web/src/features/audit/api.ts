@@ -11,6 +11,8 @@ function toSearchParams(query: AuditLogQuery = {}): URLSearchParams {
   if (query.actor) sp.set('actor', query.actor)
   if (query.q) sp.set('q', query.q)
   if (query.resource_type) sp.set('resource_type', query.resource_type)
+  if (query.sort) sp.set('sort', query.sort)
+  if (query.order) sp.set('order', query.order)
   if (query.limit != null) sp.set('limit', String(query.limit))
   if (query.offset != null) sp.set('offset', String(query.offset))
   return sp
