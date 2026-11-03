@@ -972,7 +972,7 @@ export default function PolicyDetailPage() {
                   </div>
                 </>
               )}
-              <div className="dialog-actions">
+              <div className="dialog-actions rule-form-actions">
                 <button
                   type="button"
                   className="btn btn-ghost"
