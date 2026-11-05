@@ -1,0 +1,150 @@
+package networkpolicy
+
+import (
+	"context"
+	"errors"
+	"strings"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+)
+
+func (s *Store) ListPolicies(ctx context.Context) ([]Policy, error) {
+	const q = `
+		SELECT id, name, description, mode, priority, version, published_at,
+		       created_at, updated_at
+		FROM network_policies
+		ORDER BY name, created_at
+	`
+
+	rows, err := s.pool.Query(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]Policy, 0)
+	for rows.Next() {
+		var p Policy
+		if err := rows.Scan(
+			&p.ID,
+			&p.Name,
+			&p.Description,
+			&p.Mode,
+			&p.Priority,
+			&p.Version,
+			&p.PublishedAt,
+			&p.CreatedAt,
+			&p.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) CreatePolicy(ctx context.Context, name, description, mode string, priority int) (*Policy, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, ErrInvalid
+	}
+	mode = strings.TrimSpace(strings.ToLower(mode))
+	if mode == "" {
+		mode = "audit"
+	}
+	if mode != "audit" && mode != "enforce" {
+		return nil, ErrInvalid
+	}
+	if priority <= 0 {
+		priority = 100
+	}
+
+	const q = `
+		INSERT INTO network_policies (name, description, mode, priority)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, name, description, mode, priority, version, published_at, created_at, updated_at
+	`
+	var p Policy
+	err := s.pool.QueryRow(ctx, q, name, strings.TrimSpace(description), mode, priority).Scan(
+		&p.ID,
+		&p.Name,
+		&p.Description,
+		&p.Mode,
+		&p.Priority,
+		&p.Version,
+		&p.PublishedAt,
+		&p.CreatedAt,
+		&p.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
+func (s *Store) FindPolicyByID(ctx context.Context, id uuid.UUID) (*Policy, error) {
+	const q = `
+		SELECT id, name, description, mode, priority, version, published_at, created_at, updated_at
+		FROM network_policies
+		WHERE id = $1
+	`
+	var p Policy
+	err := s.pool.QueryRow(ctx, q, id).Scan(
+		&p.ID,
+		&p.Name,
+		&p.Description,
+		&p.Mode,
+		&p.Priority,
+		&p.Version,
+		&p.PublishedAt,
+		&p.CreatedAt,
+		&p.UpdatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
+func (s *Store) UpdatePolicyMode(ctx context.Context, id uuid.UUID, mode string) (*Policy, error) {
+	mode = strings.TrimSpace(strings.ToLower(mode))
+	if mode != "audit" && mode != "enforce" {
+		return nil, ErrInvalid
+	}
+
+	const q = `
+		UPDATE network_policies
+		SET mode = $2,
+		    updated_at = now()
+		WHERE id = $1
+		RETURNING id, name, description, mode, priority, version, published_at,
+		          created_at, updated_at
+	`
+	var p Policy
+	err := s.pool.QueryRow(ctx, q, id, mode).Scan(
+		&p.ID, &p.Name, &p.Description, &p.Mode, &p.Priority, &p.Version, &p.PublishedAt,
+		&p.CreatedAt, &p.UpdatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
+func (s *Store) DeletePolicy(ctx context.Context, id uuid.UUID) error {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM network_policies WHERE id = $1`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
