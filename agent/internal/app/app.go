@@ -15,6 +15,7 @@ import (
 	"github.com/ekkywi/sailguard/agent/internal/credstore"
 	"github.com/ekkywi/sailguard/agent/internal/eventqueue"
 	"github.com/ekkywi/sailguard/agent/internal/host"
+	"github.com/ekkywi/sailguard/agent/internal/networkpolicycache"
 	"github.com/ekkywi/sailguard/agent/internal/policycache"
 	"github.com/ekkywi/sailguard/pkgs/agentcontract"
 	policypkg "github.com/ekkywi/sailguard/pkgs/policy"
@@ -79,6 +80,7 @@ func Run(ctx context.Context, cfg config.Config, h host.Host) error {
 		recent := &recentSet{}
 
 		syncPolicy(ctx, client, cred, dataDir, cfg, h, hostname, machineID, osVersion)
+		syncNetworkPolicy(ctx, client, cred, dataDir, cfg, h, hostname, machineID, osVersion)
 		flushQueuedEvents(ctx, client, cred, dataDir, cfg, h, hostname, machineID, osVersion)
 		scanAndReport(ctx, client, cred, h, dataDir, recent, cfg, hostname, machineID, osVersion)
 		sendHeartbeat(ctx, client, cred, cfg, h, dataDir, hostname, machineID, osVersion)
@@ -105,6 +107,7 @@ func Run(ctx context.Context, cfg config.Config, h host.Host) error {
 			case <-hbTicker.C:
 				flushQueuedEvents(ctx, client, cred, dataDir, cfg, h, hostname, machineID, osVersion)
 				syncPolicy(ctx, client, cred, dataDir, cfg, h, hostname, machineID, osVersion)
+				syncNetworkPolicy(ctx, client, cred, dataDir, cfg, h, hostname, machineID, osVersion)
 				sendHeartbeat(ctx, client, cred, cfg, h, dataDir, hostname, machineID, osVersion)
 			}
 		}
@@ -353,6 +356,43 @@ func syncPolicy(
 	log.Printf(
 		"policy updated: device_id=%s version=%d mode=%s rules=%d hash=%s path=%s",
 		cred.DeviceID, ep.Version, ep.Mode, len(ep.Rules), ep.Hash, policycache.Path(dataDir),
+	)
+}
+
+func syncNetworkPolicy(
+	ctx context.Context,
+	client *controlplane.Client,
+	cred *credstore.Credential,
+	dataDir string,
+	cfg config.Config,
+	h host.Host,
+	hostname, machineID, osVersion string,
+) {
+	currentHash := networkpolicycache.Hash(dataDir)
+	data, err := client.GetNetworkPolicy(ctx, cred.DeviceToken, currentHash)
+	if err != nil {
+		if recoverFromUnauthorized(ctx, cfg, h, client, dataDir, hostname, machineID, osVersion, cred, "network policy sync", err) {
+			data, err = client.GetNetworkPolicy(ctx, cred.DeviceToken, currentHash)
+		}
+		if err != nil {
+			logDeviceCallFailed("network policy sync", cred.DeviceID, err)
+			return
+		}
+	}
+
+	if data.Unchanged {
+		log.Printf("network policy unchanged: device_id=%s hash=%s", cred.DeviceID, currentHash)
+		return
+	}
+
+	doc := networkpolicycache.FromSync(*data)
+	if err := networkpolicycache.Save(dataDir, doc); err != nil {
+		log.Printf("network policy cache save failed: %v", err)
+		return
+	}
+	log.Printf(
+		"network policy updated: device_id=%s version=%d mode=%s safety=%d rules=%d hash=%s path=%s",
+		cred.DeviceID, doc.Version, doc.Mode, len(doc.SafetyAllow), len(doc.Rules), doc.Hash, networkpolicycache.Path(dataDir),
 	)
 }
 

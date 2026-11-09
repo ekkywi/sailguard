@@ -221,3 +221,52 @@ func (c *Client) GetPolicy(
 	}
 	return env.Data, nil
 }
+
+func (c *Client) GetNetworkPolicy(
+	ctx context.Context,
+	deviceToken string,
+	currentHash string,
+) (*agentcontract.NetworkPolicySyncData, error) {
+	if c.BaseURL == "" {
+		return nil, fmt.Errorf("server URL is empty")
+	}
+	if strings.TrimSpace(deviceToken) == "" {
+		return nil, fmt.Errorf("device token is empty")
+	}
+
+	url := c.BaseURL + "/v1/agent/network-policy"
+	if h := strings.TrimSpace(currentHash); h != "" {
+		url = url + "?hash=" + h
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build network policy request: %w", err)
+	}
+	httpReq.Header.Set("Accept", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+deviceToken)
+	if c.UserAgent != "" {
+		httpReq.Header.Set("User-Agent", c.UserAgent)
+	}
+
+	res, err := c.HTTPClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("network policy request failed: %w", err)
+	}
+	defer res.Body.Close()
+
+	raw, err := io.ReadAll(io.LimitReader(res.Body, 1<<20))
+	if err != nil {
+		return nil, fmt.Errorf("read network policy response: %w", err)
+	}
+
+	var env agentcontract.Envelope[agentcontract.NetworkPolicySyncData]
+	if err := json.Unmarshal(raw, &env); err != nil {
+		return nil, fmt.Errorf("decode network policy response (status %d): %w", res.StatusCode, err)
+	}
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 || !env.OK || env.Data == nil {
+		return nil, apiError(res.StatusCode, env.Error, raw, "network policy")
+	}
+	return env.Data, nil
+}
