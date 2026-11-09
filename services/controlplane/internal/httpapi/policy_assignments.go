@@ -278,9 +278,9 @@ func (a *API) handlePublishPolicy(w http.ResponseWriter, r *http.Request) {
 	a.recordAudit(r, "policy.publish", "policy", p.ID.String(),
 		"published policy "+p.Name,
 		map[string]any{
-			"name": p.Name,
+			"name":    p.Name,
 			"version": p.Version,
-			"mode": p.Mode,
+			"mode":    p.Mode,
 		},
 	)
 
