@@ -54,6 +54,7 @@ func NewRouter(cfg config.Config, pool *pgxpool.Pool, rdb *redis.Client) http.Ha
 	mux.HandleFunc("PATCH /v1/devices/{id}", api.requirePermission("device.write", api.handlePatchDevice))
 	mux.HandleFunc("DELETE /v1/devices/{id}", api.requirePermission("device.write", api.handleDeleteDevice))
 	mux.HandleFunc("GET /v1/devices/{id}/policy", api.requirePermission("policy.read", api.handleGetDevicePolicy))
+	mux.HandleFunc("GET /v1/devices/{id}/network-policy", api.requirePermission("network.read", api.handleGetDeviceNetworkPolicy))
 	mux.HandleFunc("GET /v1/devices/{id}/overrides", api.requirePermission("policy.read", api.handleListDeviceOverrides))
 	mux.HandleFunc("POST /v1/devices/{id}/overrides", api.requirePermission("policy.write", api.handleCreateDeviceOverride))
 	mux.HandleFunc("DELETE /v1/devices/{id}/overrides/{overrideId}", api.requirePermission("policy.write", api.handleDeleteDeviceOverride))
@@ -117,6 +118,7 @@ func NewRouter(cfg config.Config, pool *pgxpool.Pool, rdb *redis.Client) http.Ha
 	mux.HandleFunc("GET /v1/agent/whoami", api.requireDeviceAuth(api.handleAgentWhoami))
 	mux.HandleFunc("POST /v1/agent/events", api.requireDeviceAuth(api.rateLimit(eventsRateKey, api.cfg.EventsRatePerMin, api.handleAgentEvents)))
 	mux.HandleFunc("GET /v1/agent/policy", api.requireDeviceAuth(api.handleAgentPolicy))
+	mux.HandleFunc("GET /v1/agent/network-policy", api.requireDeviceAuth(api.handleAgentNetworkPolicy))
 
 	mux.HandleFunc("GET /v1/alert-channels", api.requirePermission("alert.read", api.handleListAlertChannels))
 	mux.HandleFunc("PATCH /v1/alert-channels/{id}", api.requirePermission("alert.manage", api.handlePatchAlertChannel))
