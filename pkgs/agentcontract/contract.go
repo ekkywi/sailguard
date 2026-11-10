@@ -158,3 +158,25 @@ const (
 	EventViolationBlocked  = "violation_blocked"
 	EventAgentError        = "agent_error"
 )
+
+// --- Network policy sync ---
+type NetworkEffectiveRule struct {
+	ID        string `json:"id"`
+	Action    string `json:"action,omitempty"`
+	DestType  string `json:"dest_type"`
+	DestValue string `json:"dest_value"`
+	Port      *int   `json:"port,omitempty"`
+	Label     string `json:"label,omitempty"`
+	Source    string `json:"source,omitempty"`
+}
+
+type NetworkPolicySyncData struct {
+	Unchanged     bool                   `json:"unchanged,omitempty"`
+	SchemaVersion int                    `json:"schema_version"`
+	Version       int64                  `json:"version"`
+	ComputedAt    string                 `json:"computed_at,omitempty"`
+	Mode          string                 `json:"mode"`
+	Hash          string                 `json:"hash"`
+	SafetyAllow   []NetworkEffectiveRule `json:"safety_allow"`
+	Rules         []NetworkEffectiveRule `json:"rules"`
+}
