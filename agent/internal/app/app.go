@@ -18,6 +18,7 @@ import (
 	"github.com/ekkywi/sailguard/agent/internal/networkpolicycache"
 	"github.com/ekkywi/sailguard/agent/internal/policycache"
 	"github.com/ekkywi/sailguard/pkgs/agentcontract"
+	"github.com/ekkywi/sailguard/agent/internal/netenforce"
 	policypkg "github.com/ekkywi/sailguard/pkgs/policy"
 )
 
@@ -382,6 +383,14 @@ func syncNetworkPolicy(
 
 	if data.Unchanged {
 		log.Printf("network policy unchanged: device_id=%s hash=%s", cred.DeviceID, currentHash)
+		doc, err := networkpolicycache.Load(dataDir)
+		if err != nil {
+			log.Printf("network policy cache load failed: %v", err)
+			return
+		}
+		if doc != nil {
+			applyNetworkEnforce(ctx, *doc)
+		}
 		return
 	}
 
@@ -394,6 +403,15 @@ func syncNetworkPolicy(
 		"network policy updated: device_id=%s version=%d mode=%s safety=%d rules=%d hash=%s path=%s",
 		cred.DeviceID, doc.Version, doc.Mode, len(doc.SafetyAllow), len(doc.Rules), doc.Hash, networkpolicycache.Path(dataDir),
 	)
+	applyNetworkEnforce(ctx, doc)
+}
+
+func applyNetworkEnforce(ctx context.Context, doc networkpolicycache.Document) {
+	enf := netenforce.New()
+	spec := netenforce.SpecFromDocument(doc)
+	if err := enf.Apply(ctx, spec); err != nil {
+		log.Printf("network enforce apply failed: %v", err)
+	}
 }
 
 func scanAndReport(

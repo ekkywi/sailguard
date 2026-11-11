@@ -18,6 +18,14 @@ var (
 	procFwpmEngineClose0   = modFwpuclnt.NewProc("FwpmEngineClose0")
 	procFwpmProviderAdd0   = modFwpuclnt.NewProc("FwpmProviderAdd0")
 	procFwpmSubLayerAdd0   = modFwpuclnt.NewProc("FwpmSubLayerAdd0")
+
+	procFwpmFilterCreateEnumHandle0 = modFwpuclnt.NewProc("FwpmFilterCreateEnumHandle0")
+	procFwpmFilterEnum0 = modFwpuclnt.NewProc("FwpmFilterEnum0")
+	procFwpmFilterDestroyEnumHandle0 = modFwpuclnt.NewProc("FwpmFilterDestroyEnumHandle0")
+	procFwpmFilterDeleteByKey0 = modFwpuclnt.NewProc("FwpmFilterDeleteByKey0")
+	procFwpmFreeMemory0 = modFwpuclnt.NewProc("FwpmFreeMemory0")
+
+	procFwpmFilterAdd0 = modFwpuclnt.NewProc("FwpmFilterAdd0")
 )
 
 const (
