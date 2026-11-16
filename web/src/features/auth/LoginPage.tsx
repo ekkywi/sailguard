@@ -189,7 +189,7 @@ export default function LoginPage() {
         </form>
       </div>
 
-      <p className="login-footer">On-premises endpoint application control</p>
+      <p className="login-footer">Endpoint application control</p>
     </div>
   )
 }

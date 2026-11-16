@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -13,6 +14,9 @@ type Config struct {
 	EnrollmentToken   string
 	ScanInterval      time.Duration
 	HeartbeatInterval time.Duration
+	// NetworkEnforce installs OS filters (WFP on Windows). Default off:
+	// set SG_NETWORK_ENFORCE=1 or config network_enforce=true when ready to lab-test.
+	NetworkEnforce bool
 }
 
 func Load() Config {
@@ -42,6 +46,27 @@ func Load() Config {
 		),
 		ScanInterval:      getDurationEnv("SG_SCAN_INTERVAL", 3*time.Second),
 		HeartbeatInterval: getDurationEnv("SG_HEARTBEAT_INTERVAL", 30*time.Second),
+		NetworkEnforce:    loadNetworkEnforce(file.NetworkEnforce),
+	}
+}
+
+// loadNetworkEnforce: env wins. Default false (filters off).
+func loadNetworkEnforce(fileVal *bool) bool {
+	if v, ok := os.LookupEnv("SG_NETWORK_ENFORCE"); ok {
+		return parseBoolish(v)
+	}
+	if fileVal != nil {
+		return *fileVal
+	}
+	return false
+}
+
+func parseBoolish(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
 	}
 }
 

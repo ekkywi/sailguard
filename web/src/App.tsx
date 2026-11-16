@@ -9,6 +9,8 @@ import GroupsPage from './features/groups/GroupsPage'
 import GroupDetailPage from './features/groups/GroupDetailPage'
 import PoliciesPage from './features/policies/PoliciesPage'
 import PolicyDetailPage from './features/policies/PolicyDetailPage'
+import NetworkPoliciesPage from './features/network-policies/NetworkPoliciesPage'
+import NetworkPolicyDetailPage from './features/network-policies/NetworkPolicyDetailPage'
 import CategoriesPage from './features/categories/CategoriesPage'
 import CategoryDetailPage from './features/categories/CategoryDetailPage'
 import EventsPage from './features/events/EventsPage'
@@ -43,6 +45,11 @@ export default function App() {
         <Route path="/groups/:id" element={<GroupDetailPage />} />
         <Route path="/policies" element={<PoliciesPage />} />
         <Route path="/policies/:id" element={<PolicyDetailPage />} />
+        <Route path="/network-policies" element={<NetworkPoliciesPage />} />
+        <Route
+          path="/network-policies/:id"
+          element={<NetworkPolicyDetailPage />}
+        />
         <Route path="/categories" element={<CategoriesPage />} />
         <Route path="/categories/:code" element={<CategoryDetailPage />} />
         <Route path="/events" element={<EventsPage />} />

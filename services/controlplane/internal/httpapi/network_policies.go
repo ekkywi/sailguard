@@ -429,7 +429,7 @@ func (a *API) handlePatchNetworkPolicyRule(w http.ResponseWriter, r *http.Reques
 		})
 		return
 	}
-	ruleID, err := uuid.Parse(r.PathValue("rule_id"))
+	ruleID, err := uuid.Parse(r.PathValue("ruleId"))
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, envelope{
 			OK: false,
@@ -516,7 +516,7 @@ func (a *API) handleDeleteNetworkPolicyRule(w http.ResponseWriter, r *http.Reque
 		})
 		return
 	}
-	ruleID, err := uuid.Parse(r.PathValue("rule_id"))
+	ruleID, err := uuid.Parse(r.PathValue("ruleId"))
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, envelope{
 			OK: false,

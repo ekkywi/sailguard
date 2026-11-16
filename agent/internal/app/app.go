@@ -15,16 +15,20 @@ import (
 	"github.com/ekkywi/sailguard/agent/internal/credstore"
 	"github.com/ekkywi/sailguard/agent/internal/eventqueue"
 	"github.com/ekkywi/sailguard/agent/internal/host"
+	"github.com/ekkywi/sailguard/agent/internal/netenforce"
 	"github.com/ekkywi/sailguard/agent/internal/networkpolicycache"
 	"github.com/ekkywi/sailguard/agent/internal/policycache"
 	"github.com/ekkywi/sailguard/pkgs/agentcontract"
-	"github.com/ekkywi/sailguard/agent/internal/netenforce"
 	policypkg "github.com/ekkywi/sailguard/pkgs/policy"
 )
 
 var (
 	reenrollMu     sync.Mutex
 	lastReenrollAt time.Time
+
+	networkEnforceMu    sync.Mutex
+	networkAppliedHash  string
+	networkApplyRunning bool
 )
 
 const reenrollMinInterval = time.Minute
@@ -77,6 +81,11 @@ func Run(ctx context.Context, cfg config.Config, h host.Host) error {
 		defer hbTicker.Stop()
 
 		log.Printf("timers scan %s heartbeat %s", scanEvery, hbEvery)
+		if cfg.NetworkEnforce {
+			log.Printf("network enforce: ON (SG_NETWORK_ENFORCE / network_enforce)")
+		} else {
+			log.Printf("network enforce: OFF — sync cache only; set SG_NETWORK_ENFORCE=1 to install OS filters")
+		}
 
 		recent := &recentSet{}
 
@@ -389,7 +398,8 @@ func syncNetworkPolicy(
 			return
 		}
 		if doc != nil {
-			applyNetworkEnforce(ctx, *doc)
+			// Apply at most once per hash per process (startup / after failed apply).
+			scheduleNetworkEnforce(ctx, cfg, *doc)
 		}
 		return
 	}
@@ -403,15 +413,53 @@ func syncNetworkPolicy(
 		"network policy updated: device_id=%s version=%d mode=%s safety=%d rules=%d hash=%s path=%s",
 		cred.DeviceID, doc.Version, doc.Mode, len(doc.SafetyAllow), len(doc.Rules), doc.Hash, networkpolicycache.Path(dataDir),
 	)
-	applyNetworkEnforce(ctx, doc)
+	// New document from server — always schedule apply (async) when enabled.
+	networkEnforceMu.Lock()
+	networkAppliedHash = ""
+	networkEnforceMu.Unlock()
+	scheduleNetworkEnforce(ctx, cfg, doc)
 }
 
-func applyNetworkEnforce(ctx context.Context, doc networkpolicycache.Document) {
-	enf := netenforce.New()
-	spec := netenforce.SpecFromDocument(doc)
-	if err := enf.Apply(ctx, spec); err != nil {
-		log.Printf("network enforce apply failed: %v", err)
+func scheduleNetworkEnforce(ctx context.Context, cfg config.Config, doc networkpolicycache.Document) {
+	if !cfg.NetworkEnforce {
+		return
 	}
+
+	networkEnforceMu.Lock()
+	if doc.Hash != "" && doc.Hash == networkAppliedHash {
+		networkEnforceMu.Unlock()
+		return
+	}
+	if networkApplyRunning {
+		networkEnforceMu.Unlock()
+		log.Printf("network enforce: apply already running — skip")
+		return
+	}
+	networkApplyRunning = true
+	networkEnforceMu.Unlock()
+
+	go func() {
+		defer func() {
+			networkEnforceMu.Lock()
+			networkApplyRunning = false
+			networkEnforceMu.Unlock()
+		}()
+
+		log.Printf(
+			"network enforce: apply start mode=%s version=%d hash=%s",
+			doc.Mode, doc.Version, doc.Hash,
+		)
+		enf := netenforce.New()
+		spec := netenforce.SpecFromDocument(doc)
+		if err := enf.Apply(ctx, spec); err != nil {
+			log.Printf("network enforce apply failed: %v", err)
+			return
+		}
+		networkEnforceMu.Lock()
+		networkAppliedHash = doc.Hash
+		networkEnforceMu.Unlock()
+		log.Printf("network enforce: apply done hash=%s", doc.Hash)
+	}()
 }
 
 func scanAndReport(

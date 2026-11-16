@@ -30,9 +30,11 @@ func (windowsEnforcer) Apply(ctx context.Context, spec Spec) error {
 		return err
 	}
 	if spec.Mode != "enforce" {
-		log.Printf("network enforce: mode=%s — cleared filters, no blocks", spec.Mode)
+		log.Printf("network enforce: mode=%s - cleared filters, no blocks", spec.Mode)
 		return nil
 	}
+
+	spec = expandHosts(spec)
 	if err := applySpecFilters(eng, spec); err != nil {
 		return err
 	}
