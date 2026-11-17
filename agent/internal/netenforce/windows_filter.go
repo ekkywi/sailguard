@@ -7,17 +7,22 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"runtime"
 	"unsafe"
 
 	"github.com/google/uuid"
 	"golang.org/x/sys/windows"
 )
 
+// FWP_VALUE0 / FWP_CONDITION_VALUE0 — type (UINT32) + 4-byte pad + 8-byte union (amd64).
 type fwpValue0 struct {
 	Type  uint32
+	_     uint32
 	Value uintptr
 }
 
+// FWPM_ACTION0 is 20 bytes: UINT32 type then GUID at offset 4 (MSVC, no pad).
+// Do not insert padding before FilterType — that breaks FWPM_FILTER0 offsets.
 type fwpAction0 struct {
 	Type       uint32
 	FilterType windows.GUID
@@ -26,10 +31,11 @@ type fwpAction0 struct {
 type fwpmFilterCondition0 struct {
 	FieldKey       windows.GUID
 	MatchType      uint32
-	ConditionValue fwpValue0
+	ConditionValue fwpValue0 // Go pads 4 bytes so this starts at offset 24
 }
 
-// Layout must match FWPM_FILTER0 on amd64 — adjust if FwpmFilterAdd0 fails at runtime.
+// FWPM_FILTER0 amd64 layout (200 bytes). Matches WireGuard / Windows SDK:
+// action @128 (20), pad 4, providerContextKey GUID @152, reserved @168, filterId @176.
 type fwpmFilter0 struct {
 	FilterKey           windows.GUID
 	DisplayData         fwpmDisplayData0
@@ -42,10 +48,17 @@ type fwpmFilter0 struct {
 	NumFilterConditions uint32
 	FilterCondition     *fwpmFilterCondition0
 	Action              fwpAction0
-	ContextRaw          uint64
+	_                   [4]byte // align providerContextKey to offset 152
+	ProviderContextKey  windows.GUID
 	Reserved            *windows.GUID
 	FilterID            uint64
 	EffectiveWeight     fwpValue0
+}
+
+// Host-order IPv4 addr+mask (FWP_V4_ADDR_AND_MASK).
+type wfpV4AddrMask struct {
+	Addr uint32
+	Mask uint32
 }
 
 func filterKeyForRule(id string) windows.GUID {
@@ -60,6 +73,7 @@ func ipv4ToUint32(ip net.IP) (uint32, error) {
 	if v4 == nil {
 		return 0, fmt.Errorf("not IPv4: %v", ip)
 	}
+	// Numeric host-order form (first octet in high byte), same as WireGuard.
 	return binary.BigEndian.Uint32(v4), nil
 }
 
@@ -73,16 +87,17 @@ func buildConditions(destType, destValue string, port *int) ([]fwpmFilterConditi
 		if ip == nil {
 			return nil, nil, fmt.Errorf("invalid ip %q", destValue)
 		}
-		u, err := ipv4ToUint32(ip)
+		addr, err := ipv4ToUint32(ip)
 		if err != nil {
 			return nil, nil, err
 		}
+		// Exact IPv4: FWP_UINT32 inline (WireGuard pattern).
 		conds = append(conds, fwpmFilterCondition0{
 			FieldKey:  condIPRemoteAddress,
 			MatchType: fwpMatchEqual,
 			ConditionValue: fwpValue0{
 				Type:  fwpUint32,
-				Value: uintptr(u),
+				Value: uintptr(addr),
 			},
 		})
 	case "cidr":
@@ -102,11 +117,7 @@ func buildConditions(destType, destValue string, port *int) ([]fwpmFilterConditi
 		if ones != 0 {
 			mask = ^uint32(0) << uint(32-ones)
 		}
-		type v4AddrMask struct {
-			Addr uint32
-			Mask uint32
-		}
-		am := &v4AddrMask{Addr: addr, Mask: mask}
+		am := &wfpV4AddrMask{Addr: addr, Mask: mask}
 		keep = append(keep, am)
 		conds = append(conds, fwpmFilterCondition0{
 			FieldKey:  condIPRemoteAddress,
@@ -122,7 +133,6 @@ func buildConditions(destType, destValue string, port *int) ([]fwpmFilterConditi
 
 	if port != nil {
 		pu := uint16(*port)
-		keep = append(keep, &pu)
 		conds = append(conds, fwpmFilterCondition0{
 			FieldKey:  condIPRemotePort,
 			MatchType: fwpMatchEqual,
@@ -136,11 +146,10 @@ func buildConditions(destType, destValue string, port *int) ([]fwpmFilterConditi
 	return conds, keep, nil
 }
 
-func addFilter(
-	h engineHandle,
+func (e *windowsEnforcer) addFilterLocked(
 	ruleID, name string,
 	block bool,
-	weight uint64,
+	weight uint8,
 	destType, destValue string,
 	port *int,
 ) error {
@@ -148,17 +157,15 @@ func addFilter(
 	if err != nil {
 		return err
 	}
-	_ = keep
 
 	var condPtr *fwpmFilterCondition0
 	if len(conds) > 0 {
 		condPtr = &conds[0]
 	}
 
-	w := weight
 	weightVal := fwpValue0{
-		Type:  fwpUint64,
-		Value: uintptr(unsafe.Pointer(&w)),
+		Type:  fwpUint8,
+		Value: uintptr(weight),
 	}
 
 	pk := guidFromUUID(providerKey)
@@ -171,8 +178,9 @@ func addFilter(
 		actionType = fwpActionBlock
 	}
 
+	key := filterKeyForRule(ruleID)
 	f := fwpmFilter0{
-		FilterKey:           filterKeyForRule(ruleID),
+		FilterKey:           key,
 		DisplayData:         fwpmDisplayData0{Name: dispName},
 		ProviderKey:         &pk,
 		LayerKey:            layerALEAuthConnectV4,
@@ -183,27 +191,36 @@ func addFilter(
 		Action:              fwpAction0{Type: actionType},
 	}
 
+	var filterID uint64
 	r1, _, _ := procFwpmFilterAdd0.Call(
-		uintptr(h),
+		uintptr(e.eng),
 		uintptr(unsafe.Pointer(&f)),
 		0,
-		0,
+		uintptr(unsafe.Pointer(&filterID)),
 	)
+
+	runtime.KeepAlive(keep)
+	runtime.KeepAlive(conds)
+	runtime.KeepAlive(pk)
+	runtime.KeepAlive(dispName)
+	runtime.KeepAlive(f)
+
 	if r1 != 0 {
 		return fmt.Errorf("FwpmFilterAdd0 %s: 0x%X", name, r1)
 	}
+	e.installed = append(e.installed, key)
 	return nil
 }
 
-func applySpecFilters(h engineHandle, spec Spec) error {
+func (e *windowsEnforcer) applySpecFiltersLocked(spec Spec) error {
 	var errs int
 
-	addOne := func(r Rule, block bool, weight uint64) {
+	addOne := func(r Rule, block bool, weight uint8) {
 		name := r.Label
 		if name == "" {
 			name = r.ID
 		}
-		if err := addFilter(h, r.ID, name, block, weight, r.DestType, r.DestValue, r.Port); err != nil {
+		if err := e.addFilterLocked(r.ID, name, block, weight, r.DestType, r.DestValue, r.Port); err != nil {
 			log.Printf("network enforce: skip rule %s: %v", r.ID, err)
 			errs++
 		}

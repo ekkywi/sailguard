@@ -20,10 +20,11 @@ const (
 	sublayerWeight = uint16(0x5000)
 )
 
+// GUIDs from fwpmu.h (same values WireGuard uses).
 var (
 	layerALEAuthConnectV4 = mustWinGUID("c38d57d1-05a7-4c33-904f-7fbceee60e82")
-	condIPRemoteAddress   = mustWinGUID("b235ae06-9a79-4a80-bee7-c6b1f012b274")
-	condIPRemotePort      = mustWinGUID("c35a604d-d22b-4e55-a924-290c3284f87c")
+	condIPRemoteAddress   = mustWinGUID("b235ae9a-1d64-49b8-a44c-5ff3d9095045")
+	condIPRemotePort      = mustWinGUID("c35a604d-d22b-4e1a-91b4-68f674ee674b")
 )
 
 const (
@@ -33,13 +34,15 @@ const (
 
 	fwpMatchEqual = 0
 
+	fwpUint8         = 1
 	fwpUint16        = 2
 	fwpUint32        = 3
 	fwpUint64        = 4
 	fwpV4AddrAndMask = 0x100
 
-	weightPermit = uint64(0x8000)
-	weightDeny   = uint64(0x4000)
+	// FWP_UINT8 weight range index 0–15 (permit must be higher than deny).
+	weightPermit = uint8(10)
+	weightDeny   = uint8(5)
 )
 
 func mustWinGUID(s string) windows.GUID {
