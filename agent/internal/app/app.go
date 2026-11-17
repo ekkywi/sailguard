@@ -84,7 +84,7 @@ func Run(ctx context.Context, cfg config.Config, h host.Host) error {
 		if cfg.NetworkEnforce {
 			log.Printf("network enforce: ON (SG_NETWORK_ENFORCE / network_enforce)")
 		} else {
-			log.Printf("network enforce: OFF — sync cache only; set SG_NETWORK_ENFORCE=1 to install OS filters")
+			log.Printf("network enforce: OFF — sync cache only (SG_NETWORK_ENFORCE=0 / network_enforce=false)")
 		}
 
 		recent := &recentSet{}
@@ -378,6 +378,11 @@ func syncNetworkPolicy(
 	h host.Host,
 	hostname, machineID, osVersion string,
 ) {
+	serverURL := cfg.ServerURL
+	if cred.ServerURL != "" {
+		serverURL = cred.ServerURL
+	}
+
 	currentHash := networkpolicycache.Hash(dataDir)
 	data, err := client.GetNetworkPolicy(ctx, cred.DeviceToken, currentHash)
 	if err != nil {
@@ -399,7 +404,7 @@ func syncNetworkPolicy(
 		}
 		if doc != nil {
 			// Apply at most once per hash per process (startup / after failed apply).
-			scheduleNetworkEnforce(ctx, cfg, *doc)
+			scheduleNetworkEnforce(ctx, cfg, serverURL, *doc)
 		}
 		return
 	}
@@ -417,10 +422,10 @@ func syncNetworkPolicy(
 	networkEnforceMu.Lock()
 	networkAppliedHash = ""
 	networkEnforceMu.Unlock()
-	scheduleNetworkEnforce(ctx, cfg, doc)
+	scheduleNetworkEnforce(ctx, cfg, serverURL, doc)
 }
 
-func scheduleNetworkEnforce(ctx context.Context, cfg config.Config, doc networkpolicycache.Document) {
+func scheduleNetworkEnforce(ctx context.Context, cfg config.Config, serverURL string, doc networkpolicycache.Document) {
 	if !cfg.NetworkEnforce {
 		return
 	}
@@ -451,6 +456,7 @@ func scheduleNetworkEnforce(ctx context.Context, cfg config.Config, doc networkp
 		)
 		enf := netenforce.New()
 		spec := netenforce.SpecFromDocument(doc)
+		spec = netenforce.EnsureControlPlaneSafety(spec, serverURL)
 		if err := enf.Apply(ctx, spec); err != nil {
 			log.Printf("network enforce apply failed: %v", err)
 			return

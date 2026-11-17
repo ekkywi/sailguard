@@ -14,7 +14,7 @@ type FileConfig struct {
 	EnrollmentToken string `json:"enrollment_token"`
 	DataDir         string `json:"data_dir"`
 	AgentVersion    string `json:"agent_version"`
-	NetworkEnforce  *bool  `json:"network_enforce"` // optional; default off until WFP path is stable
+	NetworkEnforce  *bool  `json:"network_enforce"`
 }
 
 func loadFileConfig() (FileConfig, string, error) {

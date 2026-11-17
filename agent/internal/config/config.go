@@ -14,8 +14,8 @@ type Config struct {
 	EnrollmentToken   string
 	ScanInterval      time.Duration
 	HeartbeatInterval time.Duration
-	// NetworkEnforce installs OS filters (WFP on Windows). Default off:
-	// set SG_NETWORK_ENFORCE=1 or config network_enforce=true when ready to lab-test.
+	// NetworkEnforce installs OS filters (WFP on Windows). Default on;
+	// set SG_NETWORK_ENFORCE=0 or config network_enforce=false to disable.
 	NetworkEnforce bool
 }
 
@@ -50,7 +50,7 @@ func Load() Config {
 	}
 }
 
-// loadNetworkEnforce: env wins. Default false (filters off).
+// loadNetworkEnforce: env wins, then config.json, else default on.
 func loadNetworkEnforce(fileVal *bool) bool {
 	if v, ok := os.LookupEnv("SG_NETWORK_ENFORCE"); ok {
 		return parseBoolish(v)
@@ -58,7 +58,7 @@ func loadNetworkEnforce(fileVal *bool) bool {
 	if fileVal != nil {
 		return *fileVal
 	}
-	return false
+	return true
 }
 
 func parseBoolish(v string) bool {
