@@ -31,6 +31,13 @@ func deviceEventJSON(e telemetry.DeviceEvent) map[string]any {
 		"process_product_name": e.ProcessProductName,
 		"process_user_name":    e.ProcessUserName,
 
+		"network_dest_type":  e.NetworkDestType,
+		"network_dest_value": e.NetworkDestValue,
+		"network_dest_ip":    e.NetworkDestIP,
+		"network_dest_port":  e.NetworkDestPort,
+		"network_protocol":   e.NetworkProtocol,
+		"network_direction":  e.NetworkDirection,
+
 		"match_rule_id":       e.MatchRuleID,
 		"match_action":        e.MatchAction,
 		"match_rule_type":     e.MatchRuleType,
@@ -51,8 +58,10 @@ func parseEventListFilter(r *http.Request) (telemetry.EventListFilter, error) {
 	}
 
 	if et := strings.TrimSpace(q.Get("event_type")); et != "" {
-		if et != "violation_detected" && et != "violation_blocked" {
-			return f, fmt.Errorf("event_type must be violation_detected or violation_blocked")
+		if et != "violation_detected" &&
+			et != "violation_blocked" &&
+			et != "network_blocked" {
+			return f, fmt.Errorf("event_type must be violation_detected, violation_blocked, or network_blocked")
 		}
 		f.EventType = et
 	}
@@ -184,6 +193,8 @@ func (a *API) handleExportEventsCSV(w http.ResponseWriter, r *http.Request) {
 	_ = cw.Write([]string{
 		"occurred_at", "received_at", "event_type", "hostname", "device_id",
 		"process_name", "process_path", "process_user_name", "process_pid",
+		"network_dest_type", "network_dest_value", "network_dest_ip",
+		"network_dest_port", "network_protocol", "network_direction",
 		"match_action", "match_rule_type", "match_value", "match_category_code",
 		"policy_mode", "policy_version", "client_event_id",
 	})
@@ -191,6 +202,10 @@ func (a *API) handleExportEventsCSV(w http.ResponseWriter, r *http.Request) {
 		pid := ""
 		if e.ProcessPID != nil {
 			pid = strconv.Itoa(int(*e.ProcessPID))
+		}
+		netPort := ""
+		if e.NetworkDestPort != nil {
+			netPort = strconv.Itoa(int(*e.NetworkDestPort))
 		}
 		polVer := ""
 		if e.PolicyVersion != nil {
@@ -212,6 +227,12 @@ func (a *API) handleExportEventsCSV(w http.ResponseWriter, r *http.Request) {
 			str(e.ProcessPath),
 			str(e.ProcessUserName),
 			pid,
+			str(e.NetworkDestType),
+			str(e.NetworkDestValue),
+			str(e.NetworkDestIP),
+			netPort,
+			str(e.NetworkProtocol),
+			str(e.NetworkDirection),
 			str(e.MatchAction),
 			str(e.MatchRuleType),
 			str(e.MatchValue),

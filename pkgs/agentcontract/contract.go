@@ -2,7 +2,6 @@ package agentcontract
 
 import "github.com/ekkywi/sailguard/pkgs/policy"
 
-// Envelope is the standard API response wrapper.
 type Envelope[T any] struct {
 	OK    bool   `json:"ok"`
 	Data  *T     `json:"data,omitempty"`
@@ -15,15 +14,13 @@ type Error struct {
 	Details map[string]any `json:"details,omitempty"`
 }
 
-// --- Enroll ---
-
 type EnrollRequest struct {
 	SchemaVersion   int    `json:"schema_version"`
 	EnrollmentToken string `json:"enrollment_token"`
 	Hostname        string `json:"hostname"`
 	MachineGUID     string `json:"machine_guid"`
 	OSVersion       string `json:"os_version"`
-	OSFamily        string `json:"os_family"` // windows | linux | darwin
+	OSFamily        string `json:"os_family"`
 	AgentVersion    string `json:"agent_version"`
 }
 
@@ -36,14 +33,10 @@ type EnrollResponse struct {
 	HeartbeatSec   int     `json:"heartbeat_sec"`
 }
 
-// --- Policy sync ---
-
 type PolicySyncData struct {
 	Unchanged bool `json:"unchanged,omitempty"`
 	policy.EffectivePolicy
 }
-
-// --- Events ---
 
 type EventBatchRequest struct {
 	SchemaVersion int     `json:"schema_version"`
@@ -53,12 +46,10 @@ type EventBatchRequest struct {
 }
 
 type Event struct {
-	ClientEventID string `json:"client_event_id"`
-	EventType     string `json:"event_type"`
-	OccurredAt    string `json:"occurred_at"`
-	DedupeKey     string `json:"dedupe_key,omitempty"`
-
-	// heartbeat
+	ClientEventID string             `json:"client_event_id"`
+	EventType     string             `json:"event_type"`
+	OccurredAt    string             `json:"occurred_at"`
+	DedupeKey     string             `json:"dedupe_key,omitempty"`
 	AgentVersion  string             `json:"agent_version,omitempty"`
 	Hostname      string             `json:"hostname,omitempty"`
 	OSVersion     string             `json:"os_version,omitempty"`
@@ -67,19 +58,14 @@ type Event struct {
 	Hardware      *HardwareInventory `json:"hardware,omitempty"`
 	Metrics       *ResourceMetrics   `json:"metrics,omitempty"`
 	PrimaryIP     string             `json:"primary_ip,omitempty"`
-
-	// violation_*
-	Process     *ProcessInfo `json:"process,omitempty"`
-	Match       *MatchInfo   `json:"match,omitempty"`
-	Policy      *PolicyRef   `json:"policy,omitempty"`
-	Enforcement *Enforcement `json:"enforcement,omitempty"`
-
-	// agent_error
-	Error *AgentError `json:"error,omitempty"`
+	Process       *ProcessInfo       `json:"process,omitempty"`
+	Match         *MatchInfo         `json:"match,omitempty"`
+	Policy        *PolicyRef         `json:"policy,omitempty"`
+	Enforcement   *Enforcement       `json:"enforcement,omitempty"`
+	Network       *NetworkDest       `json:"network,omitempty"`
+	Error         *AgentError        `json:"error,omitempty"`
 }
 
-// HardwareInventory is relatively stable host inventory (Fase 2).
-// Sent on heartbeat; control plane soft-updates device columns when non-empty.
 type HardwareInventory struct {
 	CPUModel       string `json:"cpu_model,omitempty"`
 	CPUCores       int    `json:"cpu_cores,omitempty"`
@@ -89,7 +75,6 @@ type HardwareInventory struct {
 	HWModel        string `json:"hw_model,omitempty"`
 }
 
-// ResourceMetrics is a last-sample health snapshot (Fase 3), sent on heartbeat only.
 type ResourceMetrics struct {
 	UptimeSec   int64   `json:"uptime_sec,omitempty"`
 	CPUPercent  float64 `json:"cpu_percent,omitempty"`
@@ -123,9 +108,18 @@ type PolicyRef struct {
 }
 
 type Enforcement struct {
-	Result   string  `json:"result"` // terminated | terminate_failed | already_exited | skipped_allow | skipped_critical
+	Result   string  `json:"result"`
 	Attempts int     `json:"attempts"`
 	Error    *string `json:"error"`
+}
+
+type NetworkDest struct {
+	DestType  string `json:"dest_type"`
+	DestValue string `json:"dest_value"`
+	DestIP    string `json:"dest_ip,omitempty"`
+	DestPort  *int   `json:"dest_port,omitempty"`
+	Protocol  string `json:"protocol,omitempty"`
+	Direction string `json:"direction,omitempty"`
 }
 
 type AgentError struct {
@@ -151,15 +145,14 @@ type PolicyHint struct {
 	ReloadSuggested bool  `json:"reload_suggested"`
 }
 
-// Event type constants
 const (
 	EventHeartbeat         = "heartbeat"
 	EventViolationDetected = "violation_detected"
 	EventViolationBlocked  = "violation_blocked"
+	EventNetworkBlocked    = "network_blocked"
 	EventAgentError        = "agent_error"
 )
 
-// --- Network policy sync ---
 type NetworkEffectiveRule struct {
 	ID        string `json:"id"`
 	Action    string `json:"action,omitempty"`

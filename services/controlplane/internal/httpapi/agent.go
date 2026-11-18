@@ -332,6 +332,80 @@ func (a *API) handleAgentEvents(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			accepted++
+		case agentcontract.EventNetworkBlocked:
+			if ev.Network == nil ||
+				(strings.TrimSpace(ev.Network.DestValue) == "" &&
+					strings.TrimSpace(ev.Network.DestIP) == "") {
+				rejected = append(rejected, map[string]any{
+					"client_event_id": clientID,
+					"code":            "validation_error",
+					"message":         "network_blocked requires network.dest_value or network.dest_ip",
+				})
+				continue
+			}
+
+			occurredAt := time.Now().UTC()
+			if ts := strings.TrimSpace(ev.OccurredAt); ts != "" {
+				if t, err := time.Parse(time.RFC3339, ts); err == nil {
+					occurredAt = t.UTC()
+				}
+			}
+
+			msg := queue.ViolationMessage{
+				DeviceID:         deviceID.String(),
+				ClientEventID:    clientID,
+				EventType:        ev.EventType,
+				OccurredAt:       occurredAt.Format(time.RFC3339),
+				DedupeKey:        ev.DedupeKey,
+				NetworkDestType:  strings.TrimSpace(ev.Network.DestType),
+				NetworkDestValue: strings.TrimSpace(ev.Network.DestValue),
+				NetworkDestIP:    strings.TrimSpace(ev.Network.DestIP),
+				NetworkDestPort:  ev.Network.DestPort,
+				NetworkProtocol:  strings.TrimSpace(ev.Network.Protocol),
+				NetworkDirection: strings.TrimSpace(ev.Network.Direction),
+			}
+			if msg.NetworkDirection == "" {
+				msg.NetworkDirection = "out"
+			}
+			if ev.Process != nil {
+				msg.ProcessPID = ev.Process.PID
+				msg.ProcessName = ev.Process.Name
+				msg.ProcessPath = ev.Process.Path
+				msg.ProcessHashSHA256 = ev.Process.HashSHA256
+				msg.ProcessPublisher = ev.Process.Publisher
+				msg.ProcessProductName = ev.Process.ProductName
+				msg.ProcessUserName = ev.Process.UserName
+			}
+			if ev.Match != nil {
+				msg.MatchRuleID = ev.Match.RuleID
+				msg.MatchAction = ev.Match.Action
+				msg.MatchRuleType = ev.Match.RuleType
+				msg.MatchValue = ev.Match.Value
+				msg.MatchCategoryCode = ev.Match.CategoryCode
+			}
+			if ev.Policy != nil {
+				msg.PolicyVersion = ev.Policy.Version
+				msg.PolicyMode = ev.Policy.Mode
+			}
+
+			values, err := queue.EncodeViolationValues(msg)
+			if err != nil {
+				rejected = append(rejected, map[string]any{
+					"client_event_id": clientID,
+					"code":            "enqueue_error",
+					"message":         "failed to encode violation for stream",
+				})
+				continue
+			}
+			if _, err := q.Produce(r.Context(), queue.StreamEvents, values); err != nil {
+				rejected = append(rejected, map[string]any{
+					"client_event_id": clientID,
+					"code":            "enqueue_error",
+					"message":         "failed to enqueue violation",
+				})
+				continue
+			}
+			accepted++
 		default:
 			rejected = append(rejected, map[string]any{
 				"client_event_id": clientID,

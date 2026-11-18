@@ -93,8 +93,10 @@ func (f EventListFilter) buildWhere() (string, []any) {
 			 OR lower(COALESCE(e.process_path, '')) LIKE $%d
 			 OR lower(COALESCE(e.process_user_name, '')) LIKE $%d
 			 OR lower(COALESCE(e.match_value, '')) LIKE $%d
-			 OR lower(COALESCE(e.match_category_code, '')) LIKE $%d)`,
-			n, n, n, n, n, n,
+			 OR lower(COALESCE(e.match_category_code, '')) LIKE $%d
+			 OR lower(COALESCE(e.network_dest_ip, '')) LIKE $%d
+			 OR lower(COALESCE(e.network_dest_value, '')) LIKE $%d)`,
+			n, n, n, n, n, n, n, n,
 		))
 	}
 
@@ -109,6 +111,8 @@ const eventSelectCols = `
 	e.client_event_id, e.event_type, e.occurred_at, e.received_at, e.dedupe_key,
 	e.process_pid, e.process_name, e.process_path, e.process_hash_sha256,
 	e.process_publisher, e.process_product_name, e.process_user_name,
+	e.network_dest_type, e.network_dest_value, e.network_dest_ip,
+	e.network_dest_port, e.network_protocol, e.network_direction,
 	e.match_rule_id, e.match_action, e.match_rule_type, e.match_value, e.match_category_code,
 	e.policy_version, e.policy_mode
 `
@@ -131,6 +135,12 @@ func scanDeviceEvent(rows pgx.Rows) (DeviceEvent, error) {
 		&e.ProcessPublisher,
 		&e.ProcessProductName,
 		&e.ProcessUserName,
+		&e.NetworkDestType,
+		&e.NetworkDestValue,
+		&e.NetworkDestIP,
+		&e.NetworkDestPort,
+		&e.NetworkProtocol,
+		&e.NetworkDirection,
 		&e.MatchRuleID,
 		&e.MatchAction,
 		&e.MatchRuleType,
@@ -235,14 +245,21 @@ func (s *Store) InsertViolation(
 	in InsertViolationInput,
 ) (inserted bool, id uuid.UUID, err error) {
 	eventType := strings.TrimSpace(in.EventType)
-	if eventType != "violation_detected" && eventType != "violation_blocked" {
+	if eventType != "violation_detected" &&
+		eventType != "violation_blocked" &&
+		eventType != "network_blocked" {
 		return false, uuid.Nil, fmt.Errorf("invalid event_type: %q", eventType)
 	}
 	if strings.TrimSpace(in.ClientEventID) == "" {
 		return false, uuid.Nil, fmt.Errorf("client_event_id is required")
 	}
-	if strings.TrimSpace(in.ProcessName) == "" {
+	if eventType != "network_blocked" && strings.TrimSpace(in.ProcessName) == "" {
 		return false, uuid.Nil, fmt.Errorf("process_name is required")
+	}
+	if eventType == "network_blocked" &&
+		strings.TrimSpace(in.NetworkDestValue) == "" &&
+		strings.TrimSpace(in.NetworkDestIP) == "" {
+		return false, uuid.Nil, fmt.Errorf("network dest_value or dest_ip is required")
 	}
 	if in.OccurredAt.IsZero() {
 		in.OccurredAt = time.Now().UTC()
@@ -253,14 +270,18 @@ func (s *Store) InsertViolation(
 			device_id, client_event_id, event_type, occurred_at, dedupe_key,
 			process_pid, process_name, process_path, process_hash_sha256,
 			process_publisher, process_product_name, process_user_name,
+			network_dest_type, network_dest_value, network_dest_ip,
+			network_dest_port, network_protocol, network_direction,
 			match_rule_id, match_action, match_rule_type, match_value, match_category_code,
 			policy_version, policy_mode
 		) VALUES (
 			$1, $2, $3, $4, NULLIF($5, ''),
-			$6, $7, NULLIF($8, ''), NULLIF($9, ''),
+			$6, NULLIF($7, ''), NULLIF($8, ''), NULLIF($9, ''),
 			NULLIF($10, ''), NULLIF($11, ''), NULLIF($12, ''),
-			NULLIF($13, ''), NULLIF($14, ''), NULLIF($15, ''), NULLIF($16, ''), NULLIF($17, ''),
-			$18, NULLIF($19, '')
+			NULLIF($13, ''), NULLIF($14, ''), NULLIF($15, ''),
+			$16, NULLIF($17, ''), NULLIF($18, ''),
+			NULLIF($19, ''), NULLIF($20, ''), NULLIF($21, ''), NULLIF($22, ''), NULLIF($23, ''),
+			$24, NULLIF($25, '')
 		)
 		ON CONFLICT (device_id, client_event_id) DO NOTHING
 		RETURNING id
@@ -290,6 +311,12 @@ func (s *Store) InsertViolation(
 		in.ProcessPublisher,
 		in.ProcessProductName,
 		in.ProcessUserName,
+		strings.TrimSpace(in.NetworkDestType),
+		strings.TrimSpace(in.NetworkDestValue),
+		strings.TrimSpace(in.NetworkDestIP),
+		in.NetworkDestPort,
+		strings.TrimSpace(in.NetworkProtocol),
+		strings.TrimSpace(in.NetworkDirection),
 		in.MatchRuleID,
 		in.MatchAction,
 		in.MatchRuleType,

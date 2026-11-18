@@ -24,6 +24,13 @@ type DeviceEvent struct {
 	ProcessProductName *string
 	ProcessUserName    *string
 
+	NetworkDestType  *string
+	NetworkDestValue *string
+	NetworkDestIP    *string
+	NetworkDestPort  *int32
+	NetworkProtocol  *string
+	NetworkDirection *string
+
 	MatchRuleID       *string
 	MatchAction       *string
 	MatchRuleType     *string
@@ -48,6 +55,13 @@ type InsertViolationInput struct {
 	ProcessPublisher   string
 	ProcessProductName string
 	ProcessUserName    string
+
+	NetworkDestType  string
+	NetworkDestValue string
+	NetworkDestIP    string
+	NetworkDestPort  *int32
+	NetworkProtocol  string
+	NetworkDirection string
 
 	MatchRuleID       string
 	MatchAction       string

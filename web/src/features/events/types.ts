@@ -16,6 +16,13 @@ export type DeviceEvent = {
   process_product_name: string | null
   process_user_name: string | null
 
+  network_dest_type: string | null
+  network_dest_value: string | null
+  network_dest_ip: string | null
+  network_dest_port: number | null
+  network_protocol: string | null
+  network_direction: string | null
+
   match_rule_id: string | null
   match_action: string | null
   match_rule_type: string | null
@@ -26,7 +33,11 @@ export type DeviceEvent = {
   policy_mode: string | null
 }
 
-export type EventTypeFilter = '' | 'violation_detected' | 'violation_blocked'
+export type EventTypeFilter =
+  | ''
+  | 'violation_detected'
+  | 'violation_blocked'
+  | 'network_blocked'
 
 export type EventListQuery = {
   from?: string

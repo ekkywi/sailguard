@@ -198,15 +198,33 @@ func processStreamMessage(
 	}
 
 	et := strings.TrimSpace(msg.EventType)
-	if et != "violation_detected" && et != "violation_blocked" {
+	if et != "violation_detected" && et != "violation_blocked" && et != "network_blocked" {
 		log.Printf("skip bad event_type id=%s: %q", m.ID, msg.EventType)
 		ack()
 		return
 	}
-	if strings.TrimSpace(msg.ClientEventID) == "" || strings.TrimSpace(msg.ProcessName) == "" {
-		log.Printf("skip incomplete payload id=%s", m.ID)
+	if strings.TrimSpace(msg.ClientEventID) == "" {
+		log.Printf("skip incomplete payload id=%s (no client_event_id)", m.ID)
 		ack()
 		return
+	}
+	if et != "network_blocked" && strings.TrimSpace(msg.ProcessName) == "" {
+		log.Printf("skip incomplete payload id=%s (no process_name)", m.ID)
+		ack()
+		return
+	}
+	if et == "network_blocked" &&
+		strings.TrimSpace(msg.NetworkDestValue) == "" &&
+		strings.TrimSpace(msg.NetworkDestIP) == "" {
+		log.Printf("skip incomplete payload id=%s (no network dest)", m.ID)
+		ack()
+		return
+	}
+
+	var netPort *int32
+	if msg.NetworkDestPort != nil {
+		v := int32(*msg.NetworkDestPort)
+		netPort = &v
 	}
 
 	in := telemetry.InsertViolationInput{
@@ -222,6 +240,11 @@ func processStreamMessage(
 		ProcessPublisher:   msg.ProcessPublisher,
 		ProcessProductName: msg.ProcessProductName,
 		ProcessUserName:    msg.ProcessUserName,
+		NetworkDestType:    msg.NetworkDestType,
+		NetworkDestIP:      msg.NetworkDestIP,
+		NetworkDestPort:    netPort,
+		NetworkProtocol:    msg.NetworkProtocol,
+		NetworkDirection:   msg.NetworkDirection,
 		MatchRuleID:        msg.MatchRuleID,
 		MatchAction:        msg.MatchAction,
 		MatchRuleType:      msg.MatchRuleType,

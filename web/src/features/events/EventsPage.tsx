@@ -9,21 +9,16 @@ import { hasPermission } from '../../lib/permissions'
 import { useDocumentTitle } from '../../lib/useDocumentTitle'
 import { useServerSort } from '../../lib/useServerSort'
 import { exportEventsCSV, listEvents } from './api'
-import type { DeviceEvent, EventListQuery, EventTypeFilter } from './types'
+import {
+  EVENT_TYPE_CHIPS,
+  eventTargetPrimary,
+  eventTargetSecondary,
+  eventTypeLabel,
+  eventUserDisplay,
+} from './eventTypes'
+import type { EventListQuery, EventTypeFilter } from './types'
 
 const PAGE_SIZE = 25
-
-const TYPE_CHIPS: { id: EventTypeFilter; label: string }[] = [
-  { id: '', label: 'All' },
-  { id: 'violation_detected', label: 'Detected' },
-  { id: 'violation_blocked', label: 'Blocked' },
-]
-
-function eventTypeLabel(t: string): string {
-  if (t === 'violation_detected') return 'Detected'
-  if (t === 'violation_blocked') return 'Blocked'
-  return t
-}
 
 function localInputToRFC3339(local: string, endOfDay: boolean): string | undefined {
   const v = local.trim()
@@ -160,7 +155,7 @@ export default function EventsPage() {
           <p className="section-label">Telemetry</p>
           <h1 className="title">Events</h1>
           <p className="lede">
-            Agent policy violations
+            Process and network policy events
             <span className="page-meta">
               {' '}
               · {total.toLocaleString()} matching
@@ -189,7 +184,7 @@ export default function EventsPage() {
 
       <div className="audit-toolbar" role="search">
         <div className="audit-chips" aria-label="Event type">
-          {TYPE_CHIPS.map((c) => (
+          {EVENT_TYPE_CHIPS.map((c) => (
             <button
               key={c.id || 'all'}
               type="button"
@@ -246,7 +241,7 @@ export default function EventsPage() {
               className="input"
               value={qDraft}
               onChange={(e) => setQDraft(e.target.value)}
-              placeholder="Host, process, user, match…"
+              placeholder="Host, process, destination, match…"
               autoComplete="off"
             />
           </div>
@@ -276,7 +271,7 @@ export default function EventsPage() {
       <section className="list-panel" aria-labelledby="event-list-heading">
         <div className="list-panel-header">
           <h2 id="event-list-heading" className="panel-title">
-            Violations
+            Events
           </h2>
           {total > 0 ? (
             <p className="muted list-range">
@@ -297,7 +292,7 @@ export default function EventsPage() {
             <p className="muted">
               {hasFilters
                 ? 'Widen the date range or clear filters.'
-                : 'Publish an audit policy, then run an agent that matches a rule.'}
+                : 'Process violations and network blocks from enrolled agents appear here.'}
             </p>
             <div className="empty-actions">
               {hasFilters ? (
@@ -345,7 +340,7 @@ export default function EventsPage() {
                       onSort={sort.toggleSort}
                     />
                     <SortableTh
-                      label="Process"
+                      label="Target"
                       columnKey="process_name"
                       sortKey={sort.sortKey}
                       sortDir={sort.sortDir}
@@ -375,7 +370,9 @@ export default function EventsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {events.map((e) => (
+                  {events.map((e) => {
+                    const secondary = eventTargetSecondary(e)
+                    return (
                     <tr key={e.id}>
                       <td
                         className="muted"
@@ -402,16 +399,14 @@ export default function EventsPage() {
                       </td>
                       <td>
                         <div className="cell-primary mono">
-                          {e.process_name || '—'}
+                          {eventTargetPrimary(e)}
                         </div>
-                        {e.process_path ? (
-                          <div className="muted mono">{e.process_path}</div>
+                        {secondary ? (
+                          <div className="muted mono">{secondary}</div>
                         ) : null}
                       </td>
                       <td>
-                        <div className="mono">
-                          {e.process_user_name || '—'}
-                        </div>
+                        <div className="mono">{eventUserDisplay(e)}</div>
                       </td>
                       <td>
                         <div className="mono">
@@ -429,7 +424,8 @@ export default function EventsPage() {
                       </td>
                       <td className="mono muted">{e.policy_mode || '—'}</td>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

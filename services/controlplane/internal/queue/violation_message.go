@@ -34,6 +34,13 @@ type ViolationMessage struct {
 
 	PolicyVersion int64  `json:"policy_version,omitempty"`
 	PolicyMode    string `json:"policy_mode,omitempty"`
+
+	NetworkDestType  string `json:"network_dest_type,omitempty"`
+	NetworkDestValue string `json:"network_dest_value,omitempty"`
+	NetworkDestIP    string `json:"network_dest_ip,omitempty"`
+	NetworkDestPort  *int   `json:"network_dest_port,omitempty"`
+	NetworkProtocol  string `json:"network_protocol,omitempty"`
+	NetworkDirection string `json:"network_direction,omitempty"`
 }
 
 func EncodeViolationValues(msg ViolationMessage) (map[string]any, error) {
@@ -41,9 +48,29 @@ func EncodeViolationValues(msg ViolationMessage) (map[string]any, error) {
 	msg.ClientEventID = strings.TrimSpace(msg.ClientEventID)
 	msg.EventType = strings.TrimSpace(msg.EventType)
 	msg.ProcessName = strings.TrimSpace(msg.ProcessName)
-	if msg.DeviceID == "" || msg.ClientEventID == "" || msg.EventType == "" || msg.ProcessName == "" {
-		return nil, fmt.Errorf("device_id, client_event_id, event_type, and process_name are required")
+	msg.NetworkDestType = strings.TrimSpace(msg.NetworkDestType)
+	msg.NetworkDestValue = strings.TrimSpace(msg.NetworkDestValue)
+	msg.NetworkDestIP = strings.TrimSpace(msg.NetworkDestIP)
+	msg.NetworkProtocol = strings.TrimSpace(msg.NetworkProtocol)
+	msg.NetworkDirection = strings.TrimSpace(msg.NetworkDirection)
+
+	if msg.DeviceID == "" || msg.ClientEventID == "" || msg.EventType == "" {
+		return nil, fmt.Errorf("device_id, client_event_id, and event_type are required")
 	}
+
+	switch msg.EventType {
+	case "violation_detected", "violation_blocked":
+		if msg.ProcessName == "" {
+			return nil, fmt.Errorf("process_name is required for %s, msg.EventType")
+		}
+	case "network_blocked":
+		if msg.NetworkDestValue == "" && msg.NetworkDestIP == "" {
+			return nil, fmt.Errorf("network dest_value or dest_ip is required for network_blocked")
+		}
+	default:
+		return nil, fmt.Errorf("unsupported event_type %q", msg.EventType)
+	}
+
 	if msg.OccurredAt == "" {
 		msg.OccurredAt = time.Now().UTC().Format(time.RFC3339)
 	}
