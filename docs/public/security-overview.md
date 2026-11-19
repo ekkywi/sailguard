@@ -32,6 +32,7 @@ SailGuard combines a privileged endpoint agent with a centralized policy control
 
 - Agents evaluate **structured policy rules** only (no arbitrary remote shell payloads)  
 - A **critical-process safety rail** prevents termination of essential operating-system processes even if policy is misconfigured  
+- Network destination deny includes a **control-plane safety allow** so agents do not lose API reachability when outbound denials are published  
 - Local agent state (credentials, policy cache, event queue) should be protected with OS ACLs appropriate to a privileged service  
 
 ### Data platform hardening

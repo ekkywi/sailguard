@@ -6,6 +6,7 @@ SailGuard is an on-premises platform for monitoring and controlling disallowed a
 
 - Detect and report use of applications that violate organizational policy
 - Enforce policy by preventing matched processes from remaining running (process termination model)
+- Optionally deny outbound connections to listed network destinations (IP, CIDR, or hostname) as defense-in-depth beside process control
 - Express policy with multiple match dimensions (executable name, path, hash, publisher, product metadata, and curated categories)
 - Assign policy at organization, group, and device scope, with time-bounded device exceptions
 - Operate fully self-hosted for environments that require data residency and network isolation
@@ -28,7 +29,7 @@ Agents evaluate policy locally so enforcement continues during brief control-pla
 
 | Component | Responsibility |
 |-----------|----------------|
-| **Agent** | Device enrollment (including reclaim by machine ID; refuses disabled reclaim), policy sync, process observation (Linux `/proc` with full name recovery when `comm` truncates; Windows Toolhelp + WMI watch with PID-diff fallback), audit/enforce Level 1 terminate, event submission with optional process owner; heartbeat carries static hardware inventory (CPU/RAM/disk/model), last resource sample (uptime/CPU%/RAM%/disk%), and primary LAN IP; durable offline violation queue (`events-queue.json`) flushed on reconnect; Windows **SailGuardAgent** service auto-start; Linux **sailguard-agent.service** via download ZIP `install.sh`; heartbeat timer separate from enforce path; logs and waits when the server reports `device_disabled` |
+| **Agent** | Device enrollment (including reclaim by machine ID; refuses disabled reclaim), process and **network** policy sync, process observation (Linux `/proc` with full name recovery when `comm` truncates; Windows Toolhelp + WMI watch with PID-diff fallback), audit/enforce Level 1 terminate, Windows outbound destination deny via OS filtering (IPv4 IP/CIDR/host) with `network_blocked` reporting, event submission with optional process owner; heartbeat carries static hardware inventory (CPU/RAM/disk/model), last resource sample (uptime/CPU%/RAM%/disk%), and primary LAN IP; durable offline event queue (`events-queue.json`) flushed on reconnect; Windows **SailGuardAgent** service auto-start; Linux **sailguard-agent.service** via download ZIP `install.sh`; heartbeat timer separate from enforce path; logs and waits when the server reports `device_disabled` |
 | **API** | Authentication (local admin login + Bearer tokens; device Bearer with reject when `status=disabled`), authorization, configuration APIs, agent-facing endpoints (heartbeat sync; violation batches enqueued to Redis), Windows agent package download |
 | **Worker** | Consumes Redis Stream `sg:events` and persists violation rows to PostgreSQL; on new inserts delivers optional webhook alerts; periodically purges aged `device_events` (retention job; related alert deliveries cascade) |
 | **Web console** | Administrative UI (local sign-in; overview; Devices and Groups with edit/delete/disable, device asset fields PIC/location/asset tag/notes, agent hardware/resources, Online/Stale connectivity, and primary IP; Tokens; Download agent install/update packages; Policies list/create/delete, rules, assign, publish; Categories; Users; Audit log with filter/export; Events with process user; Settings → Notifications webhook; toast feedback on key actions). Visual language: calm operational console — product mark + limited gold accent (nav active, enforce mode); factual labels/CTAs (not marketing copy) |
@@ -53,6 +54,8 @@ See [Policy model](policy-model.md) for semantics.
 SailGuard’s primary enforcement approach is **endpoint process control**: detect a matching process and terminate it when the device is in enforce mode.
 
 Detection uses a **layered path**: Windows prefers WMI process-creation events, falls back to Toolhelp PID-diff if WMI fails, and always runs a **periodic full scan** as reconciliation. Heartbeat and policy pull stay on a slower cadence so enforcement latency is not tied to telemetry intervals. (ETW remains an optional future refinement.)
+
+As a complementary path, administrators may publish **network destination policies** that deny outbound connections to listed IPv4 addresses, CIDR ranges, or hostnames (resolved to IPv4 at apply time). On Windows, the agent installs OS-native filters and reports `network_blocked` when a deny filter drops a connection. A safety allow for the control-plane URL keeps the agent reachable. Linux OS-level network deny is planned; until then network policy sync may cache without installing filters on non-Windows agents.
 
 Stronger OS-native application control mechanisms (for example publisher-based OS policy packs) may be evaluated as optional advanced capabilities without changing the control-plane model.
 

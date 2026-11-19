@@ -14,7 +14,7 @@ This document describes how SailGuard policies are expressed and how an endpoint
 
 ## Match dimensions
 
-Rules may match on:
+**Process policies** may match on:
 
 - Process / executable name  
 - Filesystem path (exact or prefix/contains operators as supported)  
@@ -22,6 +22,13 @@ Rules may match on:
 - Code-signing publisher  
 - Product name metadata  
 - Category (expanded server-side before agent sync)
+
+**Network destination policies** (separate policy objects) may deny outbound destinations by:
+
+- IPv4 address  
+- IPv4 CIDR range  
+- Hostname (resolved to IPv4 when the agent applies filters)  
+- Optional destination port (omit to match all ports)
 
 ## Scope and precedence
 
@@ -55,6 +62,10 @@ Administrators can switch a policy between `audit` and `enforce` (PATCH + publis
 **Cross-platform names:** Windows and Linux often use different process identities for the “same” app (for example `Calculator.exe` vs `gnome-calculator`). On Linux, prefer the real executable name or path when writing rules; the agent recovers full names when `/proc` `comm` truncates long names (15-character kernel limit).
 
 Device overrides are managed on the device detail page. They apply only to that endpoint, win over assigned policies, and drop out of the effective policy automatically when `expires_at` passes (rows are retained for history; the console lists active overrides by default). Allow overrides require a future expiry and a reason.
+
+## Network destination policies
+
+Administrators manage network policies in the console (list/detail) separately from process policies. Effective network rules are merged and published like process policy, then synchronized to agents. In **enforce** mode on Windows, the agent installs outbound deny filters and emits `network_blocked` when a connection to a listed destination is dropped. Agents keep a safety allow for the SailGuard control-plane URL so policy sync and telemetry are not cut off by a broad deny. Linux OS filter apply for network deny is not yet shipped; agents may still receive and cache the effective network document.
 
 ## Privacy posture
 
