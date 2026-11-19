@@ -12,12 +12,13 @@ import (
 func (e *windowsEnforcer) clearInstalledLocked() error {
 	if e.eng == 0 || len(e.installed) == 0 {
 		e.installed = nil
+		e.byFilterID = nil
 		return nil
 	}
 
 	var deleted int
 	for i := range e.installed {
-		key := e.installed[i]
+		key := e.installed[i].Key
 		r1, _, _ := procFwpmFilterDeleteByKey0.Call(
 			uintptr(e.eng),
 			uintptr(unsafe.Pointer(&key)),
@@ -30,5 +31,6 @@ func (e *windowsEnforcer) clearInstalledLocked() error {
 	}
 	log.Printf("network enforce: cleared %d SailGuard filter(s)", deleted)
 	e.installed = nil
+	e.byFilterID = nil
 	return nil
 }

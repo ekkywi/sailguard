@@ -14,10 +14,24 @@ import (
 // Closing the engine after each Apply would delete all filters immediately.
 var globalWindowsEnforcer = &windowsEnforcer{}
 
+type installedFilters struct {
+	Key       windows.GUID
+	FilterID  uint64
+	RuleID    string
+	DestType  string
+	DestValue string
+	Port      *int
+	Block     bool
+}
+
 type windowsEnforcer struct {
-	mu        sync.Mutex
-	eng       engineHandle
-	installed []windows.GUID
+	mu          sync.Mutex
+	eng         engineHandle
+	sessionKey  windows.GUID
+	installed   []installedFilters
+	byFilterID  map[uint64]installedFilters
+	netEvents   windows.Handle
+	netEventCtx *netEventContext
 }
 
 func New() Enforcer { return globalWindowsEnforcer }
@@ -26,7 +40,7 @@ func (e *windowsEnforcer) ensureEngine() error {
 	if e.eng != 0 {
 		return nil
 	}
-	h, err := openEngine()
+	h, sessionKey, err := openEngine()
 	if err != nil {
 		return err
 	}
@@ -39,6 +53,13 @@ func (e *windowsEnforcer) ensureEngine() error {
 		return err
 	}
 	e.eng = h
+	e.sessionKey = sessionKey
+
+	// Net-event subscribe is best-effort: never block filter apply.
+	if err := e.subscribeNetEventsLocked(); err != nil {
+		log.Printf("network enforce: net-event subscribe failed: %v (deny filters still apply)", err)
+	}
+
 	log.Printf("network enforce: WFP engine opened (dynamic session held)")
 	return nil
 }
@@ -80,11 +101,14 @@ func (e *windowsEnforcer) Clear(ctx context.Context) error {
 	log.Printf("network enforce: clear")
 	if e.eng == 0 {
 		e.installed = nil
+		e.byFilterID = nil
 		return nil
 	}
 	_ = e.clearInstalledLocked()
+	e.unsubscribeNetEventsLocked()
 	closeEngine(e.eng)
 	e.eng = 0
+	e.sessionKey = windows.GUID{}
 	log.Printf("network enforce: WFP engine closed")
 	return nil
 }

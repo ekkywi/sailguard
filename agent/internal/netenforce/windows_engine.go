@@ -84,19 +84,20 @@ func guidFromUUID(id uuid.UUID) windows.GUID {
 	return g
 }
 
-func openEngine() (engineHandle, error) {
+func openEngine() (engineHandle, windows.GUID, error) {
+	var zero windows.GUID
 	name, err := windows.UTF16PtrFromString(providerName + " session")
 	if err != nil {
-		return 0, err
+		return 0, zero, err
 	}
 	desc, err := windows.UTF16PtrFromString(providerDesc)
 	if err != nil {
-		return 0, err
+		return 0, zero, err
 	}
 
 	session := fwpmSession0{
 		DisplayData: fwpmDisplayData0{Name: name, Description: desc},
-		Flags: fwpmSessionFlagDynamic,
+		Flags:       fwpmSessionFlagDynamic,
 	}
 
 	var h windows.Handle
@@ -108,9 +109,10 @@ func openEngine() (engineHandle, error) {
 		uintptr(unsafe.Pointer(&h)),
 	)
 	if r1 != 0 {
-		return 0, fmt.Errorf("FwpmEngineOpen0: 0x%X (need admin/service?)", r1)
+		return 0, zero, fmt.Errorf("FwpmEngineOpen0: 0x%X (need admin/service?)", r1)
 	}
-	return engineHandle(h), nil
+	// BFE fills SessionKey when input was GUID_NULL.
+	return engineHandle(h), session.SessionKey, nil
 }
 
 func closeEngine(h engineHandle) {

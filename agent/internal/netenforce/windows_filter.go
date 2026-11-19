@@ -208,7 +208,26 @@ func (e *windowsEnforcer) addFilterLocked(
 	if r1 != 0 {
 		return fmt.Errorf("FwpmFilterAdd0 %s: 0x%X", name, r1)
 	}
-	e.installed = append(e.installed, key)
+
+	rec := installedFilters{
+		Key:       key,
+		FilterID:  filterID,
+		RuleID:    ruleID,
+		DestType:  destType,
+		DestValue: destValue,
+		Port:      port,
+		Block:     block,
+	}
+	e.installed = append(e.installed, rec)
+	if e.byFilterID == nil {
+		e.byFilterID = make(map[uint64]installedFilters)
+	}
+	e.byFilterID[filterID] = rec
+
+	log.Printf(
+		"network enforce: filter id=%d rule=%s block=%v dest=%s/%s",
+		filterID, ruleID, block, destType, destValue,
+	)
 	return nil
 }
 
