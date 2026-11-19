@@ -25,3 +25,5 @@ func (stubEnforcer) Clear(ctx context.Context) error {
 	log.Printf("network enforce stub: clear (no-op)")
 	return nil
 }
+
+func (stubEnforcer) OnDrop(fn func(DropInfo)) { _ = fn }

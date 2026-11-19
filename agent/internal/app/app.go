@@ -89,6 +89,16 @@ func Run(ctx context.Context, cfg config.Config, h host.Host) error {
 
 		recent := &recentSet{}
 
+		dropCh := make(chan netenforce.DropInfo, 64)
+		netenforce.New().OnDrop(func(d netenforce.DropInfo) {
+			select {
+			case dropCh <- d:
+			default:
+				// Drop overflow — never block the WFP callback thread.
+			}
+		})
+		go consumeNetworkDrops(ctx, dropCh, client, cred, dataDir, recent, cfg, h, hostname, machineID, osVersion)
+
 		syncPolicy(ctx, client, cred, dataDir, cfg, h, hostname, machineID, osVersion)
 		syncNetworkPolicy(ctx, client, cred, dataDir, cfg, h, hostname, machineID, osVersion)
 		flushQueuedEvents(ctx, client, cred, dataDir, cfg, h, hostname, machineID, osVersion)
@@ -423,6 +433,79 @@ func syncNetworkPolicy(
 	networkAppliedHash = ""
 	networkEnforceMu.Unlock()
 	scheduleNetworkEnforce(ctx, cfg, serverURL, doc)
+}
+
+func consumeNetworkDrops(
+	ctx context.Context,
+	dropCh <-chan netenforce.DropInfo,
+	client *controlplane.Client,
+	cred *credstore.Credential,
+	dataDir string,
+	recent *recentSet,
+	cfg config.Config,
+	h host.Host,
+	hostname, machineID, osVersion string,
+) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case d := <-dropCh:
+			dedupe := fmt.Sprintf("nb:%s:%s:%d:%d", d.RuleID, d.DestIP, d.DestPort, d.Protocol)
+			if recent.seenRecently(dedupe, 45*time.Second) {
+				continue
+			}
+			ev := networkBlockedEvent(d)
+			flushEvents(ctx, client, cred, dataDir, []agentcontract.Event{ev}, "network drop", cfg, h, hostname, machineID, osVersion)
+		}
+	}
+}
+
+func networkBlockedEvent(d netenforce.DropInfo) agentcontract.Event {
+	now := time.Now().UTC().Format(time.RFC3339)
+	var portPtr *int
+	if d.DestPort > 0 {
+		p := d.DestPort
+		portPtr = &p
+	}
+	dedupe := fmt.Sprintf("nb:%s:%s:%d:%d", d.RuleID, d.DestIP, d.DestPort, d.Protocol)
+	return agentcontract.Event{
+		ClientEventID: fmt.Sprintf("nb-%d", time.Now().UnixNano()),
+		EventType:     agentcontract.EventNetworkBlocked,
+		OccurredAt:    now,
+		DedupeKey:     dedupe,
+		Match: &agentcontract.MatchInfo{
+			RuleID:   d.RuleID,
+			Action:   "deny",
+			RuleType: d.DestType,
+			Value:    d.DestValue,
+		},
+		Network: &agentcontract.NetworkDest{
+			DestType:  d.DestType,
+			DestValue: d.DestValue,
+			DestIP:    d.DestIP,
+			DestPort:  portPtr,
+			Protocol:  ipProtoName(d.Protocol),
+			Direction: "out",
+		},
+		Enforcement: &agentcontract.Enforcement{
+			Result:   "blocked",
+			Attempts: 1,
+		},
+	}
+}
+
+func ipProtoName(p uint8) string {
+	switch p {
+	case 6:
+		return "tcp"
+	case 17:
+		return "udp"
+	case 1:
+		return "icmp"
+	default:
+		return fmt.Sprintf("%d", p)
+	}
 }
 
 func scheduleNetworkEnforce(ctx context.Context, cfg config.Config, serverURL string, doc networkpolicycache.Document) {

@@ -32,6 +32,7 @@ type windowsEnforcer struct {
 	byFilterID  map[uint64]installedFilters
 	netEvents   windows.Handle
 	netEventCtx *netEventContext
+	onDrop      func(DropInfo)
 }
 
 func New() Enforcer { return globalWindowsEnforcer }
@@ -111,4 +112,10 @@ func (e *windowsEnforcer) Clear(ctx context.Context) error {
 	e.sessionKey = windows.GUID{}
 	log.Printf("network enforce: WFP engine closed")
 	return nil
+}
+
+func (e *windowsEnforcer) OnDrop(fn func(DropInfo)) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.onDrop = fn
 }

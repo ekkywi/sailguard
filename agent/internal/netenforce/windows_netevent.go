@@ -96,6 +96,7 @@ func netEventCallback(ctx uintptr, event uintptr) uintptr {
 		return 0
 	}
 	rec, ok := e.byFilterID[filterID]
+	fn := e.onDrop
 	e.mu.Unlock()
 
 	remote := remoteIPv4(&ev.Header)
@@ -107,11 +108,22 @@ func netEventCallback(ctx uintptr, event uintptr) uintptr {
 		return 0
 	}
 
+	info := DropInfo{
+		RuleID:    rec.RuleID,
+		DestType:  rec.DestType,
+		DestValue: rec.DestValue,
+		DestIP:    remote,
+		DestPort:  int(ev.Header.RemotePort),
+		Protocol:  ev.Header.IPProtocol,
+	}
 	log.Printf(
 		"network enforce: drop filterID=%d rule=%s dest=%s/%s remote=%s:%d proto=%d",
-		filterID, rec.RuleID, rec.DestType, rec.DestValue,
-		remote, ev.Header.RemotePort, ev.Header.IPProtocol,
+		filterID, info.RuleID, info.DestType, info.DestValue,
+		info.DestIP, info.DestPort, info.Protocol,
 	)
+	if fn != nil {
+		fn(info) // non-blocking: app uses buffered channel + default drop
+	}
 	return 0
 }
 

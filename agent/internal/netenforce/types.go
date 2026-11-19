@@ -18,3 +18,11 @@ type Rule struct {
 	Source    string
 }
 
+type DropInfo struct {
+	RuleID    string
+	DestType  string
+	DestValue string
+	DestIP    string
+	DestPort  int
+	Protocol  uint8
+}
