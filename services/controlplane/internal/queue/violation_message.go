@@ -61,7 +61,7 @@ func EncodeViolationValues(msg ViolationMessage) (map[string]any, error) {
 	switch msg.EventType {
 	case "violation_detected", "violation_blocked":
 		if msg.ProcessName == "" {
-			return nil, fmt.Errorf("process_name is required for %s, msg.EventType")
+			return nil, fmt.Errorf("process_name is required for %s", msg.EventType)
 		}
 	case "network_blocked":
 		if msg.NetworkDestValue == "" && msg.NetworkDestIP == "" {
