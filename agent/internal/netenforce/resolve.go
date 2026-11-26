@@ -6,6 +6,8 @@ import (
 	"net"
 )
 
+var lookupIP = net.LookupIP
+
 func expandHosts(spec Spec) Spec {
 	out := spec
 	out.SafetyAllow = expandRuleList(spec.SafetyAllow, "safety")
@@ -23,7 +25,7 @@ func expandRuleList(in []Rule, kind string) []Rule {
 			out = append(out, r)
 			continue
 		}
-		ips, err := resolveHostIPv4(r.DestValue)
+		ips, err := defaultHostResolver.ips(r.DestValue)
 		if err != nil {
 			log.Printf("network enforce: resolve %s %q failed: %v — skip", kind, r.DestValue, err)
 			continue
@@ -53,7 +55,7 @@ func expandRuleList(in []Rule, kind string) []Rule {
 }
 
 func resolveHostIPv4(host string) ([]string, error) {
-	addrs, err := net.LookupIP(host)
+	addrs, err := lookupIP(host)
 	if err != nil {
 		return nil, err
 	}

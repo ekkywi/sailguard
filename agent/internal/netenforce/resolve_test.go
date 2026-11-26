@@ -1,6 +1,9 @@
 package netenforce
 
-import "testing"
+import (
+	"net"
+	"testing"
+)
 
 func TestExpandHostsKeepsIPAndCIDR(t *testing.T) {
 	t.Parallel()
@@ -37,5 +40,25 @@ func TestExpandHostsResolvesLocalhost(t *testing.T) {
 		if r.Action != "deny" {
 			t.Fatalf("action changed: %s", r.Action)
 		}
+	}
+}
+
+func TestExpandHostsUsesLookup(t *testing.T) {
+	old := lookupIP
+	lookupIP = func(string) ([]net.IP, error) {
+		return []net.IP{net.ParseIP("203.0.113.10"), net.ParseIP("203.0.113.11")}, nil
+	}
+	defer func() { lookupIP = old }()
+
+	spec := Spec{Rules: []Rule{
+		{ID: "h1", Action: "deny", DestType: "host", DestValue: "example.test"},
+	}}
+	out := expandHosts(spec)
+
+	if len(out.Rules) != 2 {
+		t.Fatalf("want 2 rules, got %d", len(out.Rules))
+	}
+	if out.Rules[0].DestValue != "203.0.113.10" || out.Rules[1].DestValue != "203.0.113.11" {
+		t.Fatalf("unexpected IPs: %+v", out.Rules)
 	}
 }

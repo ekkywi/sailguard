@@ -101,6 +101,13 @@ func Run(ctx context.Context, cfg config.Config, h host.Host) error {
 
 		syncPolicy(ctx, client, cred, dataDir, cfg, h, hostname, machineID, osVersion)
 		syncNetworkPolicy(ctx, client, cred, dataDir, cfg, h, hostname, machineID, osVersion)
+
+		serverURL := cfg.ServerURL
+		if cred.ServerURL != "" {
+			serverURL = cred.ServerURL
+		}
+		go networkRefreshLoop(ctx, cfg, dataDir, serverURL)
+		
 		flushQueuedEvents(ctx, client, cred, dataDir, cfg, h, hostname, machineID, osVersion)
 		scanAndReport(ctx, client, cred, h, dataDir, recent, cfg, hostname, machineID, osVersion)
 		sendHeartbeat(ctx, client, cred, cfg, h, dataDir, hostname, machineID, osVersion)
